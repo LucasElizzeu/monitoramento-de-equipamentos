@@ -106,7 +106,7 @@ A leitura óptica usa rótulos RX/TX ou o cabeçalho da tabela quando disponíve
 
 O painel mostra descrição, link, RX/TX, horário da leitura e a saída original. Formatos desconhecidos ficam como **Não identificado**. Se a consulta SSH falhar, leituras anteriores não são exibidas como atuais. Uma porta inicialmente Down gera um evento; novas consultas Down não duplicam o alerta; a volta para Up registra recuperação.
 
-Cada cartão também mostra a **banda L1 de entrada (RX) e saída (TX)** e, abaixo, a banda L2 quando disponível. A consulta `show interface utilization` é feita uma vez por equipamento, junto das consultas SSH a cada 30 segundos. Os valores são exibidos em bps, Kbps, Mbps ou Gbps, conforme a escala. O parser reconhece o formato fornecido:
+Cada cartão mostra **Consumo na porta**, com apenas a banda de entrada **RX em L1**. A consulta `show interface utilization` é feita uma vez por equipamento, junto das consultas SSH a cada 30 segundos. Os valores são exibidos em bps, Kbps, Mbps ou Gbps, conforme a escala. O parser reconhece o formato fornecido:
 
 ```text
                              L1 RX      L1 TX      L2 RX      L2 TX
@@ -115,7 +115,7 @@ INTERFACE NAME               BANDWIDTH  BANDWIDTH  BANDWIDTH  BANDWIDTH
 ten-gigabit-ethernet-1/1/11  2.5Gbps    162.1Mbps  2.4Gbps    151.4Mbps
 ```
 
-Essa linha mostra **2,5 Gbps RX / 162,1 Mbps TX em L1** e **2,4 Gbps RX / 151,4 Mbps TX em L2**. São as taxas reportadas pelo equipamento na consulta; o painel não calcula médias adicionais nem mantém histórico de banda nesta versão. Tipo e número da porta são respeitados, inclusive no modo Gigabit + Ten. Valores ausentes ou formatos desconhecidos aparecem como `—`; zero só aparece quando informado pelo equipamento. A saída de utilização também está em **Ver saída do equipamento → Copiar saída**.
+Para essa linha, **Consumo na porta** exibe **2,5 Gbps**, correspondente ao RX em L1. TX e L2 permanecem apenas na saída original para diagnóstico. São as taxas reportadas pelo equipamento na consulta; o painel não calcula médias adicionais nem mantém histórico de banda nesta versão. Tipo e número da porta são respeitados, inclusive no modo Gigabit + Ten. Valores ausentes ou formatos desconhecidos aparecem como `—`; zero só aparece quando informado pelo equipamento. A saída de utilização também está em **Ver saída do equipamento → Copiar saída**.
 
 O comando de banda é adicionado automaticamente aos cadastros existentes, preservando senhas, posições e nomes. Se ele for recusado ou sua consulta falhar, o cartão informa o problema e mantém o monitoramento de link e sinais. Em **Editar → Comandos do equipamento → Consultar utilização de banda**, ajuste a consulta geral ou deixe o campo vazio para desativar apenas a banda. Essa consulta não aceita `{port}`.
 

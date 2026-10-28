@@ -90,8 +90,8 @@ function bandwidth(value){
 }
 function utilizationHTML(p){
  if(p.utilization_enabled===false)return '';
- const note=p.utilization_error||(p.rx_bps==null&&p.tx_bps==null&&p.rx_percent==null&&p.tx_percent==null?'Banda não informada ou formato não reconhecido.':'');
- return `<div class="port-traffic"><div class="traffic-heading">BANDA · L1</div><div class="traffic-values"><span>RX · ENTRADA<strong>${bandwidth(p.rx_bps)}</strong>${p.rx_percent!=null?`<small>${number(p.rx_percent,2)}%</small>`:''}</span><span>TX · SAÍDA<strong>${bandwidth(p.tx_bps)}</strong>${p.tx_percent!=null?`<small>${number(p.tx_percent,2)}%</small>`:''}</span></div>${p.l2_rx_bps!=null||p.l2_tx_bps!=null?`<div class="traffic-l2"><span>L2 RX ${bandwidth(p.l2_rx_bps)}</span><span>L2 TX ${bandwidth(p.l2_tx_bps)}</span></div>`:''}${note?`<p class="signal-note">${esc(note)}</p>`:''}</div>`;
+ const note=p.utilization_error||(p.rx_bps==null&&p.rx_percent==null?'Consumo não informado ou formato não reconhecido.':'');
+ return `<div class="port-traffic"><div class="traffic-heading">Consumo na porta</div><div class="traffic-values"><span><strong>${bandwidth(p.rx_bps)}</strong>${p.rx_percent!=null?`<small>${number(p.rx_percent,2)}%</small>`:''}</span></div>${note?`<p class="signal-note">${esc(note)}</p>`:''}</div>`;
 }
 function portsHTML(d){if(d.ssh_error)return `<p class="ssh-warning">${icon('warning')} ${esc(d.ssh_error)} As leituras anteriores não são exibidas como atuais.</p>${sshDiagnosticHTML(d)}`;
  if(!d.port_data.length)return '<p class="muted">Aguardando a primeira consulta SSH. Intervalo: 30 segundos.</p>';
