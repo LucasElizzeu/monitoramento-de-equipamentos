@@ -30,13 +30,25 @@ function ago(date){if(!date)return 'Aguardando';const seconds=Math.max(0,Math.fl
 function toast(message){$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('#toast').hidden=true,4500);}
 async function api(path,options){const response=await fetch(path,options);if(!response.ok){let message='Não foi possível concluir a solicitação.';try{const result=await response.json();message=Array.isArray(result.detail)?result.detail.map(e=>e.msg.replace('Value error, ','')).join(' '):result.detail||message;}catch{}throw new Error(message);}return response.status===204?null:response.json();}
 async function load(){if(state.loading)return;state.loading=true;try{state.data=await api(`/api/dashboard?demo=${state.demo}`);$('#connection-error').hidden=true;render();}catch(error){$('#connection-error').textContent='Conexão com o monitor interrompida. Os dados podem estar desatualizados. Tentaremos novamente automaticamente.';$('#connection-error').hidden=false;}finally{state.loading=false;}}
-function renderMetrics(){const d=state.data.devices;const online=d.filter(x=>x.state==='online').length;const offline=d.filter(x=>x.state==='offline').length;const downPorts=d.flatMap(x=>x.port_data).filter(x=>x.state==='down').length;
- const cards=[['Equipamentos monitorados',d.length,'server','',`${d.filter(x=>x.kind==='datacom').length} Datacom`,`${d.filter(x=>x.kind==='ping').length} somente ping`],['Equipamentos online',online,'wifi','green',d.length?`${Math.round(online/d.length*100)}% da rede`:'Aguardando cadastro','Respondendo ao ping'],['Equipamentos sem ping',offline,'warning','red','Mais de 20 perdas','consecutivas'],['Portas inativas',downPorts,'ports','amber',`${d.flatMap(x=>x.port_data).length} portas consultadas`,'via SSH']];
+function pageDevices(){
+ const kind=state.page==='bbus'?'ping':state.page==='datacoms'?'datacom':null;
+ return kind?state.data.devices.filter(d=>d.kind===kind):state.data.devices;
+}
+function renderMetrics(){const d=pageDevices();const online=d.filter(x=>x.state==='online').length;const offline=d.filter(x=>x.state==='offline').length;const downPorts=d.flatMap(x=>x.port_data).filter(x=>x.state==='down').length;
+ const cards=[[state.page==='bbus'?"BBU's monitoradas":state.page==='datacoms'?'Datacoms monitorados':'Equipamentos monitorados',d.length,'server','',`${d.filter(x=>x.kind==='datacom').length} Datacoms`,`${d.filter(x=>x.kind==='ping').length} BBU's`],['Equipamentos online',online,'wifi','green',d.length?`${Math.round(online/d.length*100)}% da rede`:'Aguardando cadastro','Respondendo ao ping'],['Equipamentos sem ping',offline,'warning','red','Mais de 20 perdas','consecutivas'],['Portas inativas',downPorts,'ports','amber',`${d.flatMap(x=>x.port_data).length} portas consultadas`,'via SSH']];
+ if(state.page==='bbus'){
+  cards[0].splice(4,2,'Monitoramento por ping','ICMP');
+  cards[1][0]="BBU's online";cards[2][0]="BBU's sem ping";
+  cards[3]=["BBU's instáveis",d.filter(x=>x.state==='unstable').length,'activity','amber','De 1 a 20 perdas','consecutivas'];
+ }else if(state.page==='datacoms'){
+  cards[0].splice(4,2,'Monitoramento SSH','ping e portas');
+  cards[1][0]='Datacoms online';cards[2][0]='Datacoms sem ping';
+ }
  $('#metrics').innerHTML=cards.map(([title,value,i,color,a,b])=>`<article class="metric-card ${color}"><div class="metric-title">${title}<span class="metric-icon">${icon(i)}</span></div><div class="metric-value">${value.toString().padStart(2,'0')}</div><div class="metric-bottom"><strong>${a}</strong><span>· ${b}</span></div></article>`).join('');
  const errors=d.filter(x=>x.state==='error'||x.ssh_error).length;const unstable=d.filter(x=>x.state==='unstable').length;
  $('#network-status').textContent=!d.length?'Sua rede começa aqui':errors?'Há erros de coleta':offline||downPorts?'Sua rede precisa de atenção':unstable?'Há equipamentos com perda de ping':'Sua rede está operando normalmente';
  $('#network-subtitle').textContent=!d.length?'Cadastre um equipamento para começar':`${d.length} equipamentos acompanhados`;
- $('#nav-count').textContent=d.length;$('#alert-dot').hidden=!state.data.alerts.some(a=>a.level==='critical');
+ $('#bbu-count').textContent=state.data.devices.filter(x=>x.kind==='ping').length;$('#datacom-count').textContent=state.data.devices.filter(x=>x.kind==='datacom').length;$('#alert-dot').hidden=!state.data.alerts.some(a=>a.level==='critical');
 }
 function chart(samples, target){
  const buckets=new Map();for(const s of samples){const key=Math.floor(new Date(s.at).getTime()/5000)*5000;const item=buckets.get(key)||{sum:0,n:0};if(s.success&&s.latency!=null){item.sum+=s.latency;item.n++;}buckets.set(key,item);}
@@ -52,9 +64,10 @@ function chart(samples, target){
 }
 function eventHTML(event){const i=event.level==='success'?'check':'warning';return `<div class="event-item"><span class="event-icon ${esc(event.level)}">${icon(i)}</span><div class="event-body"><strong>${esc(event.message)}</strong><p>${esc(event.device_name)}</p></div><span class="event-time" title="${esc(new Date(event.at).toLocaleString('pt-BR'))}">${ago(event.at)}</span></div>`;}
 function empty(title,description,action=false){return `<div class="empty-state">${icon('activity')}<h3>${title}</h3><p>${description}</p>${action?'<button class="button primary" data-action="add">Adicionar equipamento</button>':''}</div>`;}
-function renderDevices(){const q=$('#search').value.toLowerCase();const filter=$('#state-filter').value;const all=state.data.devices;const devices=all.filter(d=>(d.name.toLowerCase().includes(q)||d.host.includes(q))&&(filter==='all'||d.state===filter));
+function renderDevices(){const q=$('#search').value.toLowerCase();const filter=$('#state-filter').value;const all=pageDevices();const devices=all.filter(d=>(d.name.toLowerCase().includes(q)||d.host.includes(q))&&(filter==='all'||d.state===filter));
+ $('#table-title').textContent=state.page==='bbus'?"BBU's":state.page==='datacoms'?'Datacoms':'Equipamentos';$('#table-description').textContent=state.page==='bbus'?"Disponibilidade e latência das suas BBU's.":state.page==='datacoms'?'Disponibilidade dos Datacoms. Consulte portas e sinais abaixo.':'Acompanhe a disponibilidade de cada ponto da rede.';
  $('#table-count').textContent=all.length;$('#table-summary').textContent=`Exibindo ${devices.length} de ${all.length} equipamentos`;
- $('#device-rows').innerHTML=devices.length?devices.map(d=>`<tr><td><div class="device-cell"><span class="device-icon">${icon(d.kind==='datacom'?'ports':'server')}</span><div><strong>${esc(d.name)}</strong><small>${d.kind==='datacom'?'DATACOM · SSH':'MONITORAMENTO ICMP'}</small></div></div></td><td class="ip">${esc(d.host)}</td><td>${badge(d.state)}</td><td class="latency">${d.latency!=null?`<span class="tiny-bars">▂▄▆</span>${number(d.latency)} <small>ms</small>`:'—'}</td><td><span class="loss-value ${d.failures>20?'critical':''}"><span class="loss-track"><i style="width:${Math.min(d.failures/21*100,100)}%"></i></span>${d.failures}<span class="muted">/ 21</span></span></td><td>${ago(d.last_check)}</td><td><div class="device-actions"><button class="icon-button" data-detail="${d.id}" title="Ver detalhes" aria-label="Ver detalhes de ${esc(d.name)}">${icon('arrow')}</button><button class="icon-button" data-remove="${d.id}" title="Remover equipamento" aria-label="Remover ${esc(d.name)}">${icon('trash')}</button></div></td></tr>`).join(''):`<tr><td colspan="7">${empty(all.length?'Nenhum resultado encontrado':'Sua rede, em um só lugar',all.length?'Tente outro nome, IP ou filtro.':'Adicione seu primeiro equipamento ou explore a demonstração para conhecer o painel.',!all.length)}</td></tr>`;
+ $('#device-rows').innerHTML=devices.length?devices.map(d=>`<tr><td><div class="device-cell"><span class="device-icon">${icon(d.kind==='datacom'?'ports':'server')}</span><div><strong>${esc(d.name)}</strong><small>${d.kind==='datacom'?'DATACOM · SSH':"BBU · PING ICMP"}</small></div></div></td><td class="ip">${esc(d.host)}</td><td>${badge(d.state)}</td><td class="latency">${d.latency!=null?`<span class="tiny-bars">▂▄▆</span>${number(d.latency)} <small>ms</small>`:'—'}</td><td><span class="loss-value ${d.failures>20?'critical':''}"><span class="loss-track"><i style="width:${Math.min(d.failures/21*100,100)}%"></i></span>${d.failures}<span class="muted">/ 21</span></span></td><td>${ago(d.last_check)}</td><td><div class="device-actions"><button class="icon-button" data-detail="${d.id}" title="Ver detalhes" aria-label="Ver detalhes de ${esc(d.name)}">${icon('arrow')}</button><button class="icon-button" data-remove="${d.id}" title="Remover equipamento" aria-label="Remover ${esc(d.name)}">${icon('trash')}</button></div></td></tr>`).join(''):`<tr><td colspan="7">${empty(all.length?'Nenhum resultado encontrado':state.page==='bbus'?"Cadastre sua primeira BBU":state.page==='datacoms'?'Conecte seu primeiro Datacom':'Sua rede, em um só lugar',all.length?'Tente outro nome, IP ou filtro.':state.page==='bbus'?"Adicione uma BBU para acompanhar ping, latência e perdas consecutivas.":state.page==='datacoms'?'Adicione um Datacom para acompanhar disponibilidade, portas e sinais ópticos.':'Adicione seu primeiro equipamento ou explore a demonstração para conhecer o painel.',!all.length)}</td></tr>`;
 }
 function portsHTML(d){if(d.ssh_error)return `<p class="ssh-warning">${icon('warning')} ${esc(d.ssh_error)} As leituras anteriores não são exibidas como atuais.</p>`;
  if(!d.port_data.length)return '<p class="muted">Aguardando a primeira consulta SSH. Intervalo: 30 segundos.</p>';
@@ -66,18 +79,42 @@ function render(){const {devices,alerts,samples}=state.data;$('#demo-banner').hi
  const datacoms=devices.filter(d=>d.kind==='datacom');$('#ports-content').innerHTML=datacoms.length?datacoms.map(d=>`<div class="port-device"><h3>${esc(d.name)}</h3><p>${esc(d.host)} · ${d.ports.length||d.port_data.length} portas · ${d.ports.length?'seleção manual':'detecção automática'}</p>${portsHTML(d)}</div>`).join(''):empty('Conecte seu primeiro Datacom','Cadastre uma conexão SSH para acompanhar portas e sinais ópticos.',true);
  if(state.selected&&$('#detail-dialog').open){if(state.demo){state.detailSamples=samples.filter(s=>s.device_id===state.selected);renderDetail();}else{const selected=state.selected;api(`/api/devices/${selected}/history`).then(history=>{if(state.selected===selected){state.detailSamples=history;renderDetail();}}).catch(()=>{});}}
 }
-const pages={overview:['Visão geral','Tudo conectado. Tudo sob controle.'],devices:['Equipamentos','Disponibilidade e latência de cada ponto da sua rede.'],ports:['Portas & sinais','Acompanhe suas interfaces e a potência dos links ópticos.'],alerts:['Eventos','Cada mudança na rede, registrada em um só lugar.']};
-function navigate(page){state.page=page;document.querySelectorAll('[data-page]').forEach(e=>e.classList.toggle('active',e.dataset.page===page));$('#page-title').textContent=pages[page][0];$('#breadcrumb').textContent=pages[page][0];$('#page-description').textContent=pages[page][1];$('#overview-charts').hidden=page!=='overview';$('#devices-section').hidden=!['overview','devices'].includes(page);$('#ports-section').hidden=page!=='ports';$('#alerts-section').hidden=page!=='alerts';}
+const pages={overview:['Visão geral','Tudo conectado. Tudo sob controle.'],bbus:["BBU's","Monitore o ping, a latência e as perdas das suas BBU's."],datacoms:['Datacoms','Disponibilidade, portas e sinais ópticos dos seus Datacoms.'],alerts:['Eventos','Cada mudança na rede, registrada em um só lugar.']};
+function navigate(page){
+ state.page=page;
+ document.querySelectorAll('[data-page]').forEach(e=>{
+  e.classList.toggle('active',e.dataset.page===page);
+  if(e.dataset.page===page)e.setAttribute('aria-current','page');else e.removeAttribute('aria-current');
+ });
+ $('#page-title').textContent=pages[page][0];$('#breadcrumb').textContent=pages[page][0];$('#page-description').textContent=pages[page][1];
+ $('#add-device-label').textContent=page==='bbus'?'Adicionar BBU':page==='datacoms'?'Adicionar Datacom':'Adicionar equipamento';
+ $('#overview-charts').hidden=page!=='overview';
+ $('#devices-section').hidden=!['overview','bbus','datacoms'].includes(page);
+ $('#ports-section').hidden=page!=='datacoms';$('#alerts-section').hidden=page!=='alerts';
+ $('#search').value='';$('#state-filter').value='all';
+ render();
+}
 function toggleDemo(value){state.demo=value;state.selected=null;localStorage.setItem('nexo-demo',String(value));load();}
-function openAdd(){$('#device-form').reset();for(const name of ['username','password','fingerprint'])$(`[name="${name}"]`).required=false;$('#ssh-fields').hidden=true;$('#form-error').hidden=true;$('#device-dialog').showModal();}
+function syncDeviceKind(){
+ const ssh=$('[name="kind"]:checked').value==='datacom';
+ $('#ssh-fields').hidden=!ssh;
+ for(const name of ['username','password','fingerprint'])$(`[name="${name}"]`).required=ssh;
+ $('#device-dialog-title').textContent=ssh?'Adicionar Datacom':'Adicionar BBU';
+ $('[name="name"]').placeholder=ssh?'Ex.: Datacom • Core principal':'Ex.: BBU • Torre central';
+}
+function openAdd(){
+ $('#device-form').reset();
+ $(`[name="kind"][value="${state.page==='datacoms'?'datacom':'ping'}"]`).checked=true;
+ syncDeviceKind();$('#form-error').hidden=true;$('#device-dialog').showModal();
+}
 function renderDetail(){const d=state.data.devices.find(d=>d.id===state.selected);if(!d){$('#detail-dialog').close();state.selected=null;return;}
  const opened=[...$('#detail-content').querySelectorAll('details')].map(e=>e.open);
  $('#detail-content').innerHTML=`<div class="dialog-heading"><div><div class="eyebrow">${d.kind==='datacom'?'DATACOM · SSH + ICMP':'MONITORAMENTO ICMP'}</div><h2>${esc(d.name)}</h2></div><button class="icon-button" data-close-detail aria-label="Fechar">${icon('close')}</button></div><p class="dialog-description">${esc(d.host)} · Intervalo ${d.interval}s ${state.demo?'· Demonstração':''}</p><div class="detail-summary"><div class="detail-stat">Disponibilidade<strong>${badge(d.state)}</strong></div><div class="detail-stat">Latência<strong>${number(d.latency)} <small>ms</small></strong></div><div class="detail-stat">Perdas consecutivas<strong>${d.failures} <small>/ 21</small></strong></div></div>${d.state==='error'?'<p class="ssh-warning">O servidor não conseguiu executar o ping. Verifique permissões ICMP e acesso de rede. Este erro não é contado como perda.</p>':''}<h2>Histórico de ping</h2><div class="chart-container detail-chart" id="detail-chart"></div>${d.kind==='datacom'?`<div class="section-divider">PORTAS E SINAIS ÓPTICOS</div>${portsHTML(d)}`:''}`;
  $('#detail-content').querySelectorAll('details').forEach((e,i)=>e.open=Boolean(opened[i]));chart(state.detailSamples||[], $('#detail-chart'));
 }
 async function openDetail(id){state.selected=id;state.detailSamples=[];renderDetail();$('#detail-dialog').showModal();try{state.detailSamples=state.demo?state.data.samples.filter(s=>s.device_id===id):await api(`/api/devices/${id}/history`);if(state.selected===id)renderDetail();}catch(e){toast(e.message);}}
-$('#device-form').addEventListener('submit',async event=>{event.preventDefault();const form=new FormData(event.target);const d=Object.fromEntries(form);d.interval=Number(d.interval);d.ssh_port=Number(d.ssh_port);d.ports=d.ports.split(',').map(p=>p.trim()).filter(Boolean);$('#save-device').disabled=true;$('#form-error').hidden=true;try{await api('/api/devices',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});$('#device-dialog').close();state.demo=false;localStorage.setItem('nexo-demo','false');toast('É isso! Equipamento adicionado à sua rede.');await load();}catch(e){$('#form-error').textContent=e.message;$('#form-error').hidden=false;}finally{$('#save-device').disabled=false;}});
-document.querySelectorAll('[name="kind"]').forEach(el=>el.addEventListener('change',()=>{const ssh=$('[name="kind"]:checked').value==='datacom';$('#ssh-fields').hidden=!ssh;for(const name of ['username','password','fingerprint'])$(`[name="${name}"]`).required=ssh;}));
+$('#device-form').addEventListener('submit',async event=>{event.preventDefault();const form=new FormData(event.target);const d=Object.fromEntries(form);d.interval=Number(d.interval);d.ssh_port=Number(d.ssh_port);d.ports=d.ports.split(',').map(p=>p.trim()).filter(Boolean);$('#save-device').disabled=true;$('#form-error').hidden=true;try{await api('/api/devices',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});$('#device-dialog').close();state.demo=false;localStorage.setItem('nexo-demo','false');navigate(d.kind==='datacom'?'datacoms':'bbus');toast('É isso! Equipamento adicionado à sua rede.');await load();}catch(e){$('#form-error').textContent=e.message;$('#form-error').hidden=false;}finally{$('#save-device').disabled=false;}});
+document.querySelectorAll('[name="kind"]').forEach(el=>el.addEventListener('change',syncDeviceKind));
 document.querySelectorAll('[data-page]').forEach(e=>e.addEventListener('click',()=>navigate(e.dataset.page)));
 $('#all-events').addEventListener('click',()=>navigate('alerts'));
 $('#add-device').addEventListener('click',openAdd);

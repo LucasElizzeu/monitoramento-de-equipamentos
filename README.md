@@ -16,6 +16,15 @@ Abra a interface na porta 8000 do computador que executa o programa. O botão **
 
 Use somente **um processo/worker** do servidor, para evitar consultas e eventos duplicados. A máquina precisa permanecer ligada para monitorar. Os horários são armazenados em UTC e exibidos no fuso do navegador.
 
+## Abas do painel
+
+- **BBU's:** equipamentos cadastrados como ping, com disponibilidade, latência e perdas consecutivas.
+- **Datacoms:** equipamentos SSH, com disponibilidade, portas, descrições e sinais RX/TX.
+- **Visão geral:** resumo conjunto da rede.
+- **Eventos:** histórico conjunto de quedas, recuperações e erros de coleta.
+
+Os equipamentos existentes aparecem na aba correspondente ao tipo já cadastrado, sem migração do banco ou novo cadastro. Cada aba possui sua lista e seus contadores; o botão de adicionar já seleciona o tipo correspondente. A regra de alerta permanece na 21ª perda consecutiva.
+
 ## Ping
 
 - Cadastre nome, IP IPv4/IPv6 e intervalo (5 segundos por padrão).
