@@ -252,6 +252,58 @@ class MonitorTests(unittest.TestCase):
         self.assertEqual(self.device_state()['config_version'], 0)
 
 
+    def test_transceiver_command_default_and_legacy_input(self):
+        self.assertEqual(app.DeviceInput(name='Local', host='127.0.0.1').optics_command, 'show interface transceivers')
+        self.assertEqual(app.DeviceInput(name='Local', host='127.0.0.1', optics_command='show interface tranceivers').optics_command, 'show interface transceivers')
+        self.assertEqual(app.DeviceInput(name='Local', host='127.0.0.1', optics_command='display transceiver {port}').optics_command, 'display transceiver {port}')
+
+    def test_legacy_optics_migration_preserves_data_and_is_idempotent(self):
+        d = app.create_device(app.DeviceInput(name='Datacom', host='192.0.2.1', kind='datacom',
+            username='op', password='test-only', fingerprint='SHA256:'+'a'*43))
+        app.record_ping(d['id'], True, 3)
+        with app.connect() as db:
+            db.execute("UPDATE devices SET optics_command='show interface tranceivers' WHERE id=?", (d['id'],))
+            password = db.execute('SELECT password FROM devices WHERE id=?', (d['id'],)).fetchone()[0]
+        app.init_db()
+        app.init_db()
+        migrated = next(x for x in app.dashboard()['devices'] if x['id'] == d['id'])
+        self.assertEqual(migrated['optics_command'], 'show interface transceivers')
+        self.assertEqual(migrated['config_version'], d['config_version'] + 1)
+        self.assertEqual(migrated['last_ssh'], 0)
+        self.assertEqual(len(app.history(d['id'])), 1)
+        with app.connect() as db:
+            self.assertEqual(db.execute('SELECT password FROM devices WHERE id=?', (d['id'],)).fetchone()[0], password)
+            db.execute("UPDATE devices SET optics_command='display transceiver {port}' WHERE id=?", (d['id'],))
+        app.init_db()
+        custom = next(x for x in app.dashboard()['devices'] if x['id'] == d['id'])
+        self.assertEqual(custom['optics_command'], 'display transceiver {port}')
+
+    def test_cli_syntax_error_with_zero_exit_is_not_a_valid_measurement(self):
+        client = Mock()
+        stdout, stderr = Mock(), Mock()
+        stdout.read.return_value = b'show interface \n syntax error: unknown argument\n'
+        stdout.channel.recv_exit_status.return_value = 0
+        stderr.read.return_value = b''
+        client.exec_command.return_value = (Mock(), stdout, stderr)
+        with self.assertRaises(app.CommandRejected) as error:
+            app.ssh_read(client, 'show interface transceivers')
+        self.assertIn('show interface transceivers', str(error.exception))
+        stdout.read.return_value = b'gigabit-ethernet 1/1/1 | 40 C | 3 V | 19 mA | -6 dBm | -12 dBm'
+        self.assertIn('-12 dBm', app.ssh_read(client, 'show interface transceivers'))
+
+    def test_ssh_reports_rejected_command_in_dashboard(self):
+        d = app.create_device(app.DeviceInput(name='Datacom', host='192.0.2.1', kind='datacom',
+            username='op', password='test-only', fingerprint='SHA256:'+'a'*43))
+        original = dict(d, password=app.CIPHER.encrypt(b'test-only').decode(), ports='[]')
+        with patch.object(app.paramiko, 'SSHClient'), patch.object(app, 'ssh_read', side_effect=[
+            '1/1/1 Up false 10G full - - lag-1 LINK',
+            app.CommandRejected('O equipamento rejeitou o comando "show interface transceivers".')]):
+            app.check_ssh(original)
+        result = next(x for x in app.dashboard()['devices'] if x['id'] == d['id'])
+        self.assertIn('show interface transceivers', result['ssh_error'])
+        self.assertEqual(result['port_data'], [])
+
+
 
 if __name__ == '__main__':
     unittest.main()

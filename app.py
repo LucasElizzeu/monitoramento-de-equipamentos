@@ -73,6 +73,10 @@ def init_db():
         columns = {row['name'] for row in db.execute('PRAGMA table_info(devices)')}
         if 'config_version' not in columns:
             db.execute('ALTER TABLE devices ADD COLUMN config_version INTEGER NOT NULL DEFAULT 0')
+        # Correct only the old built-in typo; preserve custom commands and credentials.
+        db.execute("UPDATE devices SET optics_command='show interface transceivers', "
+                   "last_ssh=0, config_version=config_version+1 "
+                   "WHERE kind='datacom' AND lower(trim(optics_command))='show interface tranceivers'")
     os.chmod(DB, 0o600)
 
 
@@ -87,7 +91,7 @@ class DeviceInput(BaseModel):
     fingerprint: str = ''
     ports: list[str] = Field(default_factory=list, max_length=128)
     status_command: str = 'show interface link'
-    optics_command: str = 'show interface tranceivers'
+    optics_command: str = 'show interface transceivers'
 
     @field_validator('name')
     @classmethod
@@ -123,6 +127,8 @@ class DeviceInput(BaseModel):
     @field_validator('status_command', 'optics_command')
     @classmethod
     def valid_command(cls, value):
+        if value.strip().lower() == 'show interface tranceivers':
+            value = 'show interface transceivers'
         if (not re.fullmatch(r'(?:show|display) [a-zA-Z0-9 /_.:{}-]{1,150}', value)
                 or value.count('{port}') > 1 or '{' in value.replace('{port}', '')
                 or '}' in value.replace('{port}', '')):
@@ -289,12 +295,20 @@ def parse_port(port, status_output, optics_output, optics_context=None):
                 checked_at=now(), status_output=status_output, optics_output=optics_output)
 
 
+class CommandRejected(paramiko.SSHException):
+    """A device can reject a CLI command while SSH still reports exit code zero."""
+
+
 def ssh_read(client, command):
     _, stdout, stderr = client.exec_command(command, timeout=7)
     output = stdout.read(65536).decode('utf-8', 'replace')
     error = stderr.read(4096).decode('utf-8', 'replace')
-    if stdout.channel.recv_exit_status() not in (0, -1) or error.strip():
-        raise paramiko.SSHException('Comando rejeitado. Confira o perfil de comandos do equipamento.')
+    rejected = re.search(
+        r'syntax\s+error\s*:|^\s*%?\s*(?:unknown|invalid|unrecognized|incomplete|ambiguous)\s+(?:command|argument|input)\b',
+        clean_cli(output), re.I | re.M)
+    if stdout.channel.recv_exit_status() not in (0, -1) or error.strip() or rejected:
+        raise CommandRejected(f'O equipamento rejeitou o comando "{command}". '
+                              'Confira a sintaxe em Editar → Comandos do equipamento.')
     return output
 
 
@@ -321,6 +335,8 @@ def check_ssh(device):
             result['status_output'] = status_bulk if status_bulk is not None else status
             result['optics_output'] = optics_bulk if optics_bulk is not None else optics
             ports.append(result)
+    except CommandRejected as exc:
+        error = str(exc)
     except paramiko.AuthenticationException:
         error = 'Autenticação SSH recusada. Verifique usuário e senha.'
     except Exception:

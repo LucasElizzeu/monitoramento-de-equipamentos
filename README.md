@@ -65,10 +65,10 @@ Comandos padrão informados para este projeto:
 
 ```text
 show interface link
-show interface tranceivers
+show interface transceivers
 ```
 
-A grafia `tranceivers` foi preservada conforme informada. Se o seu firmware usar `transceivers`, ajuste no cadastro, em **Comandos do equipamento**.
+O comando óptico padrão foi corrigido para `transceivers`. Ao iniciar, cadastros Datacom que ainda usam exatamente o antigo padrão `show interface tranceivers` são corrigidos automaticamente, preservando credenciais e histórico. Comandos personalizados são mantidos. Se o firmware rejeitar uma consulta com `syntax error: unknown argument` ou outra indicação de comando inválido, o painel informa qual comando foi rejeitado, mesmo quando o SSH retorna código de saída zero. Ajuste a sintaxe do modelo em **Editar → Comandos do equipamento**.
 
 - Consultas SSH a cada 30 segundos.
 - Deixe a lista de portas vazia para detectar as interfaces da listagem `show interface link` (até 128 portas por equipamento). Ou selecione portas separadas por vírgula: `1/1/21, 1/1/22`.
