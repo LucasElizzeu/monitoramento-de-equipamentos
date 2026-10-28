@@ -28,7 +28,7 @@ Os equipamentos existentes aparecem na aba correspondente ao tipo já cadastrado
 ## Ping
 
 - Cadastre nome, IP IPv4/IPv6 e intervalo de 1 a 300 segundos (1 segundo por padrão). Equipamentos existentes mantêm seu intervalo até serem editados.
-- Cada tentativa envia um pacote ICMP. O timeout é de até 1,5 segundo, limitado a 80% do intervalo (0,8 segundo no intervalo de 1 segundo). O intervalo é contado entre os inícios das tentativas; uma mesma sonda não se sobrepõe. Sob carga, os horários dependem da disponibilidade dos coletores.
+- Cada tentativa envia um pacote ICMP. O tempo máximo de resposta é independente do intervalo: **4 segundos por padrão**, editável de 1 a 30 segundos. A versão anterior reduzia a espera para 0,8 segundo quando o intervalo era 1 segundo, podendo perder respostas lentas. O intervalo é contado entre os inícios das tentativas; se a anterior ainda estiver aguardando resposta, a próxima espera sua conclusão. Assim, no intervalo de 1 segundo e timeout de 4 segundos, um alvo silencioso pode ser consultado aproximadamente a cada 4 segundos. Não são enviadas sondas sobrepostas. Sob carga, os horários dependem da disponibilidade dos coletores.
 - De 1 a 20 perdas consecutivas: **Instável**.
 - Na **21ª perda consecutiva**: **Sem ping**, com um evento de queda.
 - Resposta recebida: contador zerado. Se estava sem ping, registra recuperação.
@@ -37,7 +37,9 @@ Os equipamentos existentes aparecem na aba correspondente ao tipo já cadastrado
 
 ### Permissão e acesso à rede
 
-O coletor usa sockets ICMP sem privilégios via `icmplib`. Linux precisa permitir o grupo do processo em `net.ipv4.ping_group_range`. Um administrador pode incluir o GID do usuário nessa faixa; preserve grupos já autorizados na máquina. Não execute a aplicação inteira como root para resolver isso.
+No **Windows**, o coletor usa o `PING.EXE` da pasta System32, com um pacote de 32 bytes, a mesma ferramenta disponível no CMD. A execução dispensa sockets raw do Python e não abre novas janelas. O programa interpreta respostas do alvo em português/inglês, incluindo latência abaixo de 1ms (representada como 0ms na resolução inteira do Windows). Mensagens de host inacessível não são consideradas sucesso mesmo se o comando retornar código zero. Falhas locais de execução e saídas não reconhecidas são erros de coleta e não aumentam a contagem de perdas. A seleção do backend ocorre automaticamente no sistema em que o servidor está rodando.
+
+Em **Linux/Unix**, o coletor usa sockets ICMP sem privilégios via `icmplib`, também com payload de 32 bytes. Linux precisa permitir o grupo do processo em `net.ipv4.ping_group_range`. Um administrador pode incluir o GID do usuário nessa faixa; preserve grupos já autorizados na máquina. Não execute a aplicação inteira como root para resolver isso.
 
 Para um contêiner Linux, o administrador pode definir esse sysctl no contêiner, por exemplo `--sysctl net.ipv4.ping_group_range="0 2147483647"` para autorizar os grupos no namespace do contêiner. Essa configuração não é aplicada automaticamente pelo programa.
 
@@ -45,9 +47,13 @@ Para um contêiner Linux, o administrador pode definir esse sysctl no contêiner
 
 O servidor também precisa alcançar os IPs da sua rede. Um proxy HTTP não transporta ICMP e não substitui a conectividade SSH. Para equipamentos privados, use um computador na rede de gerenciamento ou uma rota/VPN administrada e autorizada. Este projeto não cria VPNs nem libera firewalls.
 
+### Comparar com o ping manual
+
+No computador que executa o programa, compare o alvo usando `ping -n 4 IP` no CMD do Windows. Testar de outro computador não comprova que o servidor tem a mesma rota/VPN/interface de saída. No painel, abra **Ver detalhes** (seta da linha): **Última tentativa de ping** mostra a ferramenta usada, o timeout e o resultado, inclusive mensagens do `ping.exe`. Envie esse diagnóstico se o comportamento continuar diferente. Não há acesso aos IPs privados do usuário a partir desta tarefa; as saídas do Windows foram testadas com casos simulados, e não houve validação em uma máquina Windows real nesta etapa.
+
 ## Editar equipamentos
 
-Clique no **lápis** da linha do equipamento, nas abas BBU's, Datacoms ou Visão geral. É possível alterar nome, IP, intervalo, tipo, portas e configurações SSH sem recriar o cadastro.
+Clique no **lápis** da linha do equipamento, nas abas BBU's, Datacoms ou Visão geral. É possível alterar nome, IP, intervalo, tempo máximo de resposta do ping, tipo, portas e configurações SSH sem recriar o cadastro.
 
 Ao editar um Datacom, deixe a senha vazia para manter a atual; preencha apenas para substituí-la. A senha nunca é enviada de volta ao navegador. Nome/intervalo preservam as amostras. Se trocar IP ou tipo, as amostras e estados do alvo anterior são limpos para evitar misturar medições, mas o ID e os eventos históricos são preservados. Consultas iniciadas antes da edição não sobrescrevem a configuração atualizada.
 

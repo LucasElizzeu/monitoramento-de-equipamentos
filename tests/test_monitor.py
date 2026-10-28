@@ -143,7 +143,7 @@ class MonitorTests(unittest.TestCase):
         starts = []
         def probe(*args, **kwargs):
             starts.append(time.monotonic())
-            self.assertLess(kwargs['timeout'], 1)
+            self.assertEqual(kwargs['timeout'], 4)
             time.sleep(0.2)
             return Mock(is_alive=True, avg_rtt=1.2)
         app.STOP.clear()
@@ -247,9 +247,13 @@ class MonitorTests(unittest.TestCase):
         # Simulate the installed schema before editing support existed.
         with app.connect() as db:
             db.execute('ALTER TABLE devices DROP COLUMN config_version')
+            db.execute('ALTER TABLE devices DROP COLUMN ping_timeout')
+            db.execute('ALTER TABLE devices DROP COLUMN ping_detail')
         app.init_db()
         self.assertEqual(self.device_state()['name'], 'Local')
         self.assertEqual(self.device_state()['config_version'], 0)
+        self.assertEqual(self.device_state()['ping_timeout'], 4)
+        self.assertIsNone(self.device_state()['ping_detail'])
 
 
     def test_transceiver_command_default_and_legacy_input(self):
@@ -302,6 +306,74 @@ class MonitorTests(unittest.TestCase):
         result = next(x for x in app.dashboard()['devices'] if x['id'] == d['id'])
         self.assertIn('show interface transceivers', result['ssh_error'])
         self.assertEqual(result['port_data'], [])
+
+
+    def test_native_windows_ping_uses_same_system_command(self):
+        output = 'Resposta de 10.0.3.6: bytes=32 tempo=2ms TTL=64\n'
+        with patch.object(app.subprocess, 'run', return_value=Mock(stdout=output, stderr='', returncode=0)) as run:
+            self.assertEqual(app.windows_ping('10.0.3.6', 4), (True, 2.0, output.strip()))
+        args = run.call_args.args[0]
+        self.assertEqual(args[-1], '10.0.3.6')
+        self.assertEqual(args[1:-1], ['-4', '-n', '1', '-w', '4000'])
+        self.assertTrue(args[0].endswith('PING.EXE'))
+        self.assertNotIn('shell', run.call_args.kwargs)
+
+    def test_native_windows_handles_latency_and_ipv6(self):
+        for host, output, latency in [
+            ('10.0.3.6', 'Reply from 10.0.3.6: bytes=32 time<1ms TTL=64', 0.0),
+            ('10.0.3.6', 'Resposta de 10.0.3.6: bytes=32 tempo=1200ms TTL=64', 1200.0),
+            ('::1', 'Reply from ::1: time<1ms', 0.0)]:
+            with self.subTest(host=host, output=output), patch.object(app.subprocess, 'run', return_value=Mock(stdout=output, stderr='', returncode=0)):
+                alive, rtt, _ = app.windows_ping(host, 4)
+                self.assertEqual((alive, rtt), (True, latency))
+
+    def test_native_windows_unreachable_with_exit_zero_is_not_online(self):
+        output = 'Resposta de 10.0.3.1: Host de destino inacessível.\nRecebidos = 1'
+        with patch.object(app.subprocess, 'run', return_value=Mock(stdout=output, stderr='', returncode=0)):
+            self.assertFalse(app.windows_ping('10.0.3.6', 4)[0])
+        output = 'Request timed out.\nLost = 1 (100% loss)'
+        with patch.object(app.subprocess, 'run', return_value=Mock(stdout=output, stderr='', returncode=1)):
+            self.assertFalse(app.windows_ping('10.0.3.6', 4)[0])
+
+    def test_native_windows_does_not_accept_other_source_or_unknown_output(self):
+        for output in ['Reply from 10.0.3.60: bytes=32 time=2ms TTL=64', 'Unexpected localized output']:
+            with self.subTest(output=output), patch.object(app.subprocess, 'run', return_value=Mock(stdout=output, stderr='', returncode=0)):
+                with self.assertRaises(app.PingCollectionError):
+                    app.windows_ping('10.0.3.6', 4)
+
+    def test_windows_local_failure_is_a_collector_error(self):
+        with patch.object(app, 'IS_WINDOWS', True), patch.object(app.subprocess, 'run', return_value=Mock(stdout='PING: transmit failed. General failure.', stderr='', returncode=1)):
+            app.check_ping(self.device)
+        self.assertEqual(self.device_state()['state'], 'error')
+        self.assertEqual(self.device_state()['failures'], 0)
+        self.assertIn('General failure', self.device_state()['ping_detail'])
+        self.assertEqual(app.history(self.id), [])
+
+    def test_windows_missing_executable_is_not_packet_loss(self):
+        with patch.object(app, 'IS_WINDOWS', True), patch.object(app.subprocess, 'run', side_effect=FileNotFoundError):
+            app.check_ping(self.device)
+        self.assertEqual(self.device_state()['state'], 'error')
+        self.assertEqual(self.device_state()['failures'], 0)
+
+    def test_windows_collector_selects_native_ping(self):
+        with patch.object(app, 'IS_WINDOWS', True), patch.object(app, 'windows_ping', return_value=(True, 1200, 'Native echo reply')) as native, patch.object(app, 'ping') as library:
+            app.check_ping(self.device)
+            native.assert_called_once_with('127.0.0.1', 4)
+            library.assert_not_called()
+        self.assertEqual((self.device_state()['state'], self.device_state()['latency']), ('online', 1200))
+        self.assertEqual(self.device_state()['ping_detail'], 'Native echo reply')
+
+    def test_timeout_is_independent_of_interval_and_validated(self):
+        device = app.create_device(app.DeviceInput(name='Slow link', host='192.0.2.2', interval=1, ping_timeout=6))
+        with patch.object(app, 'IS_WINDOWS', False), patch.object(app, 'ping', return_value=Mock(is_alive=True, avg_rtt=1200)) as library:
+            app.check_ping(device)
+            self.assertEqual(library.call_args.kwargs['timeout'], 6)
+        result = next(d for d in app.dashboard()['devices'] if d['id'] == device['id'])
+        self.assertEqual(result['state'], 'online')
+        self.assertEqual(result['ping_timeout'], 6)
+        for timeout in (0, 31, float('inf'), float('nan')):
+            with self.assertRaises(ValueError):
+                app.DeviceInput(name='Invalid', host='127.0.0.2', ping_timeout=timeout)
 
 
 

@@ -133,8 +133,8 @@ function openEdit(id){
  const device=state.data.devices.find(d=>d.id===id);
  if(!device)return;
  state.editing=device;$('#device-form').reset();
- for(const name of ['name','host','interval','ssh_port','username','fingerprint','status_command','optics_command']){
-  $(`[name="${name}"]`).value=device[name]??'';
+ for(const name of ['name','host','interval','ping_timeout','ssh_port','username','fingerprint','status_command','optics_command']){
+  $(`[name="${name}"]`).value=device[name]??(name==='ping_timeout'?4:'');
  }
  $(`[name="kind"][value="${device.kind}"]`).checked=true;
  $('[name="ports"]').value=device.ports.join(', ');$('[name="password"]').value='';
@@ -142,13 +142,13 @@ function openEdit(id){
 }
 function renderDetail(){const d=state.data.devices.find(d=>d.id===state.selected);if(!d){$('#detail-dialog').close();state.selected=null;return;}
  const opened=[...$('#detail-content').querySelectorAll('details')].map(e=>e.open);
- $('#detail-content').innerHTML=`<div class="dialog-heading"><div><div class="eyebrow">${d.kind==='datacom'?'DATACOM · SSH + ICMP':'MONITORAMENTO ICMP'}</div><h2>${esc(d.name)}</h2></div><button class="icon-button" data-close-detail aria-label="Fechar">${icon('close')}</button></div><p class="dialog-description">${esc(d.host)} · Intervalo ${d.interval}s ${state.demo?'· Demonstração':''}</p><div class="detail-summary"><div class="detail-stat">Disponibilidade<strong>${badge(d.state)}</strong></div><div class="detail-stat">Latência<strong>${number(d.latency)} <small>ms</small></strong></div><div class="detail-stat">Perdas consecutivas<strong>${d.failures} <small>/ 21</small></strong></div></div>${d.state==='error'?'<p class="ssh-warning">O servidor não conseguiu executar o ping. Verifique permissões ICMP e acesso de rede. Este erro não é contado como perda.</p>':''}<h2>Histórico de ping</h2><div class="chart-container detail-chart" id="detail-chart"></div>${d.kind==='datacom'?`<div class="section-divider">PORTAS E SINAIS ÓPTICOS</div>${portsHTML(d)}`:''}`;
+ $('#detail-content').innerHTML=`<div class="dialog-heading"><div><div class="eyebrow">${d.kind==='datacom'?'DATACOM · SSH + ICMP':'MONITORAMENTO ICMP'}</div><h2>${esc(d.name)}</h2></div><button class="icon-button" data-close-detail aria-label="Fechar">${icon('close')}</button></div><p class="dialog-description">${esc(d.host)} · Intervalo ${d.interval}s ${state.demo?'· Demonstração':''}</p><div class="detail-summary"><div class="detail-stat">Disponibilidade<strong>${badge(d.state)}</strong></div><div class="detail-stat">Latência<strong>${number(d.latency)} <small>ms</small></strong></div><div class="detail-stat">Perdas consecutivas<strong>${d.failures} <small>/ 21</small></strong></div></div>${d.state==='error'?'<p class="ssh-warning">O coletor não conseguiu executar o ping. Veja o diagnóstico abaixo. Este erro não é contado como perda.</p>':''}<h2>Última tentativa de ping</h2><p class="dialog-description">${esc(d.ping_backend||'ICMP')} · espera máxima ${number(d.ping_timeout??4)}s</p><pre class="ping-diagnostic">${esc(d.ping_detail||'Aguardando a primeira tentativa.')}</pre><h2>Histórico de ping</h2><div class="chart-container detail-chart" id="detail-chart"></div>${d.kind==='datacom'?`<div class="section-divider">PORTAS E SINAIS ÓPTICOS</div>${portsHTML(d)}`:''}`;
  $('#detail-content').querySelectorAll('details').forEach((e,i)=>e.open=Boolean(opened[i]));chart(state.detailSamples||[], $('#detail-chart'));
 }
 async function openDetail(id){state.selected=id;state.detailSamples=[];renderDetail();$('#detail-dialog').showModal();try{state.detailSamples=state.demo?state.data.samples.filter(s=>s.device_id===id):await api(`/api/devices/${id}/history`);if(state.selected===id)renderDetail();}catch(e){toast(e.message);}}
 $('#device-form').addEventListener('submit',async event=>{
  event.preventDefault();const form=new FormData(event.target);const d=Object.fromEntries(form);
- d.interval=Number(d.interval);d.ssh_port=Number(d.ssh_port);d.ports=d.ports.split(',').map(p=>p.trim()).filter(Boolean);
+ d.interval=Number(d.interval);d.ping_timeout=Number(d.ping_timeout);d.ssh_port=Number(d.ssh_port);d.ports=d.ports.split(',').map(p=>p.trim()).filter(Boolean);
  const editingId=state.editing?.id;$('#save-device').disabled=true;$('#form-error').hidden=true;
  try{
   await api(editingId?`/api/devices/${editingId}`:'/api/devices',{method:editingId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});

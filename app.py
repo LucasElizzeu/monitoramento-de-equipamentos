@@ -7,6 +7,8 @@ import math
 import os
 import re
 import sqlite3
+import subprocess
+import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -38,6 +40,7 @@ DB = DATA / 'monitor.db'
 LOCK = threading.RLock()
 STOP = threading.Event()
 INFLIGHT = set()
+IS_WINDOWS = sys.platform == 'win32'
 
 
 def now():
@@ -73,6 +76,10 @@ def init_db():
         columns = {row['name'] for row in db.execute('PRAGMA table_info(devices)')}
         if 'config_version' not in columns:
             db.execute('ALTER TABLE devices ADD COLUMN config_version INTEGER NOT NULL DEFAULT 0')
+        if 'ping_timeout' not in columns:
+            db.execute('ALTER TABLE devices ADD COLUMN ping_timeout REAL NOT NULL DEFAULT 4')
+        if 'ping_detail' not in columns:
+            db.execute('ALTER TABLE devices ADD COLUMN ping_detail TEXT')
         # Correct only the old built-in typo; preserve custom commands and credentials.
         db.execute("UPDATE devices SET optics_command='show interface transceivers', "
                    "last_ssh=0, config_version=config_version+1 "
@@ -85,6 +92,7 @@ class DeviceInput(BaseModel):
     host: str
     kind: str = 'ping'
     interval: int = Field(default=1, ge=1, le=300)
+    ping_timeout: float = Field(default=4, ge=1, le=30, allow_inf_nan=False)
     ssh_port: int = Field(default=22, ge=1, le=65535)
     username: str = Field(default='', max_length=100)
     password: str = Field(default='', max_length=500)
@@ -139,6 +147,7 @@ class DeviceInput(BaseModel):
 def public_device(row):
     value = dict(row)
     value['has_password'] = bool(value.pop('password'))
+    value['ping_backend'] = 'Windows ping.exe' if IS_WINDOWS else 'ICMP (icmplib)'
     value['ports'] = json.loads(value['ports'] or '[]')
     value['port_data'] = json.loads(value['port_data'] or '[]')
     return value
@@ -149,13 +158,14 @@ def alert(db, device, level, message):
                (device['id'], device['name'], now(), level, message))
 
 
-def record_ping(device_id, success, latency=None, error=None, expected_version=None, started_at=None):
+def record_ping(device_id, success, latency=None, error=None, expected_version=None, started_at=None, detail=None):
     """Only completed ICMP probes count as packet loss; local errors do not."""
     with LOCK, connect() as db:
         device = db.execute('SELECT * FROM devices WHERE id=?', (device_id,)).fetchone()
         if not device or (expected_version is not None and device['config_version'] != expected_version):
             return
         ping_at = started_at if started_at is not None else time.time()
+        db.execute('UPDATE devices SET ping_detail=? WHERE id=?', ((detail or error or ('Resposta ICMP recebida.' if success else 'Sem resposta ICMP.'))[:5000], device_id))
         if error:
             if device['state'] != 'error':
                 alert(db, device, 'warning', error)
@@ -179,16 +189,57 @@ def record_ping(device_id, success, latency=None, error=None, expected_version=N
         db.execute('DELETE FROM alerts WHERE id NOT IN (SELECT id FROM alerts ORDER BY id DESC LIMIT 1000)')
 
 
+class PingCollectionError(Exception):
+    """Local execution failures must not count as missing echo replies."""
+
+
+def windows_ping(host, timeout):
+    address = ipaddress.ip_address(host)
+    executable = str(Path(os.environ.get('SystemRoot', r'C:\Windows')) / 'System32' / 'PING.EXE')
+    args = [executable, '-4' if address.version == 4 else '-6', '-n', '1', '-w', str(round(timeout * 1000)), str(address)]
+    try:
+        result = subprocess.run(args, capture_output=True, encoding='oem', errors='replace',
+                                timeout=timeout + 2, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise PingCollectionError('Não foi possível executar o ping do Windows. Verifique se ping.exe está disponível.') from exc
+    output = (result.stdout + '\n' + result.stderr).strip()
+    local_failure = re.search(r'general failure|transmit failed|falha geral|falha na transmiss[aã]o|access (?:is )?denied|acesso negado', output, re.I)
+    if local_failure or result.returncode not in (0, 1):
+        raise PingCollectionError('Falha local do ping do Windows.\n' + output[:4000])
+    for line in output.splitlines():
+        # A Windows unreachable reply can exit zero: require an actual target echo.
+        target = r'(?<![\w:.%])' + re.escape(str(address)) + r'(?::\s|\s|\])'
+        if not re.search(target, line, re.I):
+            continue
+        timing = re.search(r'(?:time|tempo)\s*([=<])\s*(\d+(?:[.,]\d+)?)\s*ms', line, re.I)
+        echo = bool(re.search(r'\bTTL\s*=\s*\d+', line, re.I)) if address.version == 4 else bool(timing)
+        if echo:
+            # Windows reports integer milliseconds; <1ms is below that resolution.
+            latency = (0.0 if timing.group(1) == '<' else float(timing.group(2).replace(',', '.'))) if timing else None
+            return True, latency, output
+    loss = re.search(r'timed out|tempo limite|inacess[ií]vel|unreachable|TTL (?:expired|expirad)|100%|100\s*%|limite de saltos', output, re.I)
+    if loss:
+        return False, None, output
+    raise PingCollectionError('Não foi possível interpretar o resultado do ping do Windows.\n' + output[:4000])
+
+
 def check_ping(device):
     started_at = time.time()
     version = device.get('config_version')
+    timeout = device.get('ping_timeout', 4)
     try:
-        result = ping(device['host'], count=1, timeout=min(1.5, device['interval'] * 0.8), privileged=False)
-        record_ping(device['id'], result.is_alive, result.avg_rtt if result.is_alive else None,
-                    expected_version=version, started_at=started_at)
-    except Exception:
-        record_ping(device['id'], False, error='Não foi possível executar ICMP. Verifique as permissões e a rede do servidor.',
-                    expected_version=version, started_at=started_at)
+        if IS_WINDOWS:
+            success, latency, detail = windows_ping(device['host'], timeout)
+        else:
+            result = ping(device['host'], count=1, timeout=timeout, privileged=False, payload_size=32)
+            success, latency = result.is_alive, result.avg_rtt if result.is_alive else None
+            detail = f'ICMP: resposta em {latency:.2f} ms.' if success else f'Sem resposta ICMP dentro de {timeout:g} segundos.'
+        record_ping(device['id'], success, latency, expected_version=version,
+                    started_at=started_at, detail=detail)
+    except Exception as exc:
+        error = str(exc).splitlines()[0] if isinstance(exc, PingCollectionError) else 'Não foi possível executar ICMP. Verifique as permissões e a rede do servidor.'
+        record_ping(device['id'], False, error=error, expected_version=version,
+                    started_at=started_at, detail=f'{error}\n{type(exc).__name__}: {exc}'[:5000])
 
 
 def fingerprint(key):
@@ -485,7 +536,7 @@ def update_device(device_id: int, device: DeviceInput):
                           ('ssh_port', 'username', 'password', 'fingerprint', 'ports', 'status_command', 'optics_command'))
         if changed_target:
             db.execute('DELETE FROM samples WHERE device_id=?', (device_id,))
-            values.update(state='pending', failures=0, latency=None, last_check=None)
+            values.update(state='pending', failures=0, latency=None, last_check=None, ping_detail=None)
         if changed_target or changed_ssh:
             values.update(port_data='[]', ssh_error=None)
         values.update(config_version=previous['config_version'] + 1, last_ping=0, last_ssh=0)
