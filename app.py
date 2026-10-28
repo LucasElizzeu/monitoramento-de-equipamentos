@@ -92,7 +92,7 @@ def init_db():
         if 'ssh_diagnostic' not in columns:
             db.execute("ALTER TABLE devices ADD COLUMN ssh_diagnostic TEXT NOT NULL DEFAULT '{}'")
         if 'circuit_position' not in columns:
-            db.execute('ALTER TABLE devices ADD COLUMN circuit_position INTEGER')
+            db.execute('ALTER TABLE devices ADD COLUMN circuit_position REAL')
         if 'port_aliases' not in columns:
             db.execute("ALTER TABLE devices ADD COLUMN port_aliases TEXT NOT NULL DEFAULT '{}'")
         if 'utilization_command' not in columns:
@@ -116,10 +116,22 @@ class DeviceInput(BaseModel):
     fingerprint: str = ''
     ports: list[str] = Field(default_factory=list, max_length=128)
     interface_type: str = 'auto'
-    circuit_position: int | None = Field(default=None, ge=1, le=10000)
+    circuit_position: float | None = Field(default=None, ge=1, le=10000, allow_inf_nan=False)
     status_command: str = 'show interface link'
     optics_command: str = 'show interface transceivers'
     utilization_command: str = 'show interface utilization'
+
+    @field_validator('circuit_position', mode='before')
+    @classmethod
+    def valid_position(cls, value):
+        if isinstance(value, str):
+            value = value.strip()
+            if not value:
+                return None
+            if not re.fullmatch(r'\d+(?:[.,]\d+)?', value):
+                raise ValueError('Informe uma posição como 2 ou 2.1.')
+            return value.replace(',', '.')
+        return value
 
     @field_validator('name')
     @classmethod

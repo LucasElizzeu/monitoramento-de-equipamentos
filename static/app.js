@@ -196,7 +196,7 @@ function renderDetail(){const d=state.data.devices.find(d=>d.id===state.selected
 async function openDetail(id){state.selected=id;state.detailSamples=[];renderDetail();$('#detail-dialog').showModal();try{state.detailSamples=state.demo?state.data.samples.filter(s=>s.device_id===id):await api(`/api/devices/${id}/history`);if(state.selected===id)renderDetail();}catch(e){toast(e.message);}}
 $('#device-form').addEventListener('submit',async event=>{
  event.preventDefault();const form=new FormData(event.target);const d=Object.fromEntries(form);
- d.circuit_position=d.circuit_position===''?null:Number(d.circuit_position);d.interval=Number(d.interval);d.ping_timeout=Number(d.ping_timeout);d.ssh_port=Number(d.ssh_port);d.ports=d.interface_type==='mixed'?[...normalizedPorts(d.ten_ports).map(port=>'ten:'+port),...normalizedPorts(d.giga_ports).map(port=>'giga:'+port)]:d.ports.split(',').map(p=>p.trim()).filter(Boolean);delete d.ten_ports;delete d.giga_ports;
+ d.circuit_position=d.circuit_position===''?null:Number(d.circuit_position.trim().replace(',','.'));d.interval=Number(d.interval);d.ping_timeout=Number(d.ping_timeout);d.ssh_port=Number(d.ssh_port);d.ports=d.interface_type==='mixed'?[...normalizedPorts(d.ten_ports).map(port=>'ten:'+port),...normalizedPorts(d.giga_ports).map(port=>'giga:'+port)]:d.ports.split(',').map(p=>p.trim()).filter(Boolean);delete d.ten_ports;delete d.giga_ports;
  const editingId=state.editing?.id;$('#save-device').disabled=true;$('#form-error').hidden=true;
  try{
   await api(editingId?`/api/devices/${editingId}`:'/api/devices',{method:editingId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});

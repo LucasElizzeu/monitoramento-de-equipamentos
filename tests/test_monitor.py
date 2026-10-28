@@ -611,9 +611,24 @@ class MonitorTests(unittest.TestCase):
         self.assertEqual(kept['circuit_position'], 10)
         cleared = app.update_device(self.id, app.DeviceInput(name='Renamed', host='127.0.0.1', circuit_position=None))
         self.assertIsNone(cleared['circuit_position'])
-        for position in (0, -1, 10001, 2.5):
+        for position in (0, -1, 10001, float('inf'), float('nan'), '2.1.1', '2,1,2'):
             with self.assertRaises(ValueError):
                 app.DeviceInput(name='Invalid', host='127.0.0.1', circuit_position=position)
+
+    def test_decimal_positions_work_with_legacy_integer_column_and_restart(self):
+        with app.connect() as db:
+            db.execute('ALTER TABLE devices DROP COLUMN circuit_position')
+            db.execute('ALTER TABLE devices ADD COLUMN circuit_position INTEGER')
+        for value in (2.1, '2.1', '2,1'):
+            with self.subTest(value=value):
+                updated = app.update_device(self.id, app.DeviceInput(name='Rota alternativa', host='127.0.0.1', circuit_position=value))
+                self.assertEqual(updated['circuit_position'], 2.1)
+                app.init_db()
+                self.assertEqual(self.device_state()['circuit_position'], 2.1)
+        kept = app.update_device(self.id, app.DeviceInput(name='Renamed', host='127.0.0.1'))
+        self.assertEqual(kept['circuit_position'], 2.1)
+        cleared = app.update_device(self.id, app.DeviceInput(name='Renamed', host='127.0.0.1', circuit_position=None))
+        self.assertIsNone(cleared['circuit_position'])
 
 
     def utilization_fixture(self):

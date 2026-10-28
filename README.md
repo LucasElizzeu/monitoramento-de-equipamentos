@@ -27,7 +27,7 @@ Os equipamentos existentes aparecem na aba correspondente ao tipo já cadastrado
 
 ## Ordem do circuito e nomes personalizados
 
-Na edição de cada Datacom (lápis da linha), preencha **Posição no circuito** com 1, 2, 3 etc. A aba Datacoms e os blocos de portas seguem essa ordem numérica. Os que estiverem sem posição aparecem no final; posições iguais mantêm a ordem de cadastro. Apague o número para voltar à ordenação sem posição. As posições são salvas no banco e permanecem ao reiniciar.
+Na edição de cada Datacom (lápis da linha), preencha **Posição no circuito** com 1, 2, 3 ou posições intermediárias como **2.1** e **2.2**, para organizar trechos com duas rotas. O campo aceita ponto ou vírgula (`2.1` ou `2,1`), de 1 a 10000. A sequência será **2 → 2.1 → 2.2 → 3**. A aba Datacoms e os blocos de portas seguem essa ordem numérica. Os que estiverem sem posição aparecem no final; posições iguais mantêm a ordem de cadastro. Apague o número para voltar à ordenação sem posição. As posições são salvas no banco e permanecem ao reiniciar.
 
 Para substituir no painel descrições como `SWITCH_DM4380-CAA...`, clique no **lápis ao lado do nome da porta**, digite o nome desejado e salve. Exemplos: `Entrada do circuito`, `Saída para Anori` ou `Link principal`. A personalização vale para o painel e os novos alertas. A descrição original do Datacom aparece na janela de edição e na saída do equipamento.
 
