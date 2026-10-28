@@ -250,12 +250,14 @@ class MonitorTests(unittest.TestCase):
             db.execute('ALTER TABLE devices DROP COLUMN ping_timeout')
             db.execute('ALTER TABLE devices DROP COLUMN ping_detail')
             db.execute('ALTER TABLE devices DROP COLUMN interface_type')
+            db.execute('ALTER TABLE devices DROP COLUMN ssh_diagnostic')
         app.init_db()
         self.assertEqual(self.device_state()['name'], 'Local')
         self.assertEqual(self.device_state()['config_version'], 0)
         self.assertEqual(self.device_state()['ping_timeout'], 4)
         self.assertIsNone(self.device_state()['ping_detail'])
         self.assertEqual(self.device_state()['interface_type'], 'auto')
+        self.assertEqual(self.device_state()['ssh_diagnostic'], '{}')
 
 
     def test_transceiver_command_default_and_legacy_input(self):
@@ -469,6 +471,73 @@ class MonitorTests(unittest.TestCase):
         result = next(x for x in app.dashboard()['devices'] if x['id'] == d['id'])
         self.assertEqual(result['port_data'][0]['state'], 'up')
         self.assertEqual(result['port_data'][0]['rx'], -12)
+
+
+    def test_compact_and_hyphenated_headers_keep_selected_ten_family(self):
+        for giga, ten in [('GigabitEthernet Interfaces:', 'TenGigabitEthernet Interfaces:'),
+                          ('Gigabit-Ethernet Interfaces:', 'Ten-GigabitEthernet Interfaces:'),
+                          ('Gigabit Ethernet Interfaces:', '10GE Interfaces:')]:
+            with self.subTest(ten=ten):
+                status = f'{giga}\n1/1/1 Down false - - - - - GIGA\n{ten}\n1/1/1 Up false 10G full - - - TEN'
+                selected = app.port_lines('1/1/1', status, 'ten-gigabit-ethernet')
+                self.assertIn('1/1/1 Up', selected)
+                self.assertNotIn('1/1/1 Down', selected)
+
+    def test_repeated_same_ten_diagnostics_are_one_interface_not_another_family(self):
+        optics = ('TenGigabitEthernet Interfaces:\n'
+                  'TenGigabitEthernet 1/1/1 RX power: -12 dBm\n'
+                  'TenGigabitEthernet 1/1/1 TX power: -6 dBm')
+        selected = app.port_lines('1/1/1', optics, 'ten-gigabit-ethernet')
+        self.assertEqual(app.optical_powers(selected), (-12, -6))
+
+
+    def test_compact_ten_end_to_end_uses_saved_selection(self):
+        d = app.create_device(app.DeviceInput(name='Compact Ten', host='192.0.2.5', kind='datacom',
+            username='op', password='test-only', fingerprint='SHA256:'+'a'*43, ports=['1/1/1']))
+        edited = app.update_device(d['id'], app.DeviceInput(name='Compact Ten', host='192.0.2.5', kind='datacom',
+            username='op', fingerprint='SHA256:'+'a'*43, ports=['1/1/1'], interface_type='ten-gigabit-ethernet'))
+        with app.connect() as db:
+            stored = dict(db.execute('SELECT * FROM devices WHERE id=?', (d['id'],)).fetchone())
+        status = 'GigabitEthernet Interfaces:\n1/1/1 Down false - - - - - GIGA\nTenGigabitEthernet Interfaces:\n1/1/1 Up false 10G full - - - TEN'
+        optics = 'GigabitEthernet 1/1/1 | 40 C | 3 V | 19 mA | -2 dBm | -26 dBm\nTenGigabitEthernet 1/1/1 | 40 C | 3 V | 19 mA | -6 dBm | -12 dBm'
+        with patch.object(app.paramiko, 'SSHClient'), patch.object(app, 'ssh_read', side_effect=[status, optics]):
+            app.check_ssh(stored)
+        result = next(x for x in app.dashboard()['devices'] if x['id'] == d['id'])
+        self.assertIsNone(result['ssh_error'])
+        self.assertEqual(result['port_data'][0]['state'], 'up')
+        self.assertEqual(result['port_data'][0]['rx'], -12)
+        self.assertEqual(result['port_data'][0]['interface_type'], 'ten-gigabit-ethernet')
+        self.assertEqual(result['ssh_diagnostic'], {})
+
+    def test_explicit_type_unrecognized_output_keeps_diagnostic_and_no_password(self):
+        d = app.create_device(app.DeviceInput(name='Unknown Ten', host='192.0.2.6', kind='datacom',
+            username='op', password='test-only-secret', fingerprint='SHA256:'+'a'*43, ports=['1/1/1'],
+            interface_type='ten-gigabit-ethernet'))
+        with app.connect() as db:
+            stored = dict(db.execute('SELECT * FROM devices WHERE id=?', (d['id'],)).fetchone())
+        status = 'UnknownFamily Interfaces:\n1/1/1 Down false - - - - - FIRST\nOtherFamily Interfaces:\n1/1/1 Up false 10G full - - - SECOND'
+        with patch.object(app.paramiko, 'SSHClient'), patch.object(app, 'ssh_read', side_effect=[status, 'No optical data']):
+            app.check_ssh(stored)
+        result = next(x for x in app.dashboard()['devices'] if x['id'] == d['id'])
+        self.assertIn('Ten Gigabit Ethernet', result['ssh_error'])
+        self.assertNotIn('Edite o Datacom', result['ssh_error'])
+        self.assertEqual(result['ssh_diagnostic']['interface_type'], 'ten-gigabit-ethernet')
+        self.assertEqual(result['ssh_diagnostic']['status_output'], status)
+        self.assertEqual(result['ssh_diagnostic']['stage'], 'portas: 1/1/1')
+        self.assertNotIn('test-only-secret', json.dumps(result))
+        self.assertEqual(result['port_data'], [])
+
+    def test_conflicting_same_family_states_are_not_silently_picked(self):
+        output = 'TenGigabitEthernet Interfaces:\n1/1/1 Up false 10G full - - - FIRST\n1/1/1 Down false - - - - - SECOND'
+        with self.assertRaises(app.InterfaceSelectionError) as error:
+            app.port_lines('1/1/1', output, 'ten-gigabit-ethernet')
+        self.assertIn('estados Up e Down conflitantes', str(error.exception))
+
+    def test_cr_only_output_preserves_interface_sections(self):
+        output = 'GigabitEthernet Interfaces:\r1/1/1 Down false - - - - - GIGA\rTenGigabitEthernet Interfaces:\r1/1/1 Up false 10G full - - - TEN'
+        result = app.port_lines('1/1/1', output, 'ten-gigabit-ethernet')
+        self.assertIn('1/1/1 Up', result)
+        self.assertNotIn('1/1/1 Down', result)
 
 
 

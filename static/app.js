@@ -72,7 +72,15 @@ function renderDevices(){const q=$('#search').value.toLowerCase();const filter=$
  $('#table-count').textContent=all.length;$('#table-summary').textContent=`Exibindo ${devices.length} de ${all.length} equipamentos`;
  $('#device-rows').innerHTML=devices.length?devices.map(d=>`<tr><td><div class="device-cell"><span class="device-icon">${icon(d.kind==='datacom'?'ports':'server')}</span><div><strong>${esc(d.name)}</strong><small>${d.kind==='datacom'?'DATACOM · SSH':"BBU · PING ICMP"}</small></div></div></td><td class="ip">${esc(d.host)}</td><td>${badge(d.state)}</td><td class="latency">${d.latency!=null?`<span class="tiny-bars">▂▄▆</span>${number(d.latency)} <small>ms</small>`:'—'}</td><td><span class="loss-value ${d.failures>20?'critical':''}"><span class="loss-track"><i style="width:${Math.min(d.failures/21*100,100)}%"></i></span>${d.failures}<span class="muted">/ 21</span></span></td><td>${ago(d.last_check)}</td><td><div class="device-actions"><button class="icon-button" data-edit="${d.id}" title="Editar equipamento" aria-label="Editar ${esc(d.name)}">${icon('edit')}</button><button class="icon-button" data-detail="${d.id}" title="Ver detalhes" aria-label="Ver detalhes de ${esc(d.name)}">${icon('arrow')}</button><button class="icon-button" data-remove="${d.id}" title="Remover equipamento" aria-label="Remover ${esc(d.name)}">${icon('trash')}</button></div></td></tr>`).join(''):`<tr><td colspan="7">${empty(all.length?'Nenhum resultado encontrado':state.page==='bbus'?"Cadastre sua primeira BBU":state.page==='datacoms'?'Conecte seu primeiro Datacom':'Sua rede, em um só lugar',all.length?'Tente outro nome, IP ou filtro.':state.page==='bbus'?"Adicione uma BBU para acompanhar ping, latência e perdas consecutivas.":state.page==='datacoms'?'Adicione um Datacom para acompanhar disponibilidade, portas e sinais ópticos.':'Adicione seu primeiro equipamento ou explore a demonstração para conhecer o painel.',!all.length)}</td></tr>`;
 }
-function portsHTML(d){if(d.ssh_error)return `<p class="ssh-warning">${icon('warning')} ${esc(d.ssh_error)} As leituras anteriores não são exibidas como atuais.</p>`;
+function sshDiagnosticHTML(d){
+ const diagnostic=d.ssh_diagnostic||{};
+ const family=interfaceLabels[diagnostic.interface_type||d.interface_type]||'Automático';
+ const metadata=`Tipo salvo: ${family}\nEtapa: ${diagnostic.stage||'Aguardando nova consulta'}`;
+ const status=`Comando de portas: ${diagnostic.status_command||d.status_command||'—'}\n${diagnostic.status_output||'Nenhuma saída registrada nesta tentativa.'}`;
+ const optics=`Comando de sinais: ${diagnostic.optics_command||d.optics_command||'—'}\n${diagnostic.optics_output||'Nenhuma saída registrada nesta tentativa.'}`;
+ return `<details class="ssh-diagnostic" data-port-key="${d.id}:ssh-diagnostic"><summary>Ver diagnóstico da consulta SSH</summary><button type="button" class="button secondary output-copy" data-copy-output>${icon('copy')}Copiar diagnóstico</button><pre>${esc(metadata)}</pre><pre>${esc(status)}</pre><pre>${esc(optics)}</pre></details>`;
+}
+function portsHTML(d){if(d.ssh_error)return `<p class="ssh-warning">${icon('warning')} ${esc(d.ssh_error)} As leituras anteriores não são exibidas como atuais.</p>${sshDiagnosticHTML(d)}`;
  if(!d.port_data.length)return '<p class="muted">Aguardando a primeira consulta SSH. Intervalo: 30 segundos.</p>';
  return `<div class="port-cards">${d.port_data.map(p=>`<article class="port-card"><div class="port-card-header"><strong>${esc(p.name)}</strong>${badge(p.state)}</div>${p.interface_type&&p.interface_type!=='auto'?`<small class="port-family">${esc(interfaceLabels[p.interface_type]||p.interface_type)}</small>`:''}${p.description?`<p class="muted">${esc(p.description)}</p>`:''}<div class="optical"><span>RX · RECEPÇÃO<strong>${number(p.rx,2)} <small>dBm</small></strong></span><span>TX · TRANSMISSÃO<strong>${number(p.tx,2)} <small>dBm</small></strong></span></div><small>Leitura ${ago(p.checked_at)}</small>${p.rx==null&&p.tx==null?'<p class="signal-note">Sinal não informado ou formato não reconhecido.</p>':''}<details data-port-key="${d.id}:${esc(p.name)}"><summary>Ver saída do equipamento</summary><button type="button" class="button secondary output-copy" data-copy-output>${icon('copy')}Copiar saída</button><pre>${esc(p.status_output)}</pre><pre>${esc(p.optics_output)}</pre></details></article>`).join('')}</div>`;}
 function readingOutput(){
@@ -108,7 +116,7 @@ function navigate(page){
  render();
 }
 function toggleDemo(value){
- document.querySelectorAll('.port-card details[open]').forEach(e=>e.open=false);
+ document.querySelectorAll('.port-card details[open], .ssh-diagnostic[open]').forEach(e=>e.open=false);
  window.getSelection()?.removeAllRanges();
  state.demo=value;state.selected=null;localStorage.setItem('nexo-demo',String(value));load();
 }
@@ -181,11 +189,11 @@ async function copyOutput(button){
  }
 }
 $('#resume-live').addEventListener('click',()=>{
- document.querySelectorAll('.port-card details[open]').forEach(e=>e.open=false);
+ document.querySelectorAll('.port-card details[open], .ssh-diagnostic[open]').forEach(e=>e.open=false);
  window.getSelection()?.removeAllRanges();render();
 });
 document.addEventListener('toggle',event=>{
- if(event.target.matches('.port-card details'))render();
+ if(event.target.matches('.port-card details, .ssh-diagnostic'))render();
 },true);
 document.addEventListener('selectionchange',()=>{
  const selected=Boolean(window.getSelection()?.toString());

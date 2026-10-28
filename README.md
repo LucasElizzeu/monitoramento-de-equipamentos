@@ -78,10 +78,10 @@ O comando óptico padrão foi corrigido para `transceivers`. Ao iniciar, cadastr
 
 - Consultas SSH a cada 30 segundos.
 - Em **Tipo de interface**, escolha **Gigabit Ethernet (Giga)**, **Ten Gigabit Ethernet (Ten)** ou **Hundred Gigabit Ethernet**, conforme as portas que deseja acompanhar. A seleção vale para estado, descrição e sinais ópticos. Para um Datacom já cadastrado, use o lápis, selecione Ten e salve; a senha pode ficar vazia para manter a atual.
-- **Automático** mantém a compatibilidade com listagens em que cada número identifica um único tipo. Se `1/1/1` aparecer em seções Gigabit, Ten ou Hundred, o coletor solicita uma seleção explícita em vez de usar o estado ou o sinal de outra interface. Nenhum tipo é escolhido pelo estado Up/Down ou pela velocidade negociada.
+- **Automático** mantém a compatibilidade com listagens em que cada número identifica um único tipo. Se `1/1/1` aparecer em seções Gigabit, Ten ou Hundred, o coletor solicita uma seleção explícita em vez de usar o estado ou o sinal de outra interface. Se o tipo já estiver selecionado e o formato ainda não puder ser identificado, o aviso indica uma falha de interpretação, sem pedir a mesma seleção novamente. Nenhum tipo é escolhido pelo estado Up/Down ou pela velocidade negociada.
 - Os cartões identificam o tipo físico, e o histórico de transições considera tipo + número da porta. Alterar o tipo invalida as leituras anteriores e inicia nova consulta, preservando credenciais e dados de ping.
 - Deixe a lista de portas vazia para detectar as interfaces **do tipo selecionado** na listagem `show interface link` (até 128 portas por equipamento). Ou selecione portas separadas por vírgula: `1/1/21, 1/1/22`.
-- O parser mantém as seções `Gigabit Ethernet Interfaces:`, `Ten Gigabit Ethernet Interfaces:` e `Hundred Gigabit Ethernet Interfaces:` separadas, além de reconhecer os prefixos `gigabit-ethernet` e `ten-gigabit-ethernet` nas linhas ópticas. Ele foi adaptado às linhas fornecidas:
+- O parser mantém as seções Gigabit, Ten e Hundred separadas, inclusive variações como `TenGigabitEthernet Interfaces:`, `Ten-GigabitEthernet Interfaces:` e `10GE Interfaces:`. Também reconhece os prefixos compactos e com hífen nas linhas ópticas, preserva quebras de linha CR/LF e reúne linhas RX/TX da mesma interface. Estados Up/Down conflitantes continuam sendo sinalizados, sem escolher um arbitrariamente. Ele foi adaptado às linhas fornecidas:
 
 ```text
 1/1/21   Up    false     1G     full    -    -    -    TELEBRAS-ANORI
@@ -98,6 +98,10 @@ O painel mostra descrição, link, RX/TX, horário da leitura e a saída origina
 Os comandos podem ser ajustados por modelo. Aceitam apenas `show`/`display`, sem operadores de shell. Opcionalmente, use `{port}` para consultar cada porta separadamente (nesse caso, informe uma lista de portas). A conexão usa requisições SSH exec; firmwares que só aceitam shell interativo/paginação poderão precisar de um adaptador posterior.
 
 **Não houve conexão com equipamento físico nesta etapa.** O parser e as transições foram testados com os exemplos fornecidos e um cliente SSH simulado. A validação com o modelo/firmware e a rede reais ainda está pendente.
+
+### Diagnóstico de falhas SSH
+
+Se a leitura falhar, abra **Ver diagnóstico da consulta SSH**, abaixo do aviso. Ele mostra o tipo salvo, a etapa em que houve falha, os comandos e as saídas originais disponíveis, mesmo quando os cartões não puderam ser montados. Use **Copiar diagnóstico** para enviar essas informações ao suporte; a senha não é incluída. A atualização visual fica pausada durante a leitura, da mesma forma que na saída dos cartões. Ao editar a conexão, o diagnóstico anterior é limpo; a próxima consulta gera um resultado novo.
 
 ## Dados e segurança
 
