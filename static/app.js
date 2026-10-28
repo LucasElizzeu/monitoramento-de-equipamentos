@@ -83,9 +83,19 @@ function sshDiagnosticHTML(d){
  const optics=`Comando de sinais: ${diagnostic.optics_command||d.optics_command||'—'}\n${diagnostic.optics_output||'Nenhuma saída registrada nesta tentativa.'}`;
  return `<details class="ssh-diagnostic" data-port-key="${d.id}:ssh-diagnostic"><summary>Ver diagnóstico da consulta SSH</summary><button type="button" class="button secondary output-copy" data-copy-output>${icon('copy')}Copiar diagnóstico</button><pre>${esc(metadata)}</pre><pre>${esc(status)}</pre><pre>${esc(optics)}</pre></details>`;
 }
+function bandwidth(value){
+ if(value==null)return '—';
+ const [scale,unit]=value>=1e9?[1e9,'Gbps']:value>=1e6?[1e6,'Mbps']:value>=1e3?[1e3,'Kbps']:[1,'bps'];
+ return `${number(value/scale,2)} <small>${unit}</small>`;
+}
+function utilizationHTML(p){
+ if(p.utilization_enabled===false)return '';
+ const note=p.utilization_error||(p.rx_bps==null&&p.tx_bps==null&&p.rx_percent==null&&p.tx_percent==null?'Banda não informada ou formato não reconhecido.':'');
+ return `<div class="port-traffic"><div class="traffic-heading">BANDA · L1</div><div class="traffic-values"><span>RX · ENTRADA<strong>${bandwidth(p.rx_bps)}</strong>${p.rx_percent!=null?`<small>${number(p.rx_percent,2)}%</small>`:''}</span><span>TX · SAÍDA<strong>${bandwidth(p.tx_bps)}</strong>${p.tx_percent!=null?`<small>${number(p.tx_percent,2)}%</small>`:''}</span></div>${p.l2_rx_bps!=null||p.l2_tx_bps!=null?`<div class="traffic-l2"><span>L2 RX ${bandwidth(p.l2_rx_bps)}</span><span>L2 TX ${bandwidth(p.l2_tx_bps)}</span></div>`:''}${note?`<p class="signal-note">${esc(note)}</p>`:''}</div>`;
+}
 function portsHTML(d){if(d.ssh_error)return `<p class="ssh-warning">${icon('warning')} ${esc(d.ssh_error)} As leituras anteriores não são exibidas como atuais.</p>${sshDiagnosticHTML(d)}`;
  if(!d.port_data.length)return '<p class="muted">Aguardando a primeira consulta SSH. Intervalo: 30 segundos.</p>';
- return `<div class="port-cards">${d.port_data.map(p=>`<article class="port-card"><div class="port-card-header"><strong>${esc(p.name)}</strong>${badge(p.state)}</div>${p.interface_type&&p.interface_type!=='auto'?`<small class="port-family">${esc(interfaceLabels[p.interface_type]||p.interface_type)}</small>`:''}<div class="port-title-row"><p class="port-display-name">${esc(p.display_name||p.description||'Nomear porta')}</p><button type="button" class="icon-button" data-port-alias="${d.id}" data-port="${esc(p.name)}" data-family="${esc(p.interface_type||d.interface_type||'auto')}" title="Editar nome da porta" aria-label="Editar nome da porta ${esc(p.name)}">${icon('edit')}</button></div><div class="optical"><span>RX · RECEPÇÃO<strong>${number(p.rx,2)} <small>dBm</small></strong></span><span>TX · TRANSMISSÃO<strong>${number(p.tx,2)} <small>dBm</small></strong></span></div><small>Leitura ${ago(p.checked_at)}</small>${p.rx==null&&p.tx==null?'<p class="signal-note">Sinal não informado ou formato não reconhecido.</p>':''}<details data-port-key="${d.id}:${esc(p.interface_type||d.interface_type||'auto')}:${esc(p.name)}"><summary>Ver saída do equipamento</summary><button type="button" class="button secondary output-copy" data-copy-output>${icon('copy')}Copiar saída</button><pre>${esc(p.status_output)}</pre><pre>${esc(p.optics_output)}</pre></details></article>`).join('')}</div>`;}
+ return `<div class="port-cards">${d.port_data.map(p=>`<article class="port-card"><div class="port-card-header"><strong>${esc(p.name)}</strong>${badge(p.state)}</div>${p.interface_type&&p.interface_type!=='auto'?`<small class="port-family">${esc(interfaceLabels[p.interface_type]||p.interface_type)}</small>`:''}<div class="port-title-row"><p class="port-display-name">${esc(p.display_name||p.description||'Nomear porta')}</p><button type="button" class="icon-button" data-port-alias="${d.id}" data-port="${esc(p.name)}" data-family="${esc(p.interface_type||d.interface_type||'auto')}" title="Editar nome da porta" aria-label="Editar nome da porta ${esc(p.name)}">${icon('edit')}</button></div><div class="optical"><span>RX · RECEPÇÃO<strong>${number(p.rx,2)} <small>dBm</small></strong></span><span>TX · TRANSMISSÃO<strong>${number(p.tx,2)} <small>dBm</small></strong></span></div>${utilizationHTML(p)}<small>Leitura ${ago(p.checked_at)}</small>${p.rx==null&&p.tx==null?'<p class="signal-note">Sinal não informado ou formato não reconhecido.</p>':''}<details data-port-key="${d.id}:${esc(p.interface_type||d.interface_type||'auto')}:${esc(p.name)}"><summary>Ver saída do equipamento</summary><button type="button" class="button secondary output-copy" data-copy-output>${icon('copy')}Copiar saída</button><pre>${esc(p.status_output)}</pre><pre>${esc(p.optics_output)}</pre><pre>${esc(p.utilization_output)}</pre></details></article>`).join('')}</div>`;}
 function readingOutput(){
  return (state.page==='datacoms'&&Boolean($('#ports-content').querySelector('details[open]')))
   ||($('#detail-dialog').open&&Boolean($('#detail-content').querySelector('details[open]')));
@@ -170,7 +180,7 @@ function openEdit(id){
  const device=state.data.devices.find(d=>d.id===id);
  if(!device)return;
  state.editing=device;$('#device-form').reset();
- for(const name of ['name','host','interval','ping_timeout','interface_type','circuit_position','ssh_port','username','fingerprint','status_command','optics_command']){
+ for(const name of ['name','host','interval','ping_timeout','interface_type','circuit_position','ssh_port','username','fingerprint','status_command','optics_command','utilization_command']){
   $(`[name="${name}"]`).value=device[name]??(name==='ping_timeout'?4:name==='interface_type'?'auto':'');
  }
  $(`[name="kind"][value="${device.kind}"]`).checked=true;

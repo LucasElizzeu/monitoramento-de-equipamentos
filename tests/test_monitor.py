@@ -616,6 +616,104 @@ class MonitorTests(unittest.TestCase):
                 app.DeviceInput(name='Invalid', host='127.0.0.1', circuit_position=position)
 
 
+    def utilization_fixture(self):
+        return ('                             L1 RX      L1 TX      L2 RX      L2 TX\n'
+                'INTERFACE NAME               BANDWIDTH  BANDWIDTH  BANDWIDTH  BANDWIDTH\n'
+                '-------------------------------------------------------------------------\n'
+                'ten-gigabit-ethernet-1/1/11  2.5Gbps    162.1Mbps  2.4Gbps    151.4Mbps\n'
+                'gigabit-ethernet-1/1/11     10Mbps     5Mbps      9Mbps      4Mbps\n'
+                'ten-gigabit-ethernet-1/1/12  0bps       N/A        0bps       0bps')
+
+    def test_supplied_utilization_output_keeps_l1_l2_and_physical_families(self):
+        output = self.utilization_fixture()
+        ten = app.utilization_values(app.port_lines('1/1/11', output, 'ten-gigabit-ethernet'))
+        self.assertEqual((ten['rx_bps'], ten['tx_bps'], ten['l2_rx_bps'], ten['l2_tx_bps']),
+                         (2_500_000_000, 162_100_000, 2_400_000_000, 151_400_000))
+        giga = app.utilization_values(app.port_lines('1/1/11', output, 'gigabit-ethernet'))
+        self.assertEqual((giga['rx_bps'], giga['tx_bps']), (10_000_000, 5_000_000))
+        missing = app.utilization_values(app.port_lines('1/1/12', output, 'ten-gigabit-ethernet'))
+        self.assertEqual((missing['rx_bps'], missing['tx_bps'], missing['l2_tx_bps']), (0, None, 0))
+
+    def test_utilization_header_order_units_and_decimal_comma(self):
+        output = ('     L2 TX    L1 TX    L2 RX    L1 RX\n'
+                  'INTERFACE NAME  BANDWIDTH  BANDWIDTH  BANDWIDTH  BANDWIDTH\n'
+                  'ten-gigabit-ethernet-1/1/11  9Kbps  162,1Mbps  1Gbps  2,5Gbps')
+        values = app.utilization_values(output)
+        self.assertEqual((values['rx_bps'], values['tx_bps'], values['l2_tx_bps']), (2.5e9, 162.1e6, 9000))
+        self.assertEqual(app.utilization_values('RX: 10MBps')['rx_bps'], None)
+        self.assertEqual(app.utilization_values('RX packets: 12345 TX bytes: 3000')['tx_bps'], None)
+        self.assertEqual(app.utilization_values('1/1/11  200  100')['rx_bps'], None)
+
+    def test_utilization_reads_once_and_keeps_only_selected_interfaces(self):
+        d = app.create_device(app.DeviceInput(name='Mixed', host='192.0.2.9', kind='datacom', username='op',
+            password='test-only', fingerprint='SHA256:'+'a'*43, interface_type='mixed',
+            ports=['ten:1/1/11', 'giga:1/1/19']))
+        with app.connect() as db:
+            stored = dict(db.execute('SELECT * FROM devices WHERE id=?', (d['id'],)).fetchone())
+        with patch.object(app.paramiko, 'SSHClient'), patch.object(app, 'ssh_read',
+                side_effect=[*self.mixed_fixture(), self.utilization_fixture()]) as read:
+            app.check_ssh(stored)
+        self.assertEqual([call.args[1] for call in read.call_args_list],
+                         ['show interface link', 'show interface transceivers', 'show interface utilization'])
+        result = next(x for x in app.dashboard()['devices'] if x['id'] == d['id'])
+        self.assertIsNone(result['ssh_error'])
+        self.assertEqual(len(result['port_data']), 2)
+        ten, giga = result['port_data']
+        self.assertEqual((ten['rx'], ten['rx_bps'], ten['l2_tx_bps']), (-11, 2.5e9, 151.4e6))
+        self.assertIsNone(giga['rx_bps'], 'Missing Giga19 cannot borrow the readings of Giga11')
+
+    def test_rejected_utilization_does_not_hide_links_and_never_reuses_old_rates(self):
+        ports = [dict(name='1/1/11', interface_type='ten-gigabit-ethernet', state='up', rx=-12, rx_bps=999)]
+        with patch.object(app, 'ssh_read', return_value=self.utilization_fixture()):
+            app.collect_utilization(Mock(), {}, ports)
+        self.assertEqual(ports[0]['rx_bps'], 2.5e9)
+        with patch.object(app, 'ssh_read', side_effect=app.CommandRejected('Comando de utilização rejeitado.')):
+            app.collect_utilization(Mock(), {}, ports)
+        self.assertEqual((ports[0]['state'], ports[0]['rx']), ('up', -12))
+        self.assertIsNone(ports[0]['rx_bps'])
+        self.assertEqual(ports[0]['utilization_output'], '')
+        self.assertIn('rejeitado', ports[0]['utilization_error'])
+        with patch.object(app, 'ssh_read') as read:
+            app.collect_utilization(Mock(), {'utilization_command': ''}, ports)
+        read.assert_not_called()
+        self.assertFalse(ports[0]['utilization_enabled'])
+        self.assertIsNone(ports[0]['utilization_error'])
+
+    def test_ssh_utilization_failure_still_publishes_current_link_and_signal(self):
+        d = app.create_device(app.DeviceInput(name='Datacom', host='192.0.2.9', kind='datacom', username='op',
+            password='test-only', fingerprint='SHA256:'+'a'*43, interface_type='ten-gigabit-ethernet', ports=['1/1/11']))
+        with app.connect() as db:
+            stored = dict(db.execute('SELECT * FROM devices WHERE id=?', (d['id'],)).fetchone())
+        with patch.object(app.paramiko, 'SSHClient'), patch.object(app, 'ssh_read', side_effect=[
+                *self.mixed_fixture(), app.CommandRejected('O equipamento rejeitou show interface utilization.')]):
+            app.check_ssh(stored)
+        result = next(x for x in app.dashboard()['devices'] if x['id'] == d['id'])
+        self.assertIsNone(result['ssh_error'])
+        port = result['port_data'][0]
+        self.assertEqual((port['state'], port['rx']), ('up', -11))
+        self.assertIsNone(port['rx_bps'])
+        self.assertIn('show interface utilization', port['utilization_error'])
+
+    def test_ambiguous_utilization_does_not_reuse_or_cross_port_data(self):
+        ports = [dict(name='1/1/11', interface_type='auto')]
+        with patch.object(app, 'ssh_read', return_value=self.utilization_fixture()):
+            app.collect_utilization(Mock(), {}, ports)
+        self.assertIsNone(ports[0]['rx_bps'])
+        self.assertIn('mais de um tipo', ports[0]['utilization_error'])
+
+    def test_utilization_migration_and_older_clients_preserve_settings(self):
+        with app.connect() as db:
+            db.execute('ALTER TABLE devices DROP COLUMN utilization_command')
+        app.init_db()
+        self.assertEqual(self.device_state()['utilization_command'], 'show interface utilization')
+        disabled = app.update_device(self.id, app.DeviceInput(name='Local', host='127.0.0.1', utilization_command=''))
+        self.assertEqual(disabled['utilization_command'], '')
+        kept = app.update_device(self.id, app.DeviceInput(name='Renamed', host='127.0.0.1'))
+        self.assertEqual(kept['utilization_command'], '')
+        for command in ('reboot', 'show interface utilization; reboot', 'show interface utilization {port}'):
+            with self.assertRaises(ValueError):
+                app.DeviceInput(name='Local', host='127.0.0.1', utilization_command=command)
+
     def mixed_fixture(self):
         status = ('Gigabit Ethernet Interfaces:\n'
                   '1/1/10 Down false - - - - - GIGA-10\n'

@@ -95,6 +95,8 @@ def init_db():
             db.execute('ALTER TABLE devices ADD COLUMN circuit_position INTEGER')
         if 'port_aliases' not in columns:
             db.execute("ALTER TABLE devices ADD COLUMN port_aliases TEXT NOT NULL DEFAULT '{}'")
+        if 'utilization_command' not in columns:
+            db.execute("ALTER TABLE devices ADD COLUMN utilization_command TEXT NOT NULL DEFAULT 'show interface utilization'")
         # Correct only the old built-in typo; preserve custom commands and credentials.
         db.execute("UPDATE devices SET optics_command='show interface transceivers', "
                    "last_ssh=0, config_version=config_version+1 "
@@ -117,6 +119,7 @@ class DeviceInput(BaseModel):
     circuit_position: int | None = Field(default=None, ge=1, le=10000)
     status_command: str = 'show interface link'
     optics_command: str = 'show interface transceivers'
+    utilization_command: str = 'show interface utilization'
 
     @field_validator('name')
     @classmethod
@@ -155,6 +158,16 @@ class DeviceInput(BaseModel):
         if len(set(value)) != len(value):
             raise ValueError('Portas duplicadas.')
         return value
+
+    @field_validator('utilization_command')
+    @classmethod
+    def valid_utilization_command(cls, value):
+        value = value.strip()
+        if not value:
+            return ''
+        if '{port}' in value:
+            raise ValueError('Use uma consulta geral de utilização, sem {port}.')
+        return cls.valid_command(value)
 
     @field_validator('status_command', 'optics_command')
     @classmethod
@@ -483,6 +496,83 @@ def parse_port(port, status_output, optics_output, optics_context=None):
                 checked_at=now(), status_output=status_output, optics_output=optics_output)
 
 
+def utilization_values(output):
+    """Read explicitly labelled rates/percentages, never packet or byte counters."""
+    result = dict(rx_bps=None, tx_bps=None, l2_rx_bps=None, l2_tx_bps=None, rx_percent=None, tx_percent=None)
+    number = r'\d+(?:[.,]\d+)?'
+    unit = r'(?:[kmgt]?(?:bps|bits?/s)|%)'
+
+    def store(label, cell):
+        direction = re.search(r'\b(rx|tx|input|output|ingress|egress|receive|transmit|entrada|sa[ií]da)\b', label, re.I)
+        if not direction or re.search(r'\b(?:packets?|pkts?|pps|bytes?|octets?|errors?|discards?)\b', label, re.I):
+            return
+        measurement = re.fullmatch(r'\s*(' + number + r')\s*(' + unit + r')?\s*', cell, re.I)
+        if not measurement:
+            return
+        units = measurement[2] or next(iter(re.findall(unit, label, re.I)), '')
+        if not units or 'B' in units:
+            return
+        value = float(measurement[1].replace(',', '.'))
+        direction = 'rx' if direction[1].lower() in ('rx', 'input', 'ingress', 'receive', 'entrada') else 'tx'
+        if units == '%':
+            if value <= 100:
+                result[direction + '_percent'] = value
+        else:
+            scale = {'k': 1e3, 'm': 1e6, 'g': 1e9, 't': 1e12}.get(units[0].lower(), 1)
+            layer = 'l2_' if re.search(r'\bL2\b', label, re.I) else ''
+            result[layer + direction + '_bps'] = value * scale
+
+    # Explicit labels on a row or on separate lines.
+    for label, cell in re.findall(
+            r'\b((?:L[12]\s+)?(?:rx|tx|input|output|ingress|egress|receive|transmit|entrada|sa[ií]da)'
+            r'(?:\s+(?:rate|utilization|bandwidth))?\s*[:=]?)\s*('
+            + number + r'\s*' + unit + r')(?=\s|[|,;]|$)', output, re.I):
+        store(label, cell)
+    # Table headers carry direction and unit when cells contain only numbers.
+    for block in interface_blocks(output):
+        row = block['lines'][0]
+        port = re.search(r'\d+/\d+/\d+', row)
+        tail = row[port.end():].strip().strip('|').strip()
+        cells = [c.strip() for c in tail.split('|')] if '|' in tail else re.split(r'\s{2,}', tail)
+        if len(cells) == 1:
+            cells = re.findall(number + r'(?:\s*' + unit + r')?|\S+', tail, re.I)
+        for header in block['header'].splitlines():
+            layers = re.findall(r'\bL[12]\s+(?:RX|TX)\b', header, re.I)
+            if layers and len(layers) == len(cells):
+                for label, cell in zip(layers, cells):
+                    store(label, cell)
+                continue
+            columns = [c.strip() for c in header.strip().strip('|').split('|')] if '|' in header else re.split(r'\s{2,}', header.strip())
+            if len(columns) == len(cells) + 1:
+                for label, cell in zip(columns[1:], cells):
+                    store(label, cell)
+    return result
+
+
+def collect_utilization(client, device, ports):
+    """A missing traffic command must not hide link and optical monitoring."""
+    command = device.get('utilization_command', 'show interface utilization')
+    output, error = '', None
+    if command:
+        try:
+            output = ssh_read(client, command)
+        except CommandRejected as exc:
+            error = str(exc)
+        except Exception:
+            error = 'Não foi possível consultar a utilização nesta leitura.'
+    for port in ports:
+        values = dict(rx_bps=None, tx_bps=None, l2_rx_bps=None, l2_tx_bps=None, rx_percent=None, tx_percent=None)
+        port_error = error
+        if output:
+            try:
+                selected = port_lines(port['name'], output, port['interface_type'])
+                values = utilization_values(selected)
+            except InterfaceSelectionError as exc:
+                port_error = str(exc)
+        port.update(values, utilization_output=output, utilization_error=port_error,
+                    utilization_enabled=bool(command))
+
+
 class CommandRejected(paramiko.SSHException):
     """A device can reject a CLI command while SSH still reports exit code zero."""
 
@@ -551,6 +641,7 @@ def check_ssh(device):
             result.update(interface_type=family, identity=f'{family}:{query_port}',
                           status_output=status_raw, optics_output=optics_raw)
             ports.append(result)
+        collect_utilization(client, device, ports)
     except (CommandRejected, InterfaceSelectionError) as exc:
         error = str(exc)
     except paramiko.AuthenticationException:
@@ -710,12 +801,14 @@ def update_device(device_id: int, device: DeviceInput):
         values = device_values(device, previous)
         if 'circuit_position' not in device.model_fields_set:
             values['circuit_position'] = previous['circuit_position']
+        if 'utilization_command' not in device.model_fields_set:
+            values['utilization_command'] = previous['utilization_command']
         if db.execute('SELECT id FROM devices WHERE host=? AND kind=? AND id<>?',
                       (device.host, device.kind, device_id)).fetchone():
             raise HTTPException(409, 'Este IP já está cadastrado para este tipo de monitoramento.')
         changed_target = device.host != previous['host'] or device.kind != previous['kind']
         changed_ssh = any(values[key] != previous[key] for key in
-                          ('ssh_port', 'username', 'password', 'fingerprint', 'ports', 'interface_type', 'status_command', 'optics_command'))
+                          ('ssh_port', 'username', 'password', 'fingerprint', 'ports', 'interface_type', 'status_command', 'optics_command', 'utilization_command'))
         if changed_target:
             db.execute('DELETE FROM samples WHERE device_id=?', (device_id,))
             values.update(state='pending', failures=0, latency=None, last_check=None, ping_detail=None)
@@ -775,7 +868,11 @@ def demo_dashboard():
               ('Switch • Almoxarifado', '10.0.3.2', 'ping', 'offline', None),
               ('Datacom • Distribuição sul', '10.0.4.1', 'datacom', 'online', 4.1)]
     for i, (name, host, kind, state, latency) in enumerate(labels, 1):
-        ports = [] if kind == 'ping' else [dict(name=f'ge1/1/{p}', state='down' if i == 2 and p == 3 else 'up', rx=None if i == 2 and p == 3 else round(-8.3-p*1.2, 2), tx=-2.1, checked_at=now(), status_output='Exemplo de saída simulada', optics_output='Dados de demonstração') for p in range(1, 5)]
+        ports = [] if kind == 'ping' else [dict(name=f'ge1/1/{p}', state='down' if i == 2 and p == 3 else 'up', rx=None if i == 2 and p == 3 else round(-8.3-p*1.2, 2), tx=-2.1,
+            rx_bps=0 if i == 2 and p == 3 else p*120e6, tx_bps=0 if i == 2 and p == 3 else p*30e6,
+            l2_rx_bps=0 if i == 2 and p == 3 else p*115e6, l2_tx_bps=0 if i == 2 and p == 3 else p*28e6,
+            utilization_enabled=True, utilization_output='Banda simulada para demonstração.',
+            checked_at=now(), status_output='Exemplo de saída simulada', optics_output='Dados de demonstração') for p in range(1, 5)]
         devices.append(dict(id=i, name=name, host=host, kind=kind, state=state, failures=24 if state == 'offline' else 7 if state == 'unstable' else 0, latency=latency, last_check=now(), interval=5, ports=[p['name'] for p in ports], port_data=ports, ssh_error=None))
     samples = [dict(device_id=1, at=datetime.fromtimestamp(time.time()-(59-i)*5, timezone.utc).isoformat(), latency=round(3 + math.sin(i*.55)*.7 + math.cos(i*.17)*.45, 2), success=1) for i in range(60)]
     events = [dict(id=3, device_id=5, device_name=labels[4][0], at=now(), level='critical', message='Sem ping: 24 perdas consecutivas.'),

@@ -80,6 +80,7 @@ Comandos padrão informados para este projeto:
 ```text
 show interface link
 show interface transceivers
+show interface utilization
 ```
 
 O comando óptico padrão foi corrigido para `transceivers`. Ao iniciar, cadastros Datacom que ainda usam exatamente o antigo padrão `show interface tranceivers` são corrigidos automaticamente, preservando credenciais e histórico. Comandos personalizados são mantidos. Se o firmware rejeitar uma consulta com `syntax error: unknown argument` ou outra indicação de comando inválido, o painel informa qual comando foi rejeitado, mesmo quando o SSH retorna código de saída zero. Ajuste a sintaxe do modelo em **Editar → Comandos do equipamento**.
@@ -104,6 +105,19 @@ gigabit-ethernet 1/1/22 | 54.14 C | 3.3 V  | 19.77 mA | -6.39 dBm | -9.53 dBm
 A leitura óptica usa rótulos RX/TX ou o cabeçalho da tabela quando disponíveis. Sem cabeçalho, as duas últimas colunas dBm do formato fornecido são interpretadas como TX e RX, respectivamente. Temperatura/tensão/corrente podem estar ausentes, e são aceitos graus °C, vírgula decimal e linhas de diagnóstico quebradas. Os valores aparecem nos cartões com até duas casas decimais. Sinal ausente ou não reconhecido fica como `—`, nunca zero; uma medição ausente não apaga a outra. O formato real de cada firmware deve ser confirmado pela saída original.
 
 O painel mostra descrição, link, RX/TX, horário da leitura e a saída original. Formatos desconhecidos ficam como **Não identificado**. Se a consulta SSH falhar, leituras anteriores não são exibidas como atuais. Uma porta inicialmente Down gera um evento; novas consultas Down não duplicam o alerta; a volta para Up registra recuperação.
+
+Cada cartão também mostra a **banda L1 de entrada (RX) e saída (TX)** e, abaixo, a banda L2 quando disponível. A consulta `show interface utilization` é feita uma vez por equipamento, junto das consultas SSH a cada 30 segundos. Os valores são exibidos em bps, Kbps, Mbps ou Gbps, conforme a escala. O parser reconhece o formato fornecido:
+
+```text
+                             L1 RX      L1 TX      L2 RX      L2 TX
+INTERFACE NAME               BANDWIDTH  BANDWIDTH  BANDWIDTH  BANDWIDTH
+-------------------------------------------------------------------------
+ten-gigabit-ethernet-1/1/11  2.5Gbps    162.1Mbps  2.4Gbps    151.4Mbps
+```
+
+Essa linha mostra **2,5 Gbps RX / 162,1 Mbps TX em L1** e **2,4 Gbps RX / 151,4 Mbps TX em L2**. São as taxas reportadas pelo equipamento na consulta; o painel não calcula médias adicionais nem mantém histórico de banda nesta versão. Tipo e número da porta são respeitados, inclusive no modo Gigabit + Ten. Valores ausentes ou formatos desconhecidos aparecem como `—`; zero só aparece quando informado pelo equipamento. A saída de utilização também está em **Ver saída do equipamento → Copiar saída**.
+
+O comando de banda é adicionado automaticamente aos cadastros existentes, preservando senhas, posições e nomes. Se ele for recusado ou sua consulta falhar, o cartão informa o problema e mantém o monitoramento de link e sinais. Em **Editar → Comandos do equipamento → Consultar utilização de banda**, ajuste a consulta geral ou deixe o campo vazio para desativar apenas a banda. Essa consulta não aceita `{port}`.
 
 Os comandos podem ser ajustados por modelo. Aceitam apenas `show`/`display`, sem operadores de shell. Opcionalmente, use `{port}` para consultar cada porta separadamente (nesse caso, informe uma lista de portas). A conexão usa requisições SSH exec; firmwares que só aceitam shell interativo/paginação poderão precisar de um adaptador posterior.
 
