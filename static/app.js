@@ -24,7 +24,7 @@ function icon(name){return `<svg viewBox="0 0 24 24" fill="none" stroke="current
 function hydrateIcons(){document.querySelectorAll('[data-icon]').forEach(el=>{el.innerHTML=icon(el.dataset.icon);});}
 const esc = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const number = (n,digits=1) => n==null?'—':Number(n).toLocaleString('pt-BR',{maximumFractionDigits:digits});
-const interfaceLabels={'auto':'Automático','gigabit-ethernet':'Gigabit Ethernet','ten-gigabit-ethernet':'Ten Gigabit Ethernet','hundred-gigabit-ethernet':'Hundred Gigabit Ethernet'};
+const interfaceLabels={'auto':'Automático','mixed':'Gigabit + Ten (portas selecionadas)','gigabit-ethernet':'Gigabit Ethernet','ten-gigabit-ethernet':'Ten Gigabit Ethernet','hundred-gigabit-ethernet':'Hundred Gigabit Ethernet'};
 const labels = {online:'Online',offline:'Sem ping',unstable:'Instável',pending:'Aguardando',error:'Erro de coleta',up:'Ativa',down:'Inativa',unknown:'Não identificado'};
 const state = {demo:localStorage.getItem('nexo-demo')==='true', page:'overview', data:{devices:[],alerts:[],samples:[]}, loading:false, selected:null, deleting:null, editing:null, portNaming:null, dataRevision:0};
 function badge(status){return `<span class="status-pill ${esc(status)}"><i></i>${esc(labels[status]||status)}</span>`;}
@@ -85,7 +85,7 @@ function sshDiagnosticHTML(d){
 }
 function portsHTML(d){if(d.ssh_error)return `<p class="ssh-warning">${icon('warning')} ${esc(d.ssh_error)} As leituras anteriores não são exibidas como atuais.</p>${sshDiagnosticHTML(d)}`;
  if(!d.port_data.length)return '<p class="muted">Aguardando a primeira consulta SSH. Intervalo: 30 segundos.</p>';
- return `<div class="port-cards">${d.port_data.map(p=>`<article class="port-card"><div class="port-card-header"><strong>${esc(p.name)}</strong>${badge(p.state)}</div>${p.interface_type&&p.interface_type!=='auto'?`<small class="port-family">${esc(interfaceLabels[p.interface_type]||p.interface_type)}</small>`:''}<div class="port-title-row"><p class="port-display-name">${esc(p.display_name||p.description||'Nomear porta')}</p><button type="button" class="icon-button" data-port-alias="${d.id}" data-port="${esc(p.name)}" data-family="${esc(p.interface_type||d.interface_type||'auto')}" title="Editar nome da porta" aria-label="Editar nome da porta ${esc(p.name)}">${icon('edit')}</button></div><div class="optical"><span>RX · RECEPÇÃO<strong>${number(p.rx,2)} <small>dBm</small></strong></span><span>TX · TRANSMISSÃO<strong>${number(p.tx,2)} <small>dBm</small></strong></span></div><small>Leitura ${ago(p.checked_at)}</small>${p.rx==null&&p.tx==null?'<p class="signal-note">Sinal não informado ou formato não reconhecido.</p>':''}<details data-port-key="${d.id}:${esc(p.name)}"><summary>Ver saída do equipamento</summary><button type="button" class="button secondary output-copy" data-copy-output>${icon('copy')}Copiar saída</button><pre>${esc(p.status_output)}</pre><pre>${esc(p.optics_output)}</pre></details></article>`).join('')}</div>`;}
+ return `<div class="port-cards">${d.port_data.map(p=>`<article class="port-card"><div class="port-card-header"><strong>${esc(p.name)}</strong>${badge(p.state)}</div>${p.interface_type&&p.interface_type!=='auto'?`<small class="port-family">${esc(interfaceLabels[p.interface_type]||p.interface_type)}</small>`:''}<div class="port-title-row"><p class="port-display-name">${esc(p.display_name||p.description||'Nomear porta')}</p><button type="button" class="icon-button" data-port-alias="${d.id}" data-port="${esc(p.name)}" data-family="${esc(p.interface_type||d.interface_type||'auto')}" title="Editar nome da porta" aria-label="Editar nome da porta ${esc(p.name)}">${icon('edit')}</button></div><div class="optical"><span>RX · RECEPÇÃO<strong>${number(p.rx,2)} <small>dBm</small></strong></span><span>TX · TRANSMISSÃO<strong>${number(p.tx,2)} <small>dBm</small></strong></span></div><small>Leitura ${ago(p.checked_at)}</small>${p.rx==null&&p.tx==null?'<p class="signal-note">Sinal não informado ou formato não reconhecido.</p>':''}<details data-port-key="${d.id}:${esc(p.interface_type||d.interface_type||'auto')}:${esc(p.name)}"><summary>Ver saída do equipamento</summary><button type="button" class="button secondary output-copy" data-copy-output>${icon('copy')}Copiar saída</button><pre>${esc(p.status_output)}</pre><pre>${esc(p.optics_output)}</pre></details></article>`).join('')}</div>`;}
 function readingOutput(){
  return (state.page==='datacoms'&&Boolean($('#ports-content').querySelector('details[open]')))
   ||($('#detail-dialog').open&&Boolean($('#detail-content').querySelector('details[open]')));
@@ -123,6 +123,30 @@ function toggleDemo(value){
  window.getSelection()?.removeAllRanges();
  state.demo=value;state.selected=null;localStorage.setItem('nexo-demo',String(value));load();
 }
+function normalizedPorts(value){
+ return value.split(/[,;\s]+/).map(port=>port.trim()).filter(Boolean).map(port=>/^\d+$/.test(port)?`1/1/${Number(port)}`:port);
+}
+function mixedPortLists(ports){
+ const lists={ten:[],giga:[]};
+ for(const port of ports){
+  const match=port.match(/^(.+?)(\d+\/\d+\/\d+)$/);if(!match)continue;
+  const prefix=match[1].toLowerCase().replace(/[^a-z0-9]/g,'');
+  if(['ten','tengigabitethernet','10ge','10gigabitethernet','xge','xe','te'].includes(prefix))lists.ten.push(match[2]);
+  if(['giga','gigabitethernet','1ge','ge','gi'].includes(prefix))lists.giga.push(match[2]);
+ }
+ return lists;
+}
+function syncInterfaceMode(carry=false){
+ const selector=$('[name="interface_type"]');const mode=selector.value;const previous=selector.dataset.previousMode;
+ if(carry&&mode==='mixed'&&['gigabit-ethernet','ten-gigabit-ethernet'].includes(previous)){
+  const target=previous==='ten-gigabit-ethernet'?'ten_ports':'giga_ports';
+  if(!$(`[name="${target}"]`).value)$(`[name="${target}"]`).value=normalizedPorts($('[name="ports"]').value).join(', ');
+ }else if(carry&&previous==='mixed'&&mode!=='mixed'){
+  const source=mode==='ten-gigabit-ethernet'?'ten_ports':mode==='gigabit-ethernet'?'giga_ports':null;
+  $('[name="ports"]').value=source?normalizedPorts($(`[name="${source}"]`).value).join(', '):'';
+ }
+ $('#single-port-field').hidden=mode==='mixed';$('#mixed-port-fields').hidden=mode!=='mixed';selector.dataset.previousMode=mode;
+}
 function syncDeviceKind(){
  const ssh=$('[name="kind"]:checked').value==='datacom';
  $('#ssh-fields').hidden=!ssh;
@@ -134,6 +158,7 @@ function syncDeviceKind(){
  $('#device-dialog-title').textContent=state.editing?(ssh?'Editar Datacom':'Editar BBU'):(ssh?'Adicionar Datacom':'Adicionar BBU');
  $('#save-device').innerHTML=state.editing?`${icon('check')}Salvar alterações`:`${icon('plus')}Adicionar equipamento`;
  $('[name="name"]').placeholder=ssh?'Ex.: Datacom • Core principal':'Ex.: BBU • Torre central';
+ syncInterfaceMode();
 }
 function openAdd(){
  state.editing=null;$('#device-form').reset();
@@ -150,6 +175,7 @@ function openEdit(id){
  }
  $(`[name="kind"][value="${device.kind}"]`).checked=true;
  $('[name="ports"]').value=device.ports.join(', ');$('[name="password"]').value='';
+ const lists=mixedPortLists(device.ports);$('[name="ten_ports"]').value=lists.ten.join(', ');$('[name="giga_ports"]').value=lists.giga.join(', ');
  syncDeviceKind();$('#form-error').hidden=true;$('#device-dialog').showModal();
 }
 function renderDetail(){const d=state.data.devices.find(d=>d.id===state.selected);if(!d){$('#detail-dialog').close();state.selected=null;return;}
@@ -160,7 +186,7 @@ function renderDetail(){const d=state.data.devices.find(d=>d.id===state.selected
 async function openDetail(id){state.selected=id;state.detailSamples=[];renderDetail();$('#detail-dialog').showModal();try{state.detailSamples=state.demo?state.data.samples.filter(s=>s.device_id===id):await api(`/api/devices/${id}/history`);if(state.selected===id)renderDetail();}catch(e){toast(e.message);}}
 $('#device-form').addEventListener('submit',async event=>{
  event.preventDefault();const form=new FormData(event.target);const d=Object.fromEntries(form);
- d.circuit_position=d.circuit_position===''?null:Number(d.circuit_position);d.interval=Number(d.interval);d.ping_timeout=Number(d.ping_timeout);d.ssh_port=Number(d.ssh_port);d.ports=d.ports.split(',').map(p=>p.trim()).filter(Boolean);
+ d.circuit_position=d.circuit_position===''?null:Number(d.circuit_position);d.interval=Number(d.interval);d.ping_timeout=Number(d.ping_timeout);d.ssh_port=Number(d.ssh_port);d.ports=d.interface_type==='mixed'?[...normalizedPorts(d.ten_ports).map(port=>'ten:'+port),...normalizedPorts(d.giga_ports).map(port=>'giga:'+port)]:d.ports.split(',').map(p=>p.trim()).filter(Boolean);delete d.ten_ports;delete d.giga_ports;
  const editingId=state.editing?.id;$('#save-device').disabled=true;$('#form-error').hidden=true;
  try{
   await api(editingId?`/api/devices/${editingId}`:'/api/devices',{method:editingId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
@@ -168,6 +194,7 @@ $('#device-form').addEventListener('submit',async event=>{
   navigate(d.kind==='datacom'?'datacoms':'bbus');toast(editingId?'Alterações salvas. O monitoramento será atualizado.':'Equipamento adicionado à sua rede.');await load();
  }catch(e){$('#form-error').textContent=e.message;$('#form-error').hidden=false;}finally{$('#save-device').disabled=false;}
 });
+ $('[name="interface_type"]').addEventListener('change',()=>syncInterfaceMode(true));
 document.querySelectorAll('[name="kind"]').forEach(el=>el.addEventListener('change',syncDeviceKind));
 document.querySelectorAll('[data-page]').forEach(e=>e.addEventListener('click',()=>navigate(e.dataset.page)));
 $('#all-events').addEventListener('click',()=>navigate('alerts'));

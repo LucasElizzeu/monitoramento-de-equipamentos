@@ -43,6 +43,7 @@ INFLIGHT = set()
 IS_WINDOWS = sys.platform == 'win32'
 INTERFACE_LABELS = {
     'auto': 'Automático',
+    'mixed': 'Gigabit + Ten (portas selecionadas)',
     'gigabit-ethernet': 'Gigabit Ethernet',
     'ten-gigabit-ethernet': 'Ten Gigabit Ethernet',
     'hundred-gigabit-ethernet': 'Hundred Gigabit Ethernet',
@@ -180,6 +181,8 @@ class PortAliasInput(BaseModel):
     @field_validator('interface_type')
     @classmethod
     def valid_family(cls, value):
+        if value == 'mixed':
+            raise ValueError('Informe o tipo físico da porta: Gigabit ou Ten.')
         return DeviceInput.valid_interface_type(value)
 
     @field_validator('display_name')
@@ -327,8 +330,8 @@ def interface_family(prefix):
     compact = re.sub(r'[^a-z0-9]', '', prefix.lower())
     aliases = {
         'hundred-gigabit-ethernet': ('hundredgigabitethernet', '100gigabitethernet', '100ge', 'hu', 'ce'),
-        'ten-gigabit-ethernet': ('tengigabitethernet', '10gigabitethernet', 'xgigabitethernet', '10ge', 'xge', 'te', 'xe'),
-        'gigabit-ethernet': ('gigabitethernet', '1gigabitethernet', '1ge', 'ge', 'gi'),
+        'ten-gigabit-ethernet': ('tengigabitethernet', '10gigabitethernet', 'xgigabitethernet', '10ge', 'xge', 'te', 'xe', 'ten'),
+        'gigabit-ethernet': ('gigabitethernet', '1gigabitethernet', '1ge', 'ge', 'gi', 'giga'),
     }
     for family, names in aliases.items():
         for name in names:
@@ -371,9 +374,9 @@ def matching_interface_blocks(port, output, interface_type='auto'):
     if not number:
         return []
     requested_family = interface_family(port[:number.start()])
-    if interface_type != 'auto' and requested_family and requested_family != interface_type:
+    if interface_type not in ('auto', 'mixed') and requested_family and requested_family != interface_type:
         return []
-    family = requested_family or (interface_type if interface_type != 'auto' else '')
+    family = requested_family or (interface_type if interface_type not in ('auto', 'mixed') else '')
     matches = [row for row in interface_blocks(output) if row['number'] == number.group()]
     if family:
         typed = [row for row in matches if row['family'] == family]
@@ -528,19 +531,24 @@ def check_ssh(device):
                 raise InterfaceSelectionError(f'Nenhuma interface {INTERFACE_LABELS[interface_type]} encontrada. '
                                               'Confira o tipo selecionado e a saída do comando de portas.')
         for port in selected_ports:
-            diagnostic['stage'] = f"portas: {port}"
+            query_port, query_type = port, interface_type
+            if interface_type == 'mixed':
+                number = re.search(r'(?<![\d/])\d+/\d+/\d+(?![\d/])', port)
+                query_port = number.group()
+                query_type = interface_family(port[:number.start()])
+            diagnostic['stage'] = f"portas: {query_type} {query_port}" if interface_type == 'mixed' else f"portas: {port}"
             status_raw = ssh_read(client, device['status_command'].replace('{port}', port)) if status_bulk is None else status_bulk
             diagnostic['status_output'] = status_raw
-            status = status_raw if status_bulk is None and not interface_blocks(status_raw) else port_lines(port, status_raw, interface_type)
-            status_rows = matching_interface_blocks(port, status_raw, interface_type)
+            status = status_raw if status_bulk is None and not interface_blocks(status_raw) else port_lines(query_port, status_raw, query_type)
+            status_rows = matching_interface_blocks(query_port, status_raw, query_type)
             family = status_rows[0]['family'] if status_rows else ''
-            family = family or (interface_type if interface_type != 'auto' else 'auto')
+            family = family or (query_type if query_type != 'auto' else 'auto')
             diagnostic['stage'] = f"sinais: {port}"
             optics_raw = ssh_read(client, device['optics_command'].replace('{port}', port)) if optics_bulk is None else optics_bulk
             diagnostic['optics_output'] = optics_raw
-            optics = optics_raw if optics_bulk is None and not interface_blocks(optics_raw) else port_lines(port, optics_raw, family)
-            result = parse_port(port, status, optics, optics_context=optics)
-            result.update(interface_type=family, identity=f'{family}:{port}',
+            optics = optics_raw if optics_bulk is None and not interface_blocks(optics_raw) else port_lines(query_port, optics_raw, family)
+            result = parse_port(query_port, status, optics, optics_context=optics)
+            result.update(interface_type=family, identity=f'{family}:{query_port}',
                           status_output=status_raw, optics_output=optics_raw)
             ports.append(result)
     except (CommandRejected, InterfaceSelectionError) as exc:
@@ -664,6 +672,16 @@ def device_values(device, previous=None):
         raise HTTPException(422, 'Datacom requer usuário, senha e impressão digital SSH SHA256 verificada.')
     if device.kind == 'datacom' and not device.ports and ('{port}' in device.status_command or '{port}' in device.optics_command):
         raise HTTPException(422, 'Informe as portas ao usar comandos com {port}.')
+    if device.kind == 'datacom' and device.interface_type == 'mixed':
+        if not device.ports:
+            raise HTTPException(422, 'Informe ao menos uma porta na lista Ten ou Giga.')
+        if '{port}' in device.status_command or '{port}' in device.optics_command:
+            raise HTTPException(422, 'No modo Gigabit + Ten, use consultas gerais sem {port}, como show interface link e show interface transceivers.')
+        for port in device.ports:
+            qualified = re.fullmatch(r'(?P<prefix>[a-zA-Z][a-zA-Z:-]*?)(?P<number>\d+/\d+/\d+)', port)
+            family = interface_family(qualified['prefix']) if qualified else ''
+            if family not in ('gigabit-ethernet', 'ten-gigabit-ethernet'):
+                raise HTTPException(422, 'Identifique cada porta com ten:1/1/10 ou giga:1/1/19 no modo misto.')
     values['ports'] = json.dumps(values['ports'])
     values['password'] = (CIPHER.encrypt(password.encode()).decode() if password else saved_password) if device.kind == 'datacom' else ''
     return values
@@ -718,9 +736,11 @@ def update_port_alias(device_id: int, entry: PortAliasInput):
         if device['kind'] != 'datacom':
             raise HTTPException(422, 'Nomes de portas são configurados nos Datacoms.')
         family = entry.interface_type
-        if family == 'auto' and device['interface_type'] != 'auto':
+        if family == 'auto' and device['interface_type'] not in ('auto', 'mixed'):
             family = device['interface_type']
         key = port_alias_key(entry.port, family)
+        if device['interface_type'] == 'mixed' and key.startswith('auto:'):
+            raise HTTPException(422, 'Selecione Gigabit ou Ten para nomear esta porta.')
         aliases = json.loads(device['port_aliases'] or '{}')
         if entry.display_name:
             if key not in aliases and len(aliases) >= 512:

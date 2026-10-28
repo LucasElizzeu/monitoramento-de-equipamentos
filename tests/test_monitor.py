@@ -616,6 +616,91 @@ class MonitorTests(unittest.TestCase):
                 app.DeviceInput(name='Invalid', host='127.0.0.1', circuit_position=position)
 
 
+    def mixed_fixture(self):
+        status = ('Gigabit Ethernet Interfaces:\n'
+                  '1/1/10 Down false - - - - - GIGA-10\n'
+                  '1/1/19 Up false 1G full - - - GIGA-19\n'
+                  '1/1/20 Down false - - - - - GIGA-20\n'
+                  'TenGigabitEthernet Interfaces:\n'
+                  '1/1/10 Up false 10G full - - - TEN-10\n'
+                  '1/1/11 Up false 10G full - - - TEN-11\n'
+                  '1/1/12 Down false - - - - - TEN-12\n'
+                  'Hundred Gigabit Ethernet Interfaces:\n'
+                  '1/1/10 Down false - - - - - HUNDRED-10')
+        optics = ('gigabit-ethernet 1/1/10 | 40 C | 3 V | 10 mA | -2 dBm | -99 dBm\n'
+                  'gigabit-ethernet 1/1/19 | 40 C | 3 V | 10 mA | -2 dBm | -19 dBm\n'
+                  'gigabit-ethernet 1/1/20 | 40 C | 3 V | 10 mA | -2 dBm | -20 dBm\n'
+                  'ten-gigabit-ethernet 1/1/10 | 40 C | 3 V | 10 mA | -6 dBm | -10 dBm\n'
+                  'ten-gigabit-ethernet 1/1/11 | 40 C | 3 V | 10 mA | -6 dBm | -11 dBm\n'
+                  'ten-gigabit-ethernet 1/1/12 | 40 C | 3 V | 10 mA | -6 dBm | -12 dBm')
+        return status, optics
+
+    def collect_mixed(self, device_id):
+        with app.connect() as db:
+            stored = dict(db.execute('SELECT * FROM devices WHERE id=?', (device_id,)).fetchone())
+        with patch.object(app.paramiko, 'SSHClient'), patch.object(app, 'ssh_read', side_effect=self.mixed_fixture()):
+            app.check_ssh(stored)
+        return next(d for d in app.dashboard()['devices'] if d['id'] == device_id)
+
+    def test_mixed_exact_user_selection_excludes_giga_ten_and_other_groups(self):
+        d = app.create_device(app.DeviceInput(name='Mixed', host='192.0.2.9', kind='datacom', username='op',
+            password='test-only', fingerprint='SHA256:'+'a'*43, interface_type='mixed',
+            ports=['ten:1/1/10', 'ten:1/1/11', 'ten:1/1/12', 'giga:1/1/19', 'giga:1/1/20']))
+        result = self.collect_mixed(d['id'])
+        self.assertIsNone(result['ssh_error'])
+        self.assertEqual({(p['interface_type'],p['name']) for p in result['port_data']},
+            {('ten-gigabit-ethernet', '1/1/10'), ('ten-gigabit-ethernet', '1/1/11'),
+             ('ten-gigabit-ethernet', '1/1/12'), ('gigabit-ethernet', '1/1/19'), ('gigabit-ethernet', '1/1/20')})
+        ten = next(p for p in result['port_data'] if p['name']=='1/1/10')
+        self.assertEqual((ten['state'], ten['rx'], ten['description']), ('up', -10, 'TEN-10'))
+        alerts = app.dashboard()['alerts']
+        self.assertEqual(len(alerts), 2)
+        self.assertFalse(any('Porta Gigabit Ethernet 1/1/10' in a['message'] for a in alerts))
+        self.assertFalse(any('Hundred' in a['message'] for a in alerts))
+
+    def test_mixed_same_number_has_separate_names_signals_and_alerts(self):
+        d = app.create_device(app.DeviceInput(name='Mixed', host='192.0.2.9', kind='datacom', username='op',
+            password='test-only', fingerprint='SHA256:'+'a'*43, interface_type='mixed',
+            ports=['ten:1/1/10', 'giga:1/1/10']))
+        app.update_port_alias(d['id'], app.PortAliasInput(port='1/1/10', interface_type='ten-gigabit-ethernet', display_name='Ten principal'))
+        app.update_port_alias(d['id'], app.PortAliasInput(port='1/1/10', interface_type='gigabit-ethernet', display_name='Giga reserva'))
+        result = self.collect_mixed(d['id'])
+        self.assertEqual(len({p['identity'] for p in result['port_data']}), 2)
+        ports = {p['interface_type']:p for p in result['port_data']}
+        self.assertEqual((ports['ten-gigabit-ethernet']['display_name'],ports['ten-gigabit-ethernet']['rx']), ('Ten principal', -10))
+        self.assertEqual((ports['gigabit-ethernet']['display_name'],ports['gigabit-ethernet']['rx']), ('Giga reserva', -99))
+        self.assertIn('Giga reserva', app.dashboard()['alerts'][0]['message'])
+        self.collect_mixed(d['id'])
+        self.assertEqual(len(app.dashboard()['alerts']), 1)
+
+    def test_mixed_requires_typed_full_paths_and_general_commands(self):
+        for ports in ([], ['1/1/10'], ['ten:10'], ['ten:1/1/10x'], ['hundred-gigabit-ethernet:1/1/10']):
+            with self.subTest(ports=ports), self.assertRaises(app.HTTPException) as error:
+                app.create_device(app.DeviceInput(name='Mixed', host='192.0.2.9', kind='datacom', username='op',
+                    password='test-only', fingerprint='SHA256:'+'a'*43, interface_type='mixed', ports=ports))
+            self.assertEqual(error.exception.status_code, 422)
+        with self.assertRaises(app.HTTPException) as error:
+            app.create_device(app.DeviceInput(name='Mixed', host='192.0.2.9', kind='datacom', username='op',
+                password='test-only', fingerprint='SHA256:'+'a'*43, interface_type='mixed', ports=['ten:1/1/10'],
+                status_command='show interface {port}'))
+        self.assertIn('consultas gerais', error.exception.detail)
+        with self.assertRaises(ValueError):
+            app.PortAliasInput(port='1/1/10', interface_type='mixed', display_name='Ambiguous')
+
+    def test_mixed_edit_preserves_position_password_and_existing_physical_alias(self):
+        d = app.create_device(app.DeviceInput(name='Mixed', host='192.0.2.9', kind='datacom', username='op',
+            password='test-only', fingerprint='SHA256:'+'a'*43, interface_type='ten-gigabit-ethernet',
+            ports=['1/1/10'], circuit_position=3))
+        app.update_port_alias(d['id'], app.PortAliasInput(port='1/1/10', interface_type='ten-gigabit-ethernet', display_name='Nome anterior'))
+        updated = app.update_device(d['id'], app.DeviceInput(name='Mixed', host='192.0.2.9', kind='datacom', username='op',
+            fingerprint='SHA256:'+'a'*43, interface_type='mixed', ports=['ten:1/1/10', 'giga:1/1/19']))
+        self.assertEqual(updated['circuit_position'], 3)
+        self.assertTrue(updated['has_password'])
+        result = self.collect_mixed(d['id'])
+        self.assertEqual(result['port_data'][0]['display_name'], 'Nome anterior')
+        self.assertEqual(result['port_data'][1]['description'], 'GIGA-19')
+
+
 
 if __name__ == '__main__':
     unittest.main()
