@@ -3,3 +3,7 @@
 .table-scroll{position:relative;max-width:100%}th{position:relative}.chart-container{overflow:hidden}
 
 #devices-section + #ports-section:not([hidden]){margin-top:22px}
+
+.signal-note{font-size:9px;color:#9b8b69;line-height:1.5;margin:10px 0 0}
+
+.reading-banner{display:flex;align-items:center;gap:12px;padding:13px 16px;margin-bottom:18px;border:1px solid #eedcaa;background:#fff9eb;border-radius:8px;color:#9b7837;font-size:11px}.reading-banner strong{display:block;font-size:11px}.reading-banner div>span{display:block;margin-top:4px;font-size:10px;line-height:1.6}.reading-banner button{margin-left:auto;background:transparent;color:#8b6930;font-size:10px;white-space:nowrap}.output-copy{margin-top:12px;padding:7px 9px;font-size:9px}.output-copy svg{width:12px;height:12px}@media(max-width:640px){.reading-banner{flex-wrap:wrap}.reading-banner div{flex:1}.reading-banner button{margin-left:30px}}

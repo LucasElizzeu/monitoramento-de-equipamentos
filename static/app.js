@@ -13,6 +13,8 @@ const icons = {
  arrow:'<path d="m7 17 10-10M7 7h10v10"/>',
  check:'<path d="m5 12 4 4L19 6"/><circle cx="12" cy="12" r="10"/>',
  warning:'<path d="m12 3 10 18H2zM12 9v5M12 17h.01"/>',
+ copy:'<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V3H3v13h5"/>',
+ edit:'<path d="m16 3 5 5M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15z"/>',
  trash:'<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/>',
  info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/>',
  flask:'<path d="M9 3h6M10 3v6L4 19q-1 2 2 2h12q3 0 2-2L14 9V3M7 15h10"/>',
@@ -21,9 +23,9 @@ const icons = {
 function icon(name){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]||icons.server}</svg>`;}
 function hydrateIcons(){document.querySelectorAll('[data-icon]').forEach(el=>{el.innerHTML=icon(el.dataset.icon);});}
 const esc = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const number = n => n==null?'—':Number(n).toLocaleString('pt-BR',{maximumFractionDigits:1});
+const number = (n,digits=1) => n==null?'—':Number(n).toLocaleString('pt-BR',{maximumFractionDigits:digits});
 const labels = {online:'Online',offline:'Sem ping',unstable:'Instável',pending:'Aguardando',error:'Erro de coleta',up:'Ativa',down:'Inativa',unknown:'Não identificado'};
-const state = {demo:localStorage.getItem('nexo-demo')==='true', page:'overview', data:{devices:[],alerts:[],samples:[]}, loading:false, selected:null, deleting:null};
+const state = {demo:localStorage.getItem('nexo-demo')==='true', page:'overview', data:{devices:[],alerts:[],samples:[]}, loading:false, selected:null, deleting:null, editing:null};
 function badge(status){return `<span class="status-pill ${esc(status)}"><i></i>${esc(labels[status]||status)}</span>`;}
 function formatTime(date){return date?new Date(date).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'Aguardando';}
 function ago(date){if(!date)return 'Aguardando';const seconds=Math.max(0,Math.floor((Date.now()-new Date(date))/1000));return seconds<10?'Agora':seconds<60?`há ${seconds}s`:seconds<3600?`há ${Math.floor(seconds/60)}min`:`há ${Math.floor(seconds/3600)}h`;}
@@ -67,21 +69,31 @@ function empty(title,description,action=false){return `<div class="empty-state">
 function renderDevices(){const q=$('#search').value.toLowerCase();const filter=$('#state-filter').value;const all=pageDevices();const devices=all.filter(d=>(d.name.toLowerCase().includes(q)||d.host.includes(q))&&(filter==='all'||d.state===filter));
  $('#table-title').textContent=state.page==='bbus'?"BBU's":state.page==='datacoms'?'Datacoms':'Equipamentos';$('#table-description').textContent=state.page==='bbus'?"Disponibilidade e latência das suas BBU's.":state.page==='datacoms'?'Disponibilidade dos Datacoms. Consulte portas e sinais abaixo.':'Acompanhe a disponibilidade de cada ponto da rede.';
  $('#table-count').textContent=all.length;$('#table-summary').textContent=`Exibindo ${devices.length} de ${all.length} equipamentos`;
- $('#device-rows').innerHTML=devices.length?devices.map(d=>`<tr><td><div class="device-cell"><span class="device-icon">${icon(d.kind==='datacom'?'ports':'server')}</span><div><strong>${esc(d.name)}</strong><small>${d.kind==='datacom'?'DATACOM · SSH':"BBU · PING ICMP"}</small></div></div></td><td class="ip">${esc(d.host)}</td><td>${badge(d.state)}</td><td class="latency">${d.latency!=null?`<span class="tiny-bars">▂▄▆</span>${number(d.latency)} <small>ms</small>`:'—'}</td><td><span class="loss-value ${d.failures>20?'critical':''}"><span class="loss-track"><i style="width:${Math.min(d.failures/21*100,100)}%"></i></span>${d.failures}<span class="muted">/ 21</span></span></td><td>${ago(d.last_check)}</td><td><div class="device-actions"><button class="icon-button" data-detail="${d.id}" title="Ver detalhes" aria-label="Ver detalhes de ${esc(d.name)}">${icon('arrow')}</button><button class="icon-button" data-remove="${d.id}" title="Remover equipamento" aria-label="Remover ${esc(d.name)}">${icon('trash')}</button></div></td></tr>`).join(''):`<tr><td colspan="7">${empty(all.length?'Nenhum resultado encontrado':state.page==='bbus'?"Cadastre sua primeira BBU":state.page==='datacoms'?'Conecte seu primeiro Datacom':'Sua rede, em um só lugar',all.length?'Tente outro nome, IP ou filtro.':state.page==='bbus'?"Adicione uma BBU para acompanhar ping, latência e perdas consecutivas.":state.page==='datacoms'?'Adicione um Datacom para acompanhar disponibilidade, portas e sinais ópticos.':'Adicione seu primeiro equipamento ou explore a demonstração para conhecer o painel.',!all.length)}</td></tr>`;
+ $('#device-rows').innerHTML=devices.length?devices.map(d=>`<tr><td><div class="device-cell"><span class="device-icon">${icon(d.kind==='datacom'?'ports':'server')}</span><div><strong>${esc(d.name)}</strong><small>${d.kind==='datacom'?'DATACOM · SSH':"BBU · PING ICMP"}</small></div></div></td><td class="ip">${esc(d.host)}</td><td>${badge(d.state)}</td><td class="latency">${d.latency!=null?`<span class="tiny-bars">▂▄▆</span>${number(d.latency)} <small>ms</small>`:'—'}</td><td><span class="loss-value ${d.failures>20?'critical':''}"><span class="loss-track"><i style="width:${Math.min(d.failures/21*100,100)}%"></i></span>${d.failures}<span class="muted">/ 21</span></span></td><td>${ago(d.last_check)}</td><td><div class="device-actions"><button class="icon-button" data-edit="${d.id}" title="Editar equipamento" aria-label="Editar ${esc(d.name)}">${icon('edit')}</button><button class="icon-button" data-detail="${d.id}" title="Ver detalhes" aria-label="Ver detalhes de ${esc(d.name)}">${icon('arrow')}</button><button class="icon-button" data-remove="${d.id}" title="Remover equipamento" aria-label="Remover ${esc(d.name)}">${icon('trash')}</button></div></td></tr>`).join(''):`<tr><td colspan="7">${empty(all.length?'Nenhum resultado encontrado':state.page==='bbus'?"Cadastre sua primeira BBU":state.page==='datacoms'?'Conecte seu primeiro Datacom':'Sua rede, em um só lugar',all.length?'Tente outro nome, IP ou filtro.':state.page==='bbus'?"Adicione uma BBU para acompanhar ping, latência e perdas consecutivas.":state.page==='datacoms'?'Adicione um Datacom para acompanhar disponibilidade, portas e sinais ópticos.':'Adicione seu primeiro equipamento ou explore a demonstração para conhecer o painel.',!all.length)}</td></tr>`;
 }
 function portsHTML(d){if(d.ssh_error)return `<p class="ssh-warning">${icon('warning')} ${esc(d.ssh_error)} As leituras anteriores não são exibidas como atuais.</p>`;
  if(!d.port_data.length)return '<p class="muted">Aguardando a primeira consulta SSH. Intervalo: 30 segundos.</p>';
- return `<div class="port-cards">${d.port_data.map(p=>`<article class="port-card"><div class="port-card-header"><strong>${esc(p.name)}</strong>${badge(p.state)}</div>${p.description?`<p class="muted">${esc(p.description)}</p>`:''}<div class="optical"><span>RX · RECEPÇÃO<strong>${number(p.rx)} <small>dBm</small></strong></span><span>TX · TRANSMISSÃO<strong>${number(p.tx)} <small>dBm</small></strong></span></div><small>Leitura ${ago(p.checked_at)}</small><details><summary>Ver saída do equipamento</summary><pre>${esc(p.status_output)}</pre><pre>${esc(p.optics_output)}</pre></details></article>`).join('')}</div>`;}
-function render(){const {devices,alerts,samples}=state.data;$('#demo-banner').hidden=!state.demo;$('#demo-label').textContent=state.demo?'Sair da demonstração':'Ver demonstração';$('#last-update').textContent=`${state.demo?'Simulação':'Atualizado'} às ${formatTime(state.data.updated_at)}`;
+ return `<div class="port-cards">${d.port_data.map(p=>`<article class="port-card"><div class="port-card-header"><strong>${esc(p.name)}</strong>${badge(p.state)}</div>${p.description?`<p class="muted">${esc(p.description)}</p>`:''}<div class="optical"><span>RX · RECEPÇÃO<strong>${number(p.rx,2)} <small>dBm</small></strong></span><span>TX · TRANSMISSÃO<strong>${number(p.tx,2)} <small>dBm</small></strong></span></div><small>Leitura ${ago(p.checked_at)}</small>${p.rx==null&&p.tx==null?'<p class="signal-note">Sinal não informado ou formato não reconhecido.</p>':''}<details data-port-key="${d.id}:${esc(p.name)}"><summary>Ver saída do equipamento</summary><button type="button" class="button secondary output-copy" data-copy-output>${icon('copy')}Copiar saída</button><pre>${esc(p.status_output)}</pre><pre>${esc(p.optics_output)}</pre></details></article>`).join('')}</div>`;}
+function readingOutput(){
+ return (state.page==='datacoms'&&Boolean($('#ports-content').querySelector('details[open]')))
+  ||($('#detail-dialog').open&&Boolean($('#detail-content').querySelector('details[open]')));
+}
+function render(){
+ const paused=readingOutput()||Boolean(window.getSelection()?.toString());
+ $('#reading-banner').hidden=!paused;
+ if(paused)return;
+ const {devices,alerts,samples}=state.data;$('#demo-banner').hidden=!state.demo;$('#demo-label').textContent=state.demo?'Sair da demonstração':'Ver demonstração';$('#last-update').textContent=`${state.demo?'Simulação':'Atualizado'} às ${formatTime(state.data.updated_at)}`;
  renderMetrics();renderDevices();const average=chart(samples,$('#latency-chart'));$('#chart-average').innerHTML=`${number(average)} <small>ms</small>`;
  $('#recent-events').innerHTML=alerts.length?alerts.slice(0,3).map(eventHTML).join(''):empty('Nenhum evento por aqui','Quedas e recuperações aparecerão neste espaço.');
  $('#alerts-content').innerHTML=alerts.length?alerts.map(eventHTML).join(''):empty('Sua linha do tempo começa aqui','Eventos serão registrados automaticamente quando houver uma mudança na rede.');
+ const openPorts=new Set([...$('#ports-content').querySelectorAll('details[open]')].map(e=>e.dataset.portKey));
  const datacoms=devices.filter(d=>d.kind==='datacom');$('#ports-content').innerHTML=datacoms.length?datacoms.map(d=>`<div class="port-device"><h3>${esc(d.name)}</h3><p>${esc(d.host)} · ${d.ports.length||d.port_data.length} portas · ${d.ports.length?'seleção manual':'detecção automática'}</p>${portsHTML(d)}</div>`).join(''):empty('Conecte seu primeiro Datacom','Cadastre uma conexão SSH para acompanhar portas e sinais ópticos.',true);
+ $('#ports-content').querySelectorAll('details').forEach(e=>e.open=openPorts.has(e.dataset.portKey));
  if(state.selected&&$('#detail-dialog').open){if(state.demo){state.detailSamples=samples.filter(s=>s.device_id===state.selected);renderDetail();}else{const selected=state.selected;api(`/api/devices/${selected}/history`).then(history=>{if(state.selected===selected){state.detailSamples=history;renderDetail();}}).catch(()=>{});}}
 }
 const pages={overview:['Visão geral','Tudo conectado. Tudo sob controle.'],bbus:["BBU's","Monitore o ping, a latência e as perdas das suas BBU's."],datacoms:['Datacoms','Disponibilidade, portas e sinais ópticos dos seus Datacoms.'],alerts:['Eventos','Cada mudança na rede, registrada em um só lugar.']};
 function navigate(page){
- state.page=page;
+ window.getSelection()?.removeAllRanges();state.page=page;
  document.querySelectorAll('[data-page]').forEach(e=>{
   e.classList.toggle('active',e.dataset.page===page);
   if(e.dataset.page===page)e.setAttribute('aria-current','page');else e.removeAttribute('aria-current');
@@ -94,17 +106,38 @@ function navigate(page){
  $('#search').value='';$('#state-filter').value='all';
  render();
 }
-function toggleDemo(value){state.demo=value;state.selected=null;localStorage.setItem('nexo-demo',String(value));load();}
+function toggleDemo(value){
+ document.querySelectorAll('.port-card details[open]').forEach(e=>e.open=false);
+ window.getSelection()?.removeAllRanges();
+ state.demo=value;state.selected=null;localStorage.setItem('nexo-demo',String(value));load();
+}
 function syncDeviceKind(){
  const ssh=$('[name="kind"]:checked').value==='datacom';
  $('#ssh-fields').hidden=!ssh;
- for(const name of ['username','password','fingerprint'])$(`[name="${name}"]`).required=ssh;
- $('#device-dialog-title').textContent=ssh?'Adicionar Datacom':'Adicionar BBU';
+ for(const name of ['username','fingerprint'])$(`[name="${name}"]`).required=ssh;
+ const keepPassword=state.editing?.kind==='datacom'&&state.editing.has_password;
+ $('[name="password"]').required=ssh&&!keepPassword;
+ $('[name="password"]').placeholder=keepPassword?'Deixe vazio para manter a senha atual':'';
+ $('#password-help').textContent=keepPassword?'Deixe vazio para manter a senha atual. Preencha apenas para trocar.':'Armazenada de forma criptografada no servidor.';
+ $('#device-dialog-title').textContent=state.editing?(ssh?'Editar Datacom':'Editar BBU'):(ssh?'Adicionar Datacom':'Adicionar BBU');
+ $('#save-device').innerHTML=state.editing?`${icon('check')}Salvar alterações`:`${icon('plus')}Adicionar equipamento`;
  $('[name="name"]').placeholder=ssh?'Ex.: Datacom • Core principal':'Ex.: BBU • Torre central';
 }
 function openAdd(){
- $('#device-form').reset();
+ state.editing=null;$('#device-form').reset();
  $(`[name="kind"][value="${state.page==='datacoms'?'datacom':'ping'}"]`).checked=true;
+ syncDeviceKind();$('#form-error').hidden=true;$('#device-dialog').showModal();
+}
+function openEdit(id){
+ if(state.demo){toast('Os equipamentos de demonstração são exemplos. Saia da demonstração para editar sua rede.');return;}
+ const device=state.data.devices.find(d=>d.id===id);
+ if(!device)return;
+ state.editing=device;$('#device-form').reset();
+ for(const name of ['name','host','interval','ssh_port','username','fingerprint','status_command','optics_command']){
+  $(`[name="${name}"]`).value=device[name]??'';
+ }
+ $(`[name="kind"][value="${device.kind}"]`).checked=true;
+ $('[name="ports"]').value=device.ports.join(', ');$('[name="password"]').value='';
  syncDeviceKind();$('#form-error').hidden=true;$('#device-dialog').showModal();
 }
 function renderDetail(){const d=state.data.devices.find(d=>d.id===state.selected);if(!d){$('#detail-dialog').close();state.selected=null;return;}
@@ -113,7 +146,16 @@ function renderDetail(){const d=state.data.devices.find(d=>d.id===state.selected
  $('#detail-content').querySelectorAll('details').forEach((e,i)=>e.open=Boolean(opened[i]));chart(state.detailSamples||[], $('#detail-chart'));
 }
 async function openDetail(id){state.selected=id;state.detailSamples=[];renderDetail();$('#detail-dialog').showModal();try{state.detailSamples=state.demo?state.data.samples.filter(s=>s.device_id===id):await api(`/api/devices/${id}/history`);if(state.selected===id)renderDetail();}catch(e){toast(e.message);}}
-$('#device-form').addEventListener('submit',async event=>{event.preventDefault();const form=new FormData(event.target);const d=Object.fromEntries(form);d.interval=Number(d.interval);d.ssh_port=Number(d.ssh_port);d.ports=d.ports.split(',').map(p=>p.trim()).filter(Boolean);$('#save-device').disabled=true;$('#form-error').hidden=true;try{await api('/api/devices',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});$('#device-dialog').close();state.demo=false;localStorage.setItem('nexo-demo','false');navigate(d.kind==='datacom'?'datacoms':'bbus');toast('É isso! Equipamento adicionado à sua rede.');await load();}catch(e){$('#form-error').textContent=e.message;$('#form-error').hidden=false;}finally{$('#save-device').disabled=false;}});
+$('#device-form').addEventListener('submit',async event=>{
+ event.preventDefault();const form=new FormData(event.target);const d=Object.fromEntries(form);
+ d.interval=Number(d.interval);d.ssh_port=Number(d.ssh_port);d.ports=d.ports.split(',').map(p=>p.trim()).filter(Boolean);
+ const editingId=state.editing?.id;$('#save-device').disabled=true;$('#form-error').hidden=true;
+ try{
+  await api(editingId?`/api/devices/${editingId}`:'/api/devices',{method:editingId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
+  $('#device-dialog').close();state.editing=null;state.demo=false;localStorage.setItem('nexo-demo','false');
+  navigate(d.kind==='datacom'?'datacoms':'bbus');toast(editingId?'Alterações salvas. O monitoramento será atualizado.':'Equipamento adicionado à sua rede.');await load();
+ }catch(e){$('#form-error').textContent=e.message;$('#form-error').hidden=false;}finally{$('#save-device').disabled=false;}
+});
 document.querySelectorAll('[name="kind"]').forEach(el=>el.addEventListener('change',syncDeviceKind));
 document.querySelectorAll('[data-page]').forEach(e=>e.addEventListener('click',()=>navigate(e.dataset.page)));
 $('#all-events').addEventListener('click',()=>navigate('alerts'));
@@ -123,7 +165,32 @@ $('#demo-toggle').addEventListener('click',()=>toggleDemo(!state.demo));$('#exit
 $('#search').addEventListener('input',renderDevices);$('#state-filter').addEventListener('change',renderDevices);
 document.querySelectorAll('.close-dialog').forEach(e=>e.addEventListener('click',()=>$('#device-dialog').close()));
 document.querySelectorAll('.close-confirm').forEach(e=>e.addEventListener('click',()=>$('#confirm-dialog').close()));
-document.addEventListener('click',event=>{const detail=event.target.closest('[data-detail]'),remove=event.target.closest('[data-remove]');if(detail)openDetail(Number(detail.dataset.detail));if(event.target.closest('[data-close-detail]')){$('#detail-dialog').close();state.selected=null;}if(event.target.closest('[data-action="add"]'))openAdd();if(remove){if(state.demo){toast('Os equipamentos de demonstração são exemplos. Saia do modo demonstração para gerenciar sua rede.');return;}state.deleting=Number(remove.dataset.remove);const d=state.data.devices.find(d=>d.id===state.deleting);$('#confirm-description').textContent=`Deseja remover “${d.name}” (${d.host})?`;$('#confirm-dialog').showModal();}});
+document.addEventListener('click',event=>{const copy=event.target.closest('[data-copy-output]');if(copy)copyOutput(copy);const edit=event.target.closest('[data-edit]'),detail=event.target.closest('[data-detail]'),remove=event.target.closest('[data-remove]');if(edit)openEdit(Number(edit.dataset.edit));if(detail)openDetail(Number(detail.dataset.detail));if(event.target.closest('[data-close-detail]')){$('#detail-dialog').close();state.selected=null;}if(event.target.closest('[data-action="add"]'))openAdd();if(remove){if(state.demo){toast('Os equipamentos de demonstração são exemplos. Saia do modo demonstração para gerenciar sua rede.');return;}state.deleting=Number(remove.dataset.remove);const d=state.data.devices.find(d=>d.id===state.deleting);$('#confirm-description').textContent=`Deseja remover “${d.name}” (${d.host})?`;$('#confirm-dialog').showModal();}});
+async function copyOutput(button){
+ const text=[...button.closest('details').querySelectorAll('pre')].map(p=>p.textContent).join('\n\n');
+ try{
+  if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(text);
+  else{
+   const input=document.createElement('textarea');input.value=text;input.style.position='fixed';input.style.opacity='0';document.body.append(input);input.select();
+   try{if(!document.execCommand('copy'))throw new Error('Clipboard denied');}finally{input.remove();}
+  }
+  toast('Saída copiada.');
+ }catch{
+  toast('O navegador bloqueou a cópia. A atualização está pausada; você pode selecionar o texto e usar Ctrl+C.');
+ }
+}
+$('#resume-live').addEventListener('click',()=>{
+ document.querySelectorAll('.port-card details[open]').forEach(e=>e.open=false);
+ window.getSelection()?.removeAllRanges();render();
+});
+document.addEventListener('toggle',event=>{
+ if(event.target.matches('.port-card details'))render();
+},true);
+document.addEventListener('selectionchange',()=>{
+ const selected=Boolean(window.getSelection()?.toString());
+ if(selected)$('#reading-banner').hidden=false;
+ else if(!$('#reading-banner').hidden&&!readingOutput())render();
+});
 $('#confirm-remove').addEventListener('click',async()=>{$('#confirm-remove').disabled=true;try{await api(`/api/devices/${state.deleting}`,{method:'DELETE'});$('#confirm-dialog').close();toast('Equipamento removido.');await load();}catch(e){toast(e.message);}finally{$('#confirm-remove').disabled=false;}});
 for(const dialog of document.querySelectorAll('dialog'))dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});
-hydrateIcons();load();setInterval(load,3000);
+hydrateIcons();load();setInterval(load,1000);

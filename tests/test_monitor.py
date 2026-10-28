@@ -1,6 +1,8 @@
 import json
 import os
 import tempfile
+import threading
+import time
 import unittest
 from unittest.mock import Mock, patch
 
@@ -135,6 +137,120 @@ class MonitorTests(unittest.TestCase):
             app.check_ssh(d)
             self.assertEqual(app.dashboard()['alerts'][0]['level'], 'success')
             factory.return_value.close.assert_called()
+
+    def test_one_second_interval_and_cadence(self):
+        device = app.update_device(self.id, app.DeviceInput(name='Local', host='127.0.0.1', interval=1))
+        starts = []
+        def probe(*args, **kwargs):
+            starts.append(time.monotonic())
+            self.assertLess(kwargs['timeout'], 1)
+            time.sleep(0.2)
+            return Mock(is_alive=True, avg_rtt=1.2)
+        app.STOP.clear()
+        with patch.object(app, 'ping', side_effect=probe):
+            worker = threading.Thread(target=app.monitor)
+            worker.start()
+            try:
+                deadline = time.monotonic() + 4
+                while len(starts) < 3 and time.monotonic() < deadline:
+                    time.sleep(0.05)
+            finally:
+                app.STOP.set()
+                worker.join(timeout=3)
+                app.STOP.clear()
+        self.assertGreaterEqual(len(starts), 3)
+        self.assertTrue(all(0.95 <= b-a < 1.2 for a,b in zip(starts, starts[1:])), starts)
+        with self.assertRaises(ValueError):
+            app.DeviceInput(name='Local', host='127.0.0.1', interval=0)
+
+    def test_edit_preserves_password_samples_and_id(self):
+        d = app.create_device(app.DeviceInput(name='Datacom', host='192.0.2.1', kind='datacom',
+            username='op', password='test-only', fingerprint='SHA256:'+'a'*43))
+        app.record_ping(d['id'], True, 2)
+        edited = app.update_device(d['id'], app.DeviceInput(name='Novo nome', host='192.0.2.1',
+            interval=1, kind='datacom', username='op', fingerprint='SHA256:'+'a'*43))
+        self.assertEqual((edited['id'], edited['name'], edited['interval']), (d['id'], 'Novo nome', 1))
+        self.assertTrue(edited['has_password'])
+        self.assertNotIn('password', edited)
+        self.assertEqual(len(app.history(d['id'])), 1)
+        with app.connect() as db:
+            stored = db.execute('SELECT password FROM devices WHERE id=?', (d['id'],)).fetchone()[0]
+        self.assertEqual(app.CIPHER.decrypt(stored.encode()).decode(), 'test-only')
+
+    def test_edit_can_replace_password_and_ports(self):
+        d = app.create_device(app.DeviceInput(name='Datacom', host='192.0.2.1', kind='datacom',
+            username='op', password='old-test', fingerprint='SHA256:'+'a'*43))
+        edited = app.update_device(d['id'], app.DeviceInput(name='Datacom', host='192.0.2.1', kind='datacom',
+            username='op', password='new-test', fingerprint='SHA256:'+'a'*43, ports=['1/1/1']))
+        self.assertEqual(edited['ports'], ['1/1/1'])
+        with app.connect() as db:
+            stored = db.execute('SELECT password FROM devices WHERE id=?', (d['id'],)).fetchone()[0]
+        self.assertEqual(app.CIPHER.decrypt(stored.encode()).decode(), 'new-test')
+
+    def test_edit_host_discards_old_samples_and_stale_workers(self):
+        app.record_ping(self.id, True, 3)
+        original = self.device
+        app.update_device(self.id, app.DeviceInput(name='New target', host='192.0.2.2'))
+        self.assertEqual(app.history(self.id), [])
+        app.record_ping(self.id, True, 9, expected_version=original['config_version'])
+        self.assertEqual(self.device_state()['state'], 'pending')
+        self.assertEqual(app.history(self.id), [])
+
+    def test_edit_rejects_conflicts_and_missing_device(self):
+        other = app.create_device(app.DeviceInput(name='Other', host='192.0.2.2'))
+        with self.assertRaises(app.HTTPException) as error:
+            app.update_device(other['id'], app.DeviceInput(name='Duplicate', host='127.0.0.1'))
+        self.assertEqual(error.exception.status_code, 409)
+        with self.assertRaises(app.HTTPException) as error:
+            app.update_device(99999, app.DeviceInput(name='Missing', host='127.0.0.2'))
+        self.assertEqual(error.exception.status_code, 404)
+
+    def test_optics_does_not_require_temperature_voltage_or_bias(self):
+        for text in [
+            'gigabit-ethernet 1/1/1 | 45.73 °C | N/A | - | -6.51 dBm | -12.96 dBm',
+            'gigabit-ethernet-1/1/1 | - | - | - | -6,51 dBm | -12,96 dBm',
+            'gigabit-ethernet 1/1/1 45 °C 3.3 V 19 mA -6.51 dBm -12.96 dBm']:
+            with self.subTest(text=text):
+                row = app.port_lines('1/1/1', text)
+                self.assertEqual(app.parse_port('1/1/1', '1/1/1 Up', row)['rx'], -12.96)
+                self.assertEqual(app.parse_port('1/1/1', '1/1/1 Up', row)['tx'], -6.51)
+
+    def test_optics_single_missing_measurement_does_not_hide_other(self):
+        rx, tx = app.optical_powers('1/1/1 | N/A | - | - | -6.51 dBm | N/A')
+        self.assertEqual((rx, tx), (None, -6.51))
+        rx, tx = app.optical_powers('RX power: N/A TX power: -2.0 dBm')
+        self.assertEqual((rx, tx), (None, -2.0))
+        self.assertEqual(app.optical_powers('1/1/1 | - | - | - | N/A | -12.96 dBm'), (-12.96, None))
+
+    def test_optics_uses_header_order_and_wrapped_rows(self):
+        output = 'Interface | Temperature | RX Power (dBm) | TX Power (dBm)\n1/1/1 | 40 C | -12.96 | -6.51\n1/1/10 | 40 C | -25 | -3'
+        row = app.port_lines('1/1/1', output)
+        self.assertEqual(app.optical_powers(row, output), (-12.96, -6.51))
+        block = 'Interface: gigabit-ethernet 1/1/1\n RX power: -12.96 dBm\n TX power: -6.51 dBm\nInterface: gigabit-ethernet 1/1/10\n RX power: -25 dBm'
+        self.assertEqual(app.optical_powers(app.port_lines('1/1/1', block)), (-12.96, -6.51))
+
+    def test_old_ssh_result_cannot_overwrite_edited_device(self):
+        d = app.create_device(app.DeviceInput(name='Datacom', host='192.0.2.1', kind='datacom',
+            username='op', password='test-only', fingerprint='SHA256:'+'a'*43, ports=['1/1/1']))
+        original = dict(d, password=app.CIPHER.encrypt(b'test-only').decode(), ports='["1/1/1"]')
+        app.update_device(d['id'], app.DeviceInput(name='Edited', host='192.0.2.1', kind='datacom',
+            username='op', fingerprint='SHA256:'+'a'*43, ports=['1/1/2']))
+        with patch.object(app.paramiko, 'SSHClient'), patch.object(app, 'ssh_read', side_effect=[
+            '1/1/1 Down', 'gigabit-ethernet 1/1/1 | - | - | - | -2 dBm | -20 dBm']):
+            app.check_ssh(original)
+        current = next(d for d in app.dashboard()['devices'] if d['id'] == original['id'])
+        self.assertEqual(current['ports'], ['1/1/2'])
+        self.assertEqual(current['port_data'], [])
+        self.assertEqual(app.dashboard()['alerts'], [])
+
+    def test_schema_migration_keeps_existing_equipment(self):
+        # Simulate the installed schema before editing support existed.
+        with app.connect() as db:
+            db.execute('ALTER TABLE devices DROP COLUMN config_version')
+        app.init_db()
+        self.assertEqual(self.device_state()['name'], 'Local')
+        self.assertEqual(self.device_state()['config_version'], 0)
+
 
 
 if __name__ == '__main__':

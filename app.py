@@ -16,7 +16,7 @@ from pathlib import Path
 
 import paramiko
 from cryptography.fernet import Fernet
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from icmplib import ping
@@ -70,6 +70,9 @@ def init_db():
           id INTEGER PRIMARY KEY, device_id INTEGER NOT NULL, device_name TEXT NOT NULL,
           at TEXT NOT NULL, level TEXT NOT NULL, message TEXT NOT NULL);
         ''')
+        columns = {row['name'] for row in db.execute('PRAGMA table_info(devices)')}
+        if 'config_version' not in columns:
+            db.execute('ALTER TABLE devices ADD COLUMN config_version INTEGER NOT NULL DEFAULT 0')
     os.chmod(DB, 0o600)
 
 
@@ -77,7 +80,7 @@ class DeviceInput(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     host: str
     kind: str = 'ping'
-    interval: int = Field(default=5, ge=2, le=300)
+    interval: int = Field(default=1, ge=1, le=300)
     ssh_port: int = Field(default=22, ge=1, le=65535)
     username: str = Field(default='', max_length=100)
     password: str = Field(default='', max_length=500)
@@ -140,17 +143,18 @@ def alert(db, device, level, message):
                (device['id'], device['name'], now(), level, message))
 
 
-def record_ping(device_id, success, latency=None, error=None):
+def record_ping(device_id, success, latency=None, error=None, expected_version=None, started_at=None):
     """Only completed ICMP probes count as packet loss; local errors do not."""
     with LOCK, connect() as db:
         device = db.execute('SELECT * FROM devices WHERE id=?', (device_id,)).fetchone()
-        if not device:
+        if not device or (expected_version is not None and device['config_version'] != expected_version):
             return
+        ping_at = started_at if started_at is not None else time.time()
         if error:
             if device['state'] != 'error':
                 alert(db, device, 'warning', error)
             db.execute("UPDATE devices SET state='error',last_check=?,last_ping=?,latency=NULL WHERE id=?",
-                       (now(), time.time(), device_id))
+                       (now(), ping_at, device_id))
             return
         failures = 0 if success else device['failures'] + 1
         state = 'online' if success else ('offline' if failures > 20 else 'unstable')
@@ -160,7 +164,7 @@ def record_ping(device_id, success, latency=None, error=None):
             alert(db, device, 'success', 'Ping restabelecido. Equipamento online.')
         at = now()
         db.execute('UPDATE devices SET state=?,failures=?,latency=?,last_check=?,last_ping=? WHERE id=?',
-                   (state, failures, latency if success else None, at, time.time(), device_id))
+                   (state, failures, latency if success else None, at, ping_at, device_id))
         db.execute('INSERT INTO samples(device_id,at,latency,success) VALUES(?,?,?,?)',
                    (device_id, at, latency if success else None, int(success)))
         db.execute('DELETE FROM samples WHERE device_id=? AND id NOT IN '
@@ -170,11 +174,15 @@ def record_ping(device_id, success, latency=None, error=None):
 
 
 def check_ping(device):
+    started_at = time.time()
+    version = device.get('config_version')
     try:
-        result = ping(device['host'], count=1, timeout=1.5, privileged=False)
-        record_ping(device['id'], result.is_alive, result.avg_rtt if result.is_alive else None)
+        result = ping(device['host'], count=1, timeout=min(1.5, device['interval'] * 0.8), privileged=False)
+        record_ping(device['id'], result.is_alive, result.avg_rtt if result.is_alive else None,
+                    expected_version=version, started_at=started_at)
     except Exception:
-        record_ping(device['id'], False, error='Não foi possível executar ICMP. Verifique as permissões e a rede do servidor.')
+        record_ping(device['id'], False, error='Não foi possível executar ICMP. Verifique as permissões e a rede do servidor.',
+                    expected_version=version, started_at=started_at)
 
 
 def fingerprint(key):
@@ -190,31 +198,90 @@ class VerifyFingerprint(paramiko.MissingHostKeyPolicy):
             raise paramiko.SSHException('Chave SSH não corresponde à impressão digital cadastrada.')
 
 
+def clean_cli(output):
+    output = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', output)
+    return output.replace('\r', '').replace('\u2212', '-').replace('\xa0', ' ')
+
+
 def port_lines(port, output):
-    """Keep only exact interface rows, so a different port cannot supply a value."""
-    pattern = re.compile(r'(?<![\w/.-])' + re.escape(port) + r'(?![\w/.-])', re.I)
-    return '\n'.join(line for line in output.splitlines() if pattern.search(line))
+    """Select the exact interface and its wrapped diagnostic lines."""
+    if re.fullmatch(r'\d+/\d+/\d+', port):
+        pattern = re.compile(r'(?<![\d/])' + re.escape(port) + r'(?![\d/])', re.I)
+    else:
+        pattern = re.compile(r'(?<![\w/.-])' + re.escape(port) + r'(?![\w/.-])', re.I)
+    lines = []
+    active = False
+    for line in clean_cli(output).splitlines():
+        if re.search(r'(?<![\d/])\d+/\d+/\d+(?![\d/])', line):
+            active = bool(pattern.search(line))
+        if active:
+            lines.append(line)
+    return '\n'.join(lines)
 
 
-def parse_port(port, status_output, optics_output):
+def optical_power(cell):
+    cell = cell.strip()
+    # Never interpret N/A, LOS or a dash as zero power.
+    match = re.fullmatch(r'([+-]?\d+(?:[.,]\d+)?)\s*(?:dBm)?', cell, re.I)
+    return float(match.group(1).replace(',', '.')) if match else None
+
+
+def optical_powers(output, context=None):
+    output = clean_cli(output)
+    values = {'rx': None, 'tx': None}
+    direction = r'(?<![a-z])(?:rx|tx|receive[dr]?|receiving|transmit(?:ted)?|transmitting)(?![a-z])'
+    for line in output.splitlines():
+        labels = list(re.finditer(direction, line, re.I))
+        for i, label in enumerate(labels):
+            key = 'rx' if re.match(r'rx|receiv', label.group(), re.I) else 'tx'
+            segment = line[label.end():labels[i + 1].start() if i + 1 < len(labels) else len(line)]
+            match = re.search(r'([+-]?\d+(?:[.,]\d+)?)\s*dBm', segment, re.I)
+            if not match:
+                match = re.search(r'dBm\s*\)?\s*[:=]?\s*([+-]?\d+(?:[.,]\d+)?)', segment, re.I)
+            if match:
+                values[key] = float(match.group(1).replace(',', '.'))
+    # Honor explicit header order, including reversed RX/TX and values without units.
+    header = None
+    for line in clean_cli(context or output).splitlines():
+        cells = [c.strip() for c in line.strip().strip('|').split('|')]
+        rx = next((i for i,c in enumerate(cells) if re.search(r'\b(?:rx|receive[dr]?)\b', c, re.I)), None)
+        tx = next((i for i,c in enumerate(cells) if re.search(r'\b(?:tx|transmit(?:ted)?)\b', c, re.I)), None)
+        if rx is not None and tx is not None and rx != tx:
+            header = (len(cells), rx, tx)
+            break
+    for line in output.splitlines():
+        cells = [c.strip() for c in line.strip().strip('|').split('|')]
+        if header and len(cells) == header[0]:
+            for key, index in [('rx', header[1]), ('tx', header[2])]:
+                if values[key] is None:
+                    values[key] = optical_power(cells[index])
+        elif len(cells) >= 3:
+            # DmOS row ends in TX | RX. Temperature/voltage/bias may be missing.
+            power_cell = r'(?:[+-]?\d+(?:[.,]\d+)?\s*dBm|N/?A|--?|-?inf(?:inity)?(?:\s*dBm)?|LOS)'
+            if all(re.fullmatch(power_cell, cell, re.I) for cell in cells[-2:]):
+                for key, cell in [('tx', cells[-2]), ('rx', cells[-1])]:
+                    if values[key] is None:
+                        values[key] = optical_power(cell)
+        elif not re.search(direction, line, re.I):
+            # Whitespace tables with two explicit dBm measurements, TX then RX.
+            powers = re.findall(r'([+-]?\d+(?:[.,]\d+)?)\s*dBm', line, re.I)
+            if len(powers) == 2:
+                for key, value in zip(('tx', 'rx'), powers):
+                    if values[key] is None:
+                        values[key] = float(value.replace(',', '.'))
+    return values['rx'], values['tx']
+
+
+def parse_port(port, status_output, optics_output, optics_context=None):
     # Conservative extraction: ambiguous or unfamiliar output stays unknown.
     match = re.search(r'(?:line protocol|operational(?: status)?|oper(?:ation)? state|link(?: status)?|physical(?: state)?|\bis)\s*(?:is|:|=)?\s*(up|down)\b', status_output, re.I)
     states = set(s.lower() for s in re.findall(r'\b(?:up|down)\b', status_output, re.I))
     state = match.group(1).lower() if match else (next(iter(states)).lower() if len(states) == 1 else 'unknown')
-    def optical(direction):
-        terms = r'(?:rx|receive[dr]*|receiving)' if direction == 'rx' else r'(?:tx|transmit(?:ted)?|transmitting)'
-        found = re.search(terms + r'[^\n]{0,65}?(-?\d+(?:\.\d+)?)\s*dBm', optics_output, re.I)
-        return float(found.group(1)) if found else None
     description = re.search(r'\bdescription\s*[:=]\s*(.*)', status_output, re.I)
     # DmOS `show interface link`: interface, link, autoneg, speed, duplex,
     # three extra columns, then description. Never include another interface.
     link_row = re.search(r'^\s*' + re.escape(port) + r'\s+(up|down)\s+(?:true|false)\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s*(.*?)\s*$', status_output, re.I | re.M)
-    rx, tx = optical('rx'), optical('tx')
-    # Supplied DmOS table: temperature | voltage | bias | TX dBm | RX dBm.
-    # Only use this fallback for an exact row with all five known unit columns.
-    table_row = re.search(r'\|\s*-?\d+(?:\.\d+)?\s*C\s*\|\s*\d+(?:\.\d+)?\s*V\s*\|\s*\d+(?:\.\d+)?\s*mA\s*\|\s*(-?\d+(?:\.\d+)?)\s*dBm\s*\|\s*(-?\d+(?:\.\d+)?)\s*dBm', optics_output, re.I)
-    if table_row and rx is None and tx is None:
-        tx, rx = map(float, table_row.groups())
+    rx, tx = optical_powers(optics_output, optics_context)
     if link_row:
         state = link_row.group(1).lower()
     return dict(name=port, state=state, rx=rx, tx=tx,
@@ -250,7 +317,7 @@ def check_ssh(device):
         for port in selected_ports:
             status = ssh_read(client, device['status_command'].replace('{port}', port)) if status_bulk is None else port_lines(port, status_bulk)
             optics = ssh_read(client, device['optics_command'].replace('{port}', port)) if optics_bulk is None else port_lines(port, optics_bulk)
-            result = parse_port(port, status, optics)
+            result = parse_port(port, status, optics, optics_context=optics_bulk)
             result['status_output'] = status_bulk if status_bulk is not None else status
             result['optics_output'] = optics_bulk if optics_bulk is not None else optics
             ports.append(result)
@@ -262,7 +329,7 @@ def check_ssh(device):
         client.close()
     with LOCK, connect() as db:
         current = db.execute('SELECT * FROM devices WHERE id=?', (device['id'],)).fetchone()
-        if not current:
+        if not current or current['config_version'] != device.get('config_version', 0):
             return
         if error:
             if current['ssh_error'] != error:
@@ -301,7 +368,7 @@ def monitor():
                         if due and key not in INFLIGHT:
                             INFLIGHT.add(key)
                             pool.submit(run_check, device, kind)
-            STOP.wait(0.5)
+            STOP.wait(0.1)
 
 
 @asynccontextmanager
@@ -359,16 +426,23 @@ def dashboard(demo: bool = False):
     return dict(devices=devices, alerts=events, samples=samples, demo=False, updated_at=now())
 
 
-@app.post('/api/devices', status_code=201)
-def create_device(device: DeviceInput):
-    if device.kind == 'datacom' and (not device.username or not device.password
+def device_values(device, previous=None):
+    values = device.model_dump()
+    password = device.password
+    saved_password = previous['password'] if previous and previous['kind'] == 'datacom' else ''
+    if device.kind == 'datacom' and (not device.username or not (password or saved_password)
             or not re.fullmatch(r'SHA256:[A-Za-z0-9+/]{43}', device.fingerprint)):
         raise HTTPException(422, 'Datacom requer usuário, senha e impressão digital SSH SHA256 verificada.')
     if device.kind == 'datacom' and not device.ports and ('{port}' in device.status_command or '{port}' in device.optics_command):
         raise HTTPException(422, 'Informe as portas ao usar comandos com {port}.')
-    values = device.model_dump()
     values['ports'] = json.dumps(values['ports'])
-    values['password'] = CIPHER.encrypt(values['password'].encode()).decode() if values['password'] else ''
+    values['password'] = (CIPHER.encrypt(password.encode()).decode() if password else saved_password) if device.kind == 'datacom' else ''
+    return values
+
+
+@app.post('/api/devices', status_code=201)
+def create_device(device: DeviceInput):
+    values = device_values(device)
     with LOCK, connect() as db:
         if db.execute('SELECT id FROM devices WHERE host=? AND kind=?', (device.host, device.kind)).fetchone():
             raise HTTPException(409, 'Este IP já está cadastrado para este tipo de monitoramento.')
@@ -378,6 +452,30 @@ def create_device(device: DeviceInput):
         cursor = db.execute(f"INSERT INTO devices({columns}) VALUES({','.join('?' for _ in values)})", tuple(values.values()))
         result = public_device(db.execute('SELECT * FROM devices WHERE id=?', (cursor.lastrowid,)).fetchone())
     return result
+
+
+@app.put('/api/devices/{device_id}')
+def update_device(device_id: int, device: DeviceInput):
+    with LOCK, connect() as db:
+        previous = db.execute('SELECT * FROM devices WHERE id=?', (device_id,)).fetchone()
+        if not previous:
+            raise HTTPException(404, 'Equipamento não encontrado.')
+        values = device_values(device, previous)
+        if db.execute('SELECT id FROM devices WHERE host=? AND kind=? AND id<>?',
+                      (device.host, device.kind, device_id)).fetchone():
+            raise HTTPException(409, 'Este IP já está cadastrado para este tipo de monitoramento.')
+        changed_target = device.host != previous['host'] or device.kind != previous['kind']
+        changed_ssh = any(values[key] != previous[key] for key in
+                          ('ssh_port', 'username', 'password', 'fingerprint', 'ports', 'status_command', 'optics_command'))
+        if changed_target:
+            db.execute('DELETE FROM samples WHERE device_id=?', (device_id,))
+            values.update(state='pending', failures=0, latency=None, last_check=None)
+        if changed_target or changed_ssh:
+            values.update(port_data='[]', ssh_error=None)
+        values.update(config_version=previous['config_version'] + 1, last_ping=0, last_ssh=0)
+        assignments = ','.join(f'{column}=?' for column in values)
+        db.execute(f'UPDATE devices SET {assignments} WHERE id=?', (*values.values(), device_id))
+        return public_device(db.execute('SELECT * FROM devices WHERE id=?', (device_id,)).fetchone())
 
 
 @app.delete('/api/devices/{device_id}', status_code=204)

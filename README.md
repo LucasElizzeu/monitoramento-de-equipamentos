@@ -27,8 +27,8 @@ Os equipamentos existentes aparecem na aba correspondente ao tipo já cadastrado
 
 ## Ping
 
-- Cadastre nome, IP IPv4/IPv6 e intervalo (5 segundos por padrão).
-- Cada tentativa envia um pacote ICMP, com timeout de 1,5 segundo.
+- Cadastre nome, IP IPv4/IPv6 e intervalo de 1 a 300 segundos (1 segundo por padrão). Equipamentos existentes mantêm seu intervalo até serem editados.
+- Cada tentativa envia um pacote ICMP. O timeout é de até 1,5 segundo, limitado a 80% do intervalo (0,8 segundo no intervalo de 1 segundo). O intervalo é contado entre os inícios das tentativas; uma mesma sonda não se sobrepõe. Sob carga, os horários dependem da disponibilidade dos coletores.
 - De 1 a 20 perdas consecutivas: **Instável**.
 - Na **21ª perda consecutiva**: **Sem ping**, com um evento de queda.
 - Resposta recebida: contador zerado. Se estava sem ping, registra recuperação.
@@ -44,6 +44,18 @@ Para um contêiner Linux, o administrador pode definir esse sysctl no contêiner
 **Limitação observada neste ambiente na nuvem:** o parâmetro está em `1 0`, bloqueando ICMP sem privilégios; o processo também não tem permissão para criar sockets raw nem instalar pacotes de sistema como administrador. Por isso o ping real não foi validado aqui. O programa detecta essa condição e mostra erro de coleta. É necessário executar em um servidor com ICMP permitido para monitoramento real.
 
 O servidor também precisa alcançar os IPs da sua rede. Um proxy HTTP não transporta ICMP e não substitui a conectividade SSH. Para equipamentos privados, use um computador na rede de gerenciamento ou uma rota/VPN administrada e autorizada. Este projeto não cria VPNs nem libera firewalls.
+
+## Editar equipamentos
+
+Clique no **lápis** da linha do equipamento, nas abas BBU's, Datacoms ou Visão geral. É possível alterar nome, IP, intervalo, tipo, portas e configurações SSH sem recriar o cadastro.
+
+Ao editar um Datacom, deixe a senha vazia para manter a atual; preencha apenas para substituí-la. A senha nunca é enviada de volta ao navegador. Nome/intervalo preservam as amostras. Se trocar IP ou tipo, as amostras e estados do alvo anterior são limpos para evitar misturar medições, mas o ID e os eventos históricos são preservados. Consultas iniciadas antes da edição não sobrescrevem a configuração atualizada.
+
+## Ler e copiar a saída
+
+Ao abrir **Ver saída do equipamento** ou selecionar texto, a atualização **visual** é pausada para manter o conteúdo estável. O monitoramento e a busca de novas leituras continuam em segundo plano. Feche a saída ou clique em **Retomar atualização** para exibir os novos dados.
+
+Use **Copiar saída** para copiar os textos dos comandos. Se o navegador bloquear a área de transferência, selecione o texto e use Ctrl+C; a seleção será preservada durante a leitura. A interface busca novas leituras a cada segundo; a consulta SSH permanece a cada 30 segundos.
 
 ## Datacom
 
@@ -70,7 +82,7 @@ gigabit-ethernet 1/1/21 | 45.73 C | 3.37 V | 19.77 mA | -6.51 dBm | -12.96 dBm
 gigabit-ethernet 1/1/22 | 54.14 C | 3.3 V  | 19.77 mA | -6.39 dBm | -9.53 dBm
 ```
 
-A ordem óptica adotada é **temperatura, tensão, corrente, TX, RX**, usual nesse formato. O cabeçalho completo do equipamento ainda precisa confirmar TX/RX. Os dois valores são exibidos individualmente; sinal ausente fica como `—`, nunca zero. Temperatura/tensão/corrente não são confundidas com dBm.
+A leitura óptica usa rótulos RX/TX ou o cabeçalho da tabela quando disponíveis. Sem cabeçalho, as duas últimas colunas dBm do formato fornecido são interpretadas como TX e RX, respectivamente. Temperatura/tensão/corrente podem estar ausentes, e são aceitos graus °C, vírgula decimal e linhas de diagnóstico quebradas. Os valores aparecem nos cartões com até duas casas decimais. Sinal ausente ou não reconhecido fica como `—`, nunca zero; uma medição ausente não apaga a outra. O formato real de cada firmware deve ser confirmado pela saída original.
 
 O painel mostra descrição, link, RX/TX, horário da leitura e a saída original. Formatos desconhecidos ficam como **Não identificado**. Se a consulta SSH falhar, leituras anteriores não são exibidas como atuais. Uma porta inicialmente Down gera um evento; novas consultas Down não duplicam o alerta; a volta para Up registra recuperação.
 
