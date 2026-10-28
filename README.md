@@ -25,6 +25,10 @@ Use somente **um processo/worker** do servidor, para evitar consultas e eventos 
 
 Os equipamentos existentes aparecem na aba correspondente ao tipo já cadastrado, sem migração do banco ou novo cadastro. Cada aba possui sua lista e seus contadores; o botão de adicionar já seleciona o tipo correspondente. A regra de alerta permanece na 21ª perda consecutiva.
 
+Clique no ícone **!** de qualquer cartão de resumo para abrir a lista correspondente: equipamentos monitorados, online, sem ping, portas inativas ou BBU's instáveis. A lista respeita a aba atual e o total do cartão, independentemente do filtro de busca da tabela. Em **Portas inativas**, aparecem o nome personalizado da porta (ou a descrição original, se não houver nome), Datacom, IP, tipo de interface, número da porta e posição no circuito. Gigabit e Ten com o mesmo número permanecem separados. Portas de Datacoms com erro na consulta SSH não entram no total nem na lista como leituras atuais.
+
+As listas permanecem estáveis para leitura enquanto o monitoramento continua; use **Atualizar lista** para trazer o estado mais recente. O horário da lista aparece no cabeçalho. **Ver equipamento** abre os detalhes do equipamento escolhido. Cartões com total zero também podem ser abertos e mostram uma mensagem de lista vazia. O botão de fechar ou a tecla Esc retornam ao painel.
+
 ## Ordem do circuito e nomes personalizados
 
 Na edição de cada Datacom (lápis da linha), preencha **Posição no circuito** com 1, 2, 3 ou posições intermediárias como **2.1** e **2.2**, para organizar trechos com duas rotas. O campo aceita ponto ou vírgula (`2.1` ou `2,1`), de 1 a 10000. A sequência será **2 → 2.1 → 2.2 → 3**. A aba Datacoms e os blocos de portas seguem essa ordem numérica. Os que estiverem sem posição aparecem no final; posições iguais mantêm a ordem de cadastro. Apague o número para voltar à ordenação sem posição. As posições são salvas no banco e permanecem ao reiniciar.

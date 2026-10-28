@@ -17,6 +17,7 @@ const icons = {
  edit:'<path d="m16 3 5 5M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15z"/>',
  trash:'<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/>',
  info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/>',
+ attention:'<circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 17h.01"/>',
  flask:'<path d="M9 3h6M10 3v6L4 19q-1 2 2 2h12q3 0 2-2L14 9V3M7 15h10"/>',
  wifi:'<path d="M2 8a16 16 0 0 1 20 0M5 12a11 11 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M12 20h.01"/>'
 };
@@ -26,7 +27,7 @@ const esc = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'
 const number = (n,digits=1) => n==null?'—':Number(n).toLocaleString('pt-BR',{maximumFractionDigits:digits});
 const interfaceLabels={'auto':'Automático','mixed':'Gigabit + Ten (portas selecionadas)','gigabit-ethernet':'Gigabit Ethernet','ten-gigabit-ethernet':'Ten Gigabit Ethernet','hundred-gigabit-ethernet':'Hundred Gigabit Ethernet'};
 const labels = {online:'Online',offline:'Sem ping',unstable:'Instável',pending:'Aguardando',error:'Erro de coleta',up:'Ativa',down:'Inativa',unknown:'Não identificado'};
-const state = {demo:localStorage.getItem('nexo-demo')==='true', page:'overview', data:{devices:[],alerts:[],samples:[]}, loading:false, selected:null, deleting:null, editing:null, portNaming:null, dataRevision:0};
+const state = {demo:localStorage.getItem('nexo-demo')==='true', page:'overview', data:{devices:[],alerts:[],samples:[]}, loading:false, selected:null, deleting:null, editing:null, portNaming:null, metricCards:{}, metricView:null, dataRevision:0};
 function badge(status){return `<span class="status-pill ${esc(status)}"><i></i>${esc(labels[status]||status)}</span>`;}
 function formatTime(date){return date?new Date(date).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'Aguardando';}
 function ago(date){if(!date)return 'Aguardando';const seconds=Math.max(0,Math.floor((Date.now()-new Date(date))/1000));return seconds<10?'Agora':seconds<60?`há ${seconds}s`:seconds<3600?`há ${Math.floor(seconds/60)}min`:`há ${Math.floor(seconds/3600)}h`;}
@@ -36,12 +37,19 @@ async function load(){if(state.loading)return;state.loading=true;const revision=
 function orderedDatacoms(devices=state.data.devices){
  return devices.filter(d=>d.kind==='datacom').sort((a,b)=>(a.circuit_position??Infinity)-(b.circuit_position??Infinity)||a.id-b.id);
 }
-function pageDevices(){
- if(state.page==='datacoms')return orderedDatacoms();
- return state.page==='bbus'?state.data.devices.filter(d=>d.kind==='ping'):state.data.devices;
+function pageDevices(page=state.page){
+ if(page==='datacoms')return orderedDatacoms();
+ return page==='bbus'?state.data.devices.filter(d=>d.kind==='ping'):state.data.devices;
 }
-function renderMetrics(){const d=pageDevices();const online=d.filter(x=>x.state==='online').length;const offline=d.filter(x=>x.state==='offline').length;const downPorts=d.flatMap(x=>x.port_data).filter(x=>x.state==='down').length;
- const cards=[[state.page==='bbus'?"BBU's monitoradas":state.page==='datacoms'?'Datacoms monitorados':'Equipamentos monitorados',d.length,'server','',`${d.filter(x=>x.kind==='datacom').length} Datacoms`,`${d.filter(x=>x.kind==='ping').length} BBU's`],['Equipamentos online',online,'wifi','green',d.length?`${Math.round(online/d.length*100)}% da rede`:'Aguardando cadastro','Respondendo ao ping'],['Equipamentos sem ping',offline,'warning','red','Mais de 20 perdas','consecutivas'],['Portas inativas',downPorts,'ports','amber',`${d.flatMap(x=>x.port_data).length} portas consultadas`,'via SSH']];
+function collectedPorts(devices){
+ return orderedDatacoms(devices).filter(d=>!d.ssh_error).flatMap(device=>(device.port_data||[]).map(port=>({device,port})));
+}
+function metricEntries(key,devices){
+ if(key==='down-ports')return collectedPorts(devices).filter(entry=>entry.port.state==='down');
+ return devices.filter(d=>key==='all'||d.state===key).map(device=>({device}));
+}
+function renderMetrics(){const d=pageDevices();const online=metricEntries('online',d).length;const offline=metricEntries('offline',d).length;const downPorts=metricEntries('down-ports',d).length;
+ const cards=[[state.page==='bbus'?"BBU's monitoradas":state.page==='datacoms'?'Datacoms monitorados':'Equipamentos monitorados',d.length,'server','',`${d.filter(x=>x.kind==='datacom').length} Datacoms`,`${d.filter(x=>x.kind==='ping').length} BBU's`],['Equipamentos online',online,'wifi','green',d.length?`${Math.round(online/d.length*100)}% da rede`:'Aguardando cadastro','Respondendo ao ping'],['Equipamentos sem ping',offline,'warning','red','Mais de 20 perdas','consecutivas'],['Portas inativas',downPorts,'ports','amber',`${collectedPorts(d).length} portas consultadas`,'via SSH']];
  if(state.page==='bbus'){
   cards[0].splice(4,2,'Monitoramento por ping','ICMP');
   cards[1][0]="BBU's online";cards[2][0]="BBU's sem ping";
@@ -50,12 +58,53 @@ function renderMetrics(){const d=pageDevices();const online=d.filter(x=>x.state=
   cards[0].splice(4,2,'Monitoramento SSH','ping e portas');
   cards[1][0]='Datacoms online';cards[2][0]='Datacoms sem ping';
  }
- $('#metrics').innerHTML=cards.map(([title,value,i,color,a,b])=>`<article class="metric-card ${color}"><div class="metric-title">${title}<span class="metric-icon">${icon(i)}</span></div><div class="metric-value">${value.toString().padStart(2,'0')}</div><div class="metric-bottom"><strong>${a}</strong><span>· ${b}</span></div></article>`).join('');
+ const keys=['all','online','offline',state.page==='bbus'?'unstable':'down-ports'];
+ state.metricCards=Object.fromEntries(keys.map((key,index)=>[key,{title:cards[index][0],page:state.page,entries:metricEntries(key,d),at:state.data.updated_at,demo:state.demo,sshErrors:key==='down-ports'&&d.some(x=>x.kind==='datacom'&&x.ssh_error)}]));
+ const focused=document.activeElement?.dataset.metric;
+ $('#metrics').innerHTML=cards.map(([title,value,i,color,a,b],index)=>`<article class="metric-card ${color}"><div class="metric-title">${title}<button type="button" class="metric-icon metric-details" data-metric="${keys[index]}" title="Listar ${title.toLowerCase()}" aria-label="Listar ${title.toLowerCase()}" aria-haspopup="dialog" aria-controls="metric-dialog">${icon('attention')}</button></div><div class="metric-value">${value.toString().padStart(2,'0')}</div><div class="metric-bottom"><strong>${a}</strong><span>· ${b}</span></div></article>`).join('');
+ if(focused)$(`[data-metric="${focused}"]`)?.focus({preventScroll:true});
  const errors=d.filter(x=>x.state==='error'||x.ssh_error).length;const unstable=d.filter(x=>x.state==='unstable').length;
  $('#network-status').textContent=!d.length?'Sua rede começa aqui':errors?'Há erros de coleta':offline||downPorts?'Sua rede precisa de atenção':unstable?'Há equipamentos com perda de ping':'Sua rede está operando normalmente';
  $('#network-subtitle').textContent=!d.length?'Cadastre um equipamento para começar':`${d.length} equipamentos acompanhados`;
  $('#bbu-count').textContent=state.data.devices.filter(x=>x.kind==='ping').length;$('#datacom-count').textContent=state.data.devices.filter(x=>x.kind==='datacom').length;$('#alert-dot').hidden=!state.data.alerts.some(a=>a.level==='critical');
 }
+function renderMetricList(){
+ const view=state.metricView;if(!view)return;
+ const ports=view.key==='down-ports';const count=view.entries.length;
+ $('#metric-dialog-title').textContent=view.title;
+ $('#metric-dialog-description').textContent=`${pages[view.page][0]} · ${count} ${ports?(count===1?'porta':'portas'):(count===1?'equipamento':'equipamentos')} · ${view.demo?'Demonstração':'Leitura'} às ${formatTime(view.at)}`;
+ $('#metric-dialog-note').hidden=!view.sshErrors;
+ const emptyMessages={all:'Nenhum equipamento cadastrado nesta aba.',online:'Nenhum equipamento online nesta aba.',offline:'Nenhum equipamento sem ping nesta aba.',unstable:"Nenhuma BBU instável nesta aba.",'down-ports':'Nenhuma porta inativa nas leituras disponíveis.'};
+ $('#metric-dialog-results').innerHTML=count?`<ul class="metric-results">${view.entries.map(({device:d,port:p})=>{
+  const name=p?(p.custom_name||p.display_name||p.description||`Porta ${p.name}`):d.name;
+  const family=p?(interfaceLabels[p.interface_type||d.interface_type]||'Interface'):(d.kind==='datacom'?'Datacom':"BBU · Ping");
+  const context=p?`${family} · Porta ${p.name}`:family;
+  return `<li class="metric-result"><div class="metric-result-main"><strong class="metric-result-name">${esc(name)}</strong><p>${esc(p?`${d.name} · ${d.host}`:d.host)}</p><small>${esc(context)}${d.circuit_position!=null?` · Posição ${esc(d.circuit_position)}`:''}</small>${p?`<small>Leitura ${ago(p.checked_at)}</small>`:`<small>${d.failures} perdas consecutivas · ${ago(d.last_check)}</small>`}</div><div class="metric-result-actions">${badge(p?p.state:d.state)}<button type="button" class="button secondary" data-metric-device="${d.id}" aria-label="Ver equipamento ${esc(d.name)}">Ver equipamento ${icon('arrow')}</button></div></li>`;
+ }).join('')}</ul>`:`<p class="metric-empty">${emptyMessages[view.key]}</p>`;
+}
+function openMetric(key){
+ const snapshot=state.metricCards[key];if(!snapshot)return;
+ state.metricView={...snapshot,key};renderMetricList();$('#metric-dialog').showModal();
+}
+$('#refresh-metric-list').addEventListener('click',async()=>{
+ const view=state.metricView;if(!view)return;
+ $('#refresh-metric-list').disabled=true;
+ try{await load();if(state.metricView!==view)return;const devices=pageDevices(view.page);
+  state.metricView={...view,entries:metricEntries(view.key,devices),at:state.data.updated_at,sshErrors:view.key==='down-ports'&&devices.some(d=>d.kind==='datacom'&&d.ssh_error)};renderMetricList();
+ }finally{$('#refresh-metric-list').disabled=false;}
+});
+$('#close-metric-list').addEventListener('click',()=>$('#metric-dialog').close());
+$('#metric-dialog').addEventListener('close',()=>{
+ const key=state.metricView?.key;state.metricView=null;
+ if(!document.querySelector('dialog[open]'))$(`[data-metric="${key}"]`)?.focus({preventScroll:true});
+});
+document.addEventListener('click',event=>{
+ const metric=event.target.closest('[data-metric]');if(metric)openMetric(metric.dataset.metric);
+ const device=event.target.closest('[data-metric-device]');if(!device)return;
+ const id=Number(device.dataset.metricDevice);
+ if(!state.data.devices.some(d=>d.id===id)){toast('Este equipamento foi removido. Atualize a lista.');return;}
+ $('#metric-dialog').close();openDetail(id);
+});
 function chart(samples, target){
  const buckets=new Map();for(const s of samples){const key=Math.floor(new Date(s.at).getTime()/5000)*5000;const item=buckets.get(key)||{sum:0,n:0};if(s.success&&s.latency!=null){item.sum+=s.latency;item.n++;}buckets.set(key,item);}
  const points=[...buckets].sort((a,b)=>a[0]-b[0]).map(([t,v])=>({t,v:v.n?v.sum/v.n:null}));const valid=points.filter(p=>p.v!=null);
