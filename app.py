@@ -41,6 +41,12 @@ LOCK = threading.RLock()
 STOP = threading.Event()
 INFLIGHT = set()
 IS_WINDOWS = sys.platform == 'win32'
+INTERFACE_LABELS = {
+    'auto': 'Automático',
+    'gigabit-ethernet': 'Gigabit Ethernet',
+    'ten-gigabit-ethernet': 'Ten Gigabit Ethernet',
+    'hundred-gigabit-ethernet': 'Hundred Gigabit Ethernet',
+}
 
 
 def now():
@@ -80,6 +86,8 @@ def init_db():
             db.execute('ALTER TABLE devices ADD COLUMN ping_timeout REAL NOT NULL DEFAULT 4')
         if 'ping_detail' not in columns:
             db.execute('ALTER TABLE devices ADD COLUMN ping_detail TEXT')
+        if 'interface_type' not in columns:
+            db.execute("ALTER TABLE devices ADD COLUMN interface_type TEXT NOT NULL DEFAULT 'auto'")
         # Correct only the old built-in typo; preserve custom commands and credentials.
         db.execute("UPDATE devices SET optics_command='show interface transceivers', "
                    "last_ssh=0, config_version=config_version+1 "
@@ -98,6 +106,7 @@ class DeviceInput(BaseModel):
     password: str = Field(default='', max_length=500)
     fingerprint: str = ''
     ports: list[str] = Field(default_factory=list, max_length=128)
+    interface_type: str = 'auto'
     status_command: str = 'show interface link'
     optics_command: str = 'show interface transceivers'
 
@@ -121,6 +130,13 @@ class DeviceInput(BaseModel):
     def valid_kind(cls, value):
         if value not in ('ping', 'datacom'):
             raise ValueError('Tipo inválido.')
+        return value
+
+    @field_validator('interface_type')
+    @classmethod
+    def valid_interface_type(cls, value):
+        if value not in INTERFACE_LABELS:
+            raise ValueError('Selecione um tipo de interface válido.')
         return value
 
     @field_validator('ports')
@@ -260,20 +276,72 @@ def clean_cli(output):
     return output.replace('\r', '').replace('\u2212', '-').replace('\xa0', ' ')
 
 
-def port_lines(port, output):
-    """Select the exact interface and its wrapped diagnostic lines."""
-    if re.fullmatch(r'\d+/\d+/\d+', port):
-        pattern = re.compile(r'(?<![\d/])' + re.escape(port) + r'(?![\d/])', re.I)
-    else:
-        pattern = re.compile(r'(?<![\w/.-])' + re.escape(port) + r'(?![\w/.-])', re.I)
-    lines = []
-    active = False
+class InterfaceSelectionError(paramiko.SSHException):
+    """A numeric ID can refer to different physical interface families."""
+
+
+def interface_family(prefix):
+    normalized = re.sub(r'[\s_-]+', '-', prefix.strip().lower()).strip('-:')
+    for family in ('hundred-gigabit-ethernet', 'ten-gigabit-ethernet', 'gigabit-ethernet'):
+        if normalized == family or normalized.startswith(family + '-'):
+            return family
+    return {'ge': 'gigabit-ethernet', 'gi': 'gigabit-ethernet', 'te': 'ten-gigabit-ethernet',
+            'xe': 'ten-gigabit-ethernet', 'xge': 'ten-gigabit-ethernet',
+            'hu': 'hundred-gigabit-ethernet', 'ce': 'hundred-gigabit-ethernet'}.get(normalized, '')
+
+
+def interface_blocks(output):
+    """Keep section headers and explicit prefixes attached to their own rows."""
+    row_pattern = re.compile(
+        r'^\s*(?:\|\s*)?(?:Interface\s*:\s*)?'
+        r'(?:(?P<prefix>hundred[ -]+gigabit[ -]+ethernet|ten[ -]+gigabit[ -]+ethernet|'
+        r'gigabit[ -]+ethernet|xge|ge|gi|te|xe|hu|ce)[ -]*)?'
+        r'(?P<number>\d+/\d+/\d+)(?=\s|[|:]|$)', re.I)
+    blocks, headers = [], []
+    section_family = ''
+    current = None
     for line in clean_cli(output).splitlines():
-        if re.search(r'(?<![\d/])\d+/\d+/\d+(?![\d/])', line):
-            active = bool(pattern.search(line))
-        if active:
-            lines.append(line)
-    return '\n'.join(lines)
+        if re.search(r'\bEthernet\s+Interfaces?\s*:?\s*$', line, re.I):
+            current = None
+            section_family = interface_family(line.rstrip(':'))
+            headers = [line]
+            continue
+        row = row_pattern.match(line)
+        if row:
+            current = {'number': row['number'], 'family': interface_family(row['prefix'] or '') or section_family,
+                       'header': '\n'.join(headers), 'lines': [line]}
+            blocks.append(current)
+        elif current is not None:
+            current['lines'].append(line)
+        else:
+            headers.append(line)
+    return blocks
+
+
+def matching_interface_blocks(port, output, interface_type='auto'):
+    number = re.search(r'(?<![\d/])\d+/\d+/\d+(?![\d/])', port)
+    if not number:
+        return []
+    requested_family = interface_family(port[:number.start()])
+    if interface_type != 'auto' and requested_family and requested_family != interface_type:
+        return []
+    family = requested_family or (interface_type if interface_type != 'auto' else '')
+    matches = [row for row in interface_blocks(output) if row['number'] == number.group()]
+    if family:
+        typed = [row for row in matches if row['family'] == family]
+        # Unlabelled single-family command output is still usable, but a known
+        # different family must never supply a state or optical measurement.
+        matches = typed if any(row['family'] for row in matches) else matches
+    identities = {(row['family'], row['lines'][0].strip()) for row in matches}
+    if len(identities) > 1:
+        raise InterfaceSelectionError(f'A porta {number.group()} aparece em mais de um tipo ou seção. '
+                                      'Edite o Datacom e selecione Gigabit, Ten Gigabit ou Hundred Gigabit.')
+    return matches[:1]
+
+
+def port_lines(port, output, interface_type='auto'):
+    matches = matching_interface_blocks(port, output, interface_type)
+    return '\n'.join(filter(None, [matches[0]['header'], *matches[0]['lines']])) if matches else ''
 
 
 def optical_power(cell):
@@ -374,19 +442,30 @@ def check_ssh(device):
                        timeout=6, auth_timeout=6, banner_timeout=6, look_for_keys=False, allow_agent=False)
         status_bulk = None if '{port}' in device['status_command'] else ssh_read(client, device['status_command'])
         optics_bulk = None if '{port}' in device['optics_command'] else ssh_read(client, device['optics_command'])
+        interface_type = device.get('interface_type', 'auto')
         selected_ports = json.loads(device['ports'])
         if not selected_ports and status_bulk is not None:
-            selected_ports = list(dict.fromkeys(re.findall(r'^\s*([\w.-]*\d+/\d+/\d+)\s+(?:up|down)\b', status_bulk, re.I | re.M)))[:128]
+            rows = interface_blocks(status_bulk)
+            if interface_type != 'auto':
+                typed = [row for row in rows if row['family'] == interface_type]
+                rows = typed if any(row['family'] for row in rows) else rows
+            selected_ports = list(dict.fromkeys(row['number'] for row in rows))[:128]
             if not selected_ports:
-                raise paramiko.SSHException('Nenhuma porta reconhecida na listagem.')
+                raise InterfaceSelectionError(f'Nenhuma interface {INTERFACE_LABELS[interface_type]} encontrada. '
+                                              'Confira o tipo selecionado e a saída do comando de portas.')
         for port in selected_ports:
-            status = ssh_read(client, device['status_command'].replace('{port}', port)) if status_bulk is None else port_lines(port, status_bulk)
-            optics = ssh_read(client, device['optics_command'].replace('{port}', port)) if optics_bulk is None else port_lines(port, optics_bulk)
-            result = parse_port(port, status, optics, optics_context=optics_bulk)
-            result['status_output'] = status_bulk if status_bulk is not None else status
-            result['optics_output'] = optics_bulk if optics_bulk is not None else optics
+            status_raw = ssh_read(client, device['status_command'].replace('{port}', port)) if status_bulk is None else status_bulk
+            status = status_raw if status_bulk is None and not interface_blocks(status_raw) else port_lines(port, status_raw, interface_type)
+            status_rows = matching_interface_blocks(port, status_raw, interface_type)
+            family = status_rows[0]['family'] if status_rows else ''
+            family = family or (interface_type if interface_type != 'auto' else 'auto')
+            optics_raw = ssh_read(client, device['optics_command'].replace('{port}', port)) if optics_bulk is None else optics_bulk
+            optics = optics_raw if optics_bulk is None and not interface_blocks(optics_raw) else port_lines(port, optics_raw, family)
+            result = parse_port(port, status, optics, optics_context=optics)
+            result.update(interface_type=family, identity=f'{family}:{port}',
+                          status_output=status_raw, optics_output=optics_raw)
             ports.append(result)
-    except CommandRejected as exc:
+    except (CommandRejected, InterfaceSelectionError) as exc:
         error = str(exc)
     except paramiko.AuthenticationException:
         error = 'Autenticação SSH recusada. Verifique usuário e senha.'
@@ -403,13 +482,14 @@ def check_ssh(device):
                 alert(db, current, 'warning', error)
             db.execute('UPDATE devices SET ssh_error=?,last_ssh=? WHERE id=?', (error, time.time(), device['id']))
         else:
-            previous = {p['name']: p for p in json.loads(current['port_data'])}
+            previous = {p.get('identity', f"{p.get('interface_type', 'auto')}:{p['name']}"): p for p in json.loads(current['port_data'])}
             for port in ports:
-                old = previous.get(port['name'], {}).get('state')
+                old = previous.get(port['identity'], {}).get('state')
+                label = (INTERFACE_LABELS[port['interface_type']] + ' ') if port['interface_type'] != 'auto' else ''
                 if port['state'] == 'down' and old != 'down':
-                    alert(db, current, 'critical', f"Porta {port['name']} caiu (link down).")
+                    alert(db, current, 'critical', f"Porta {label}{port['name']} caiu (link down).")
                 elif port['state'] == 'up' and old == 'down':
-                    alert(db, current, 'success', f"Porta {port['name']} restabelecida.")
+                    alert(db, current, 'success', f"Porta {label}{port['name']} restabelecida.")
             db.execute('UPDATE devices SET ssh_error=NULL,last_ssh=?,port_data=? WHERE id=?',
                        (time.time(), json.dumps(ports), device['id']))
 
@@ -533,7 +613,7 @@ def update_device(device_id: int, device: DeviceInput):
             raise HTTPException(409, 'Este IP já está cadastrado para este tipo de monitoramento.')
         changed_target = device.host != previous['host'] or device.kind != previous['kind']
         changed_ssh = any(values[key] != previous[key] for key in
-                          ('ssh_port', 'username', 'password', 'fingerprint', 'ports', 'status_command', 'optics_command'))
+                          ('ssh_port', 'username', 'password', 'fingerprint', 'ports', 'interface_type', 'status_command', 'optics_command'))
         if changed_target:
             db.execute('DELETE FROM samples WHERE device_id=?', (device_id,))
             values.update(state='pending', failures=0, latency=None, last_check=None, ping_detail=None)

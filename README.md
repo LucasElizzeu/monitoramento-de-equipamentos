@@ -77,8 +77,11 @@ show interface transceivers
 O comando óptico padrão foi corrigido para `transceivers`. Ao iniciar, cadastros Datacom que ainda usam exatamente o antigo padrão `show interface tranceivers` são corrigidos automaticamente, preservando credenciais e histórico. Comandos personalizados são mantidos. Se o firmware rejeitar uma consulta com `syntax error: unknown argument` ou outra indicação de comando inválido, o painel informa qual comando foi rejeitado, mesmo quando o SSH retorna código de saída zero. Ajuste a sintaxe do modelo em **Editar → Comandos do equipamento**.
 
 - Consultas SSH a cada 30 segundos.
-- Deixe a lista de portas vazia para detectar as interfaces da listagem `show interface link` (até 128 portas por equipamento). Ou selecione portas separadas por vírgula: `1/1/21, 1/1/22`.
-- O parser foi adaptado às linhas fornecidas:
+- Em **Tipo de interface**, escolha **Gigabit Ethernet (Giga)**, **Ten Gigabit Ethernet (Ten)** ou **Hundred Gigabit Ethernet**, conforme as portas que deseja acompanhar. A seleção vale para estado, descrição e sinais ópticos. Para um Datacom já cadastrado, use o lápis, selecione Ten e salve; a senha pode ficar vazia para manter a atual.
+- **Automático** mantém a compatibilidade com listagens em que cada número identifica um único tipo. Se `1/1/1` aparecer em seções Gigabit, Ten ou Hundred, o coletor solicita uma seleção explícita em vez de usar o estado ou o sinal de outra interface. Nenhum tipo é escolhido pelo estado Up/Down ou pela velocidade negociada.
+- Os cartões identificam o tipo físico, e o histórico de transições considera tipo + número da porta. Alterar o tipo invalida as leituras anteriores e inicia nova consulta, preservando credenciais e dados de ping.
+- Deixe a lista de portas vazia para detectar as interfaces **do tipo selecionado** na listagem `show interface link` (até 128 portas por equipamento). Ou selecione portas separadas por vírgula: `1/1/21, 1/1/22`.
+- O parser mantém as seções `Gigabit Ethernet Interfaces:`, `Ten Gigabit Ethernet Interfaces:` e `Hundred Gigabit Ethernet Interfaces:` separadas, além de reconhecer os prefixos `gigabit-ethernet` e `ten-gigabit-ethernet` nas linhas ópticas. Ele foi adaptado às linhas fornecidas:
 
 ```text
 1/1/21   Up    false     1G     full    -    -    -    TELEBRAS-ANORI

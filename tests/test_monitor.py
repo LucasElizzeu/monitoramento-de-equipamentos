@@ -249,11 +249,13 @@ class MonitorTests(unittest.TestCase):
             db.execute('ALTER TABLE devices DROP COLUMN config_version')
             db.execute('ALTER TABLE devices DROP COLUMN ping_timeout')
             db.execute('ALTER TABLE devices DROP COLUMN ping_detail')
+            db.execute('ALTER TABLE devices DROP COLUMN interface_type')
         app.init_db()
         self.assertEqual(self.device_state()['name'], 'Local')
         self.assertEqual(self.device_state()['config_version'], 0)
         self.assertEqual(self.device_state()['ping_timeout'], 4)
         self.assertIsNone(self.device_state()['ping_detail'])
+        self.assertEqual(self.device_state()['interface_type'], 'auto')
 
 
     def test_transceiver_command_default_and_legacy_input(self):
@@ -374,6 +376,99 @@ class MonitorTests(unittest.TestCase):
         for timeout in (0, 31, float('inf'), float('nan')):
             with self.assertRaises(ValueError):
                 app.DeviceInput(name='Invalid', host='127.0.0.2', ping_timeout=timeout)
+
+
+    def interface_fixture(self):
+        status = ('Gigabit Ethernet Interfaces:\n'
+                  'ID Link Shutdown Speed Duplex Disabled Blocked LAG Description\n'
+                  '1/1/1 Down false - - - - - GIGA-LINK\n'
+                  'Ten Gigabit Ethernet Interfaces:\n'
+                  'ID Link Shutdown Speed Duplex Disabled Blocked LAG Description\n'
+                  '1/1/1 Up false 10G full - - lag-1 TEN-LINK\n'
+                  '1/1/2 Up false 10G full - - lag-1 TEN-SECOND\n'
+                  'Hundred Gigabit Ethernet Interfaces:\n'
+                  '1/1/1 Down false - - - - - HUNDRED-LINK')
+        optics = ('Interface | Temperature | Voltage | Bias | TX power (dBm) | RX power (dBm)\n'
+                  'gigabit-ethernet 1/1/1 | 40 C | 3 V | 10 mA | -2 dBm | -26 dBm\n'
+                  'ten-gigabit-ethernet 1/1/1 | 45 C | 3 V | 10 mA | -6 dBm | -12 dBm\n'
+                  'ten-gigabit-ethernet 1/1/2 | 44 C | 3 V | 10 mA | -7 dBm | -13 dBm\n'
+                  'hundred-gigabit-ethernet 1/1/1 | 42 C | 3 V | 10 mA | -3 dBm | -18 dBm')
+        return status, optics
+
+    def run_family_check(self, family, ports):
+        d = app.create_device(app.DeviceInput(name='Typed Datacom', host='192.0.2.3', kind='datacom',
+            username='op', password='test-only', fingerprint='SHA256:'+'a'*43, ports=ports, interface_type=family))
+        stored = dict(d, password=app.CIPHER.encrypt(b'test-only').decode(), ports=json.dumps(ports))
+        with patch.object(app.paramiko, 'SSHClient'), patch.object(app, 'ssh_read', side_effect=self.interface_fixture()):
+            app.check_ssh(stored)
+        return next(x for x in app.dashboard()['devices'] if x['id'] == d['id'])
+
+    def test_ten_selection_does_not_read_gigabit_or_hundred_same_number(self):
+        result = self.run_family_check('ten-gigabit-ethernet', ['1/1/1'])
+        self.assertIsNone(result['ssh_error'])
+        port = result['port_data'][0]
+        self.assertEqual((port['name'], port['state'], port['description'], port['rx'], port['tx']),
+                         ('1/1/1', 'up', 'TEN-LINK', -12, -6))
+        self.assertEqual(port['interface_type'], 'ten-gigabit-ethernet')
+        self.assertEqual(port['identity'], 'ten-gigabit-ethernet:1/1/1')
+        self.assertEqual(app.dashboard()['alerts'], [])
+
+    def test_ten_auto_discovery_only_includes_ten_ports(self):
+        result = self.run_family_check('ten-gigabit-ethernet', [])
+        self.assertEqual([p['name'] for p in result['port_data']], ['1/1/1', '1/1/2'])
+        self.assertTrue(all(p['state'] == 'up' for p in result['port_data']))
+        self.assertEqual(result['port_data'][1]['rx'], -13)
+
+    def test_gigabit_selection_preserves_real_down_state(self):
+        result = self.run_family_check('gigabit-ethernet', ['1/1/1'])
+        port = result['port_data'][0]
+        self.assertEqual((port['state'], port['description'], port['rx']), ('down', 'GIGA-LINK', -26))
+        self.assertIn('Gigabit Ethernet', app.dashboard()['alerts'][0]['message'])
+
+    def test_hundred_selection_does_not_use_ten_up_state(self):
+        result = self.run_family_check('hundred-gigabit-ethernet', ['1/1/1'])
+        port = result['port_data'][0]
+        self.assertEqual((port['state'], port['description'], port['rx']), ('down', 'HUNDRED-LINK', -18))
+
+    def test_auto_ambiguous_port_requests_selection_instead_of_guessing(self):
+        result = self.run_family_check('auto', ['1/1/1'])
+        self.assertEqual(result['port_data'], [])
+        self.assertIn('selecione Gigabit, Ten Gigabit', result['ssh_error'])
+        self.assertFalse(any(a['level'] == 'critical' for a in app.dashboard()['alerts']))
+
+    def test_selected_type_does_not_fall_back_to_other_family(self):
+        status, optics = self.interface_fixture()
+        self.assertEqual(app.port_lines('1/1/2', optics, 'gigabit-ethernet'), '')
+        self.assertIn('-13 dBm', app.port_lines('1/1/2', optics, 'ten-gigabit-ethernet'))
+        self.assertNotIn('-26 dBm', app.port_lines('1/1/1', optics, 'ten-gigabit-ethernet'))
+        self.assertIn('TEN-LINK', app.port_lines('1/1/1', status, 'ten-gigabit-ethernet'))
+        self.assertNotIn('HUNDRED-LINK', app.port_lines('1/1/1', status, 'ten-gigabit-ethernet'))
+
+    def test_edit_interface_type_keeps_password_and_invalidates_old_readings(self):
+        result = self.run_family_check('gigabit-ethernet', ['1/1/1'])
+        self.assertTrue(result['port_data'])
+        updated = app.update_device(result['id'], app.DeviceInput(name='Typed Datacom', host='192.0.2.3', kind='datacom',
+            username='op', fingerprint='SHA256:'+'a'*43, ports=['1/1/1'], interface_type='ten-gigabit-ethernet'))
+        self.assertEqual(updated['interface_type'], 'ten-gigabit-ethernet')
+        self.assertEqual(updated['port_data'], [])
+        self.assertEqual(updated['id'], result['id'])
+        self.assertTrue(updated['has_password'])
+        with self.assertRaises(ValueError):
+            app.DeviceInput(name='Invalid', host='127.0.0.1', interface_type='not-a-type')
+
+
+    def test_per_port_templates_still_support_unlabelled_diagnostics(self):
+        d = app.create_device(app.DeviceInput(name='Custom Datacom', host='192.0.2.4', kind='datacom',
+            username='op', password='test-only', fingerprint='SHA256:'+'a'*43, ports=['1/1/1'],
+            interface_type='ten-gigabit-ethernet', status_command='show interface ten-gigabit-ethernet {port}',
+            optics_command='show interface transceivers ten-gigabit-ethernet {port}'))
+        original = dict(d, password=app.CIPHER.encrypt(b'test-only').decode(), ports='["1/1/1"]')
+        with patch.object(app.paramiko, 'SSHClient'), patch.object(app, 'ssh_read', side_effect=[
+            'link status: up', 'RX power: -12 dBm TX power: -6 dBm']):
+            app.check_ssh(original)
+        result = next(x for x in app.dashboard()['devices'] if x['id'] == d['id'])
+        self.assertEqual(result['port_data'][0]['state'], 'up')
+        self.assertEqual(result['port_data'][0]['rx'], -12)
 
 
 

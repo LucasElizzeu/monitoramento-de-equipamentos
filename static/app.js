@@ -24,6 +24,7 @@ function icon(name){return `<svg viewBox="0 0 24 24" fill="none" stroke="current
 function hydrateIcons(){document.querySelectorAll('[data-icon]').forEach(el=>{el.innerHTML=icon(el.dataset.icon);});}
 const esc = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const number = (n,digits=1) => n==null?'—':Number(n).toLocaleString('pt-BR',{maximumFractionDigits:digits});
+const interfaceLabels={'auto':'Automático','gigabit-ethernet':'Gigabit Ethernet','ten-gigabit-ethernet':'Ten Gigabit Ethernet','hundred-gigabit-ethernet':'Hundred Gigabit Ethernet'};
 const labels = {online:'Online',offline:'Sem ping',unstable:'Instável',pending:'Aguardando',error:'Erro de coleta',up:'Ativa',down:'Inativa',unknown:'Não identificado'};
 const state = {demo:localStorage.getItem('nexo-demo')==='true', page:'overview', data:{devices:[],alerts:[],samples:[]}, loading:false, selected:null, deleting:null, editing:null};
 function badge(status){return `<span class="status-pill ${esc(status)}"><i></i>${esc(labels[status]||status)}</span>`;}
@@ -73,7 +74,7 @@ function renderDevices(){const q=$('#search').value.toLowerCase();const filter=$
 }
 function portsHTML(d){if(d.ssh_error)return `<p class="ssh-warning">${icon('warning')} ${esc(d.ssh_error)} As leituras anteriores não são exibidas como atuais.</p>`;
  if(!d.port_data.length)return '<p class="muted">Aguardando a primeira consulta SSH. Intervalo: 30 segundos.</p>';
- return `<div class="port-cards">${d.port_data.map(p=>`<article class="port-card"><div class="port-card-header"><strong>${esc(p.name)}</strong>${badge(p.state)}</div>${p.description?`<p class="muted">${esc(p.description)}</p>`:''}<div class="optical"><span>RX · RECEPÇÃO<strong>${number(p.rx,2)} <small>dBm</small></strong></span><span>TX · TRANSMISSÃO<strong>${number(p.tx,2)} <small>dBm</small></strong></span></div><small>Leitura ${ago(p.checked_at)}</small>${p.rx==null&&p.tx==null?'<p class="signal-note">Sinal não informado ou formato não reconhecido.</p>':''}<details data-port-key="${d.id}:${esc(p.name)}"><summary>Ver saída do equipamento</summary><button type="button" class="button secondary output-copy" data-copy-output>${icon('copy')}Copiar saída</button><pre>${esc(p.status_output)}</pre><pre>${esc(p.optics_output)}</pre></details></article>`).join('')}</div>`;}
+ return `<div class="port-cards">${d.port_data.map(p=>`<article class="port-card"><div class="port-card-header"><strong>${esc(p.name)}</strong>${badge(p.state)}</div>${p.interface_type&&p.interface_type!=='auto'?`<small class="port-family">${esc(interfaceLabels[p.interface_type]||p.interface_type)}</small>`:''}${p.description?`<p class="muted">${esc(p.description)}</p>`:''}<div class="optical"><span>RX · RECEPÇÃO<strong>${number(p.rx,2)} <small>dBm</small></strong></span><span>TX · TRANSMISSÃO<strong>${number(p.tx,2)} <small>dBm</small></strong></span></div><small>Leitura ${ago(p.checked_at)}</small>${p.rx==null&&p.tx==null?'<p class="signal-note">Sinal não informado ou formato não reconhecido.</p>':''}<details data-port-key="${d.id}:${esc(p.name)}"><summary>Ver saída do equipamento</summary><button type="button" class="button secondary output-copy" data-copy-output>${icon('copy')}Copiar saída</button><pre>${esc(p.status_output)}</pre><pre>${esc(p.optics_output)}</pre></details></article>`).join('')}</div>`;}
 function readingOutput(){
  return (state.page==='datacoms'&&Boolean($('#ports-content').querySelector('details[open]')))
   ||($('#detail-dialog').open&&Boolean($('#detail-content').querySelector('details[open]')));
@@ -87,7 +88,7 @@ function render(){
  $('#recent-events').innerHTML=alerts.length?alerts.slice(0,3).map(eventHTML).join(''):empty('Nenhum evento por aqui','Quedas e recuperações aparecerão neste espaço.');
  $('#alerts-content').innerHTML=alerts.length?alerts.map(eventHTML).join(''):empty('Sua linha do tempo começa aqui','Eventos serão registrados automaticamente quando houver uma mudança na rede.');
  const openPorts=new Set([...$('#ports-content').querySelectorAll('details[open]')].map(e=>e.dataset.portKey));
- const datacoms=devices.filter(d=>d.kind==='datacom');$('#ports-content').innerHTML=datacoms.length?datacoms.map(d=>`<div class="port-device"><h3>${esc(d.name)}</h3><p>${esc(d.host)} · ${d.ports.length||d.port_data.length} portas · ${d.ports.length?'seleção manual':'detecção automática'}</p>${portsHTML(d)}</div>`).join(''):empty('Conecte seu primeiro Datacom','Cadastre uma conexão SSH para acompanhar portas e sinais ópticos.',true);
+ const datacoms=devices.filter(d=>d.kind==='datacom');$('#ports-content').innerHTML=datacoms.length?datacoms.map(d=>`<div class="port-device"><h3>${esc(d.name)}</h3><p>${esc(d.host)} · ${esc(interfaceLabels[d.interface_type]||'Automático')} · ${d.ports.length||d.port_data.length} portas · ${d.ports.length?'seleção manual':'detecção automática'}</p>${portsHTML(d)}</div>`).join(''):empty('Conecte seu primeiro Datacom','Cadastre uma conexão SSH para acompanhar portas e sinais ópticos.',true);
  $('#ports-content').querySelectorAll('details').forEach(e=>e.open=openPorts.has(e.dataset.portKey));
  if(state.selected&&$('#detail-dialog').open){if(state.demo){state.detailSamples=samples.filter(s=>s.device_id===state.selected);renderDetail();}else{const selected=state.selected;api(`/api/devices/${selected}/history`).then(history=>{if(state.selected===selected){state.detailSamples=history;renderDetail();}}).catch(()=>{});}}
 }
@@ -133,8 +134,8 @@ function openEdit(id){
  const device=state.data.devices.find(d=>d.id===id);
  if(!device)return;
  state.editing=device;$('#device-form').reset();
- for(const name of ['name','host','interval','ping_timeout','ssh_port','username','fingerprint','status_command','optics_command']){
-  $(`[name="${name}"]`).value=device[name]??(name==='ping_timeout'?4:'');
+ for(const name of ['name','host','interval','ping_timeout','interface_type','ssh_port','username','fingerprint','status_command','optics_command']){
+  $(`[name="${name}"]`).value=device[name]??(name==='ping_timeout'?4:name==='interface_type'?'auto':'');
  }
  $(`[name="kind"][value="${device.kind}"]`).checked=true;
  $('[name="ports"]').value=device.ports.join(', ');$('[name="password"]').value='';
