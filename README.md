@@ -1,6 +1,6 @@
-# Nexo · Monitoramento de equipamentos
+# VELOSONET MONITORAMENTO
 
-Primeira versão de um painel local para monitorar ping e interfaces de equipamentos Datacom por SSH. Interface em português, responsiva e sem etapa de compilação ou serviços de fontes externos. Python 3.12+, FastAPI, SQLite e JavaScript.
+Primeira versão de um painel local para monitorar ping e interfaces de equipamentos Datacom por SSH. Interface em português, responsiva, com identidade VELOSONET e tema azul-marinho. Textos claros e indicadores em verde, vermelho e âmbar destacam os estados dos equipamentos. Não requer etapa de compilação ou serviços de fontes externos. Python 3.12+, FastAPI, SQLite e JavaScript.
 
 ## Executar
 
