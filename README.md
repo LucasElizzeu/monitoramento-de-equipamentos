@@ -35,6 +35,8 @@ Na edição de cada Datacom (lápis da linha), preencha **Posição no circuito*
 
 Para substituir no painel descrições como `SWITCH_DM4380-CAA...`, clique no **lápis ao lado do nome da porta**, digite o nome desejado e salve. Exemplos: `Entrada do circuito`, `Saída para Anori` ou `Link principal`. A personalização vale para o painel e os novos alertas. A descrição original do Datacom aparece na janela de edição e na saída do equipamento.
 
+Os eventos de queda e recuperação, tanto na **Visão geral** quanto na aba **Eventos**, incluem o nome personalizado da porta. Sem nome personalizado, usam a descrição informada pelo Datacom. Exemplo: `Porta Ten Gigabit Ethernet 1/1/11 (Saída para Anori) caiu (link down).` O Datacom continua identificado logo abaixo. Novos eventos guardam esse nome junto da mensagem, inclusive se o equipamento for removido depois. Eventos antigos que só tinham o número recebem o nome na exibição quando ainda for possível identificar a interface; o registro original no banco é preservado. Números antigos sem tipo que correspondam a Giga e Ten simultaneamente permanecem sem nome para não associar a porta errada.
+
 Os nomes são vinculados ao Datacom, ao tipo de interface e ao número da porta; Gigabit `1/1/1` e Ten `1/1/1` podem ter nomes diferentes. Novas consultas SSH preservam os nomes personalizados. Deixe o campo vazio para voltar à descrição original. O nome do Datacom inteiro continua editável no cadastro do equipamento.
 
 ## Ping

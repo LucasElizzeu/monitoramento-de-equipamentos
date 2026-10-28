@@ -98,6 +98,7 @@ h2 { font-size: 14px; color: #edf5ff; }
 .legend-dot { background: var(--accent); }
 .event-panel .panel-heading>span { color: var(--muted); }
 .event-item { border-color: var(--line); }
+.event-body { overflow-wrap: anywhere; }
 .event-icon { background: var(--danger-bg); color: var(--red); }
 .event-icon.success { background: var(--success-bg); color: var(--success); }
 .event-icon.warning { background: var(--warning-bg); color: var(--amber); }

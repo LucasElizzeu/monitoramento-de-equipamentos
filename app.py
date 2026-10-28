@@ -240,6 +240,35 @@ def public_device(row):
     return value
 
 
+def public_alert(row, devices):
+    """Enrich old unnamed port events without rewriting the stored history."""
+    value = dict(row)
+    match = re.fullmatch(
+        r'Porta (?:(?P<family>(?:Hundred |Ten )?Gigabit Ethernet) )?'
+        r'(?P<port>[a-zA-Z0-9/_.:-]+) (?P<change>caiu \(link down\)\.|restabelecida\.)',
+        value['message'])
+    device = devices.get(value['device_id'])
+    if not match or not device or device['kind'] != 'datacom':
+        return value
+    family = next((key for key, label in INTERFACE_LABELS.items() if label == match['family']), 'auto')
+    key = port_alias_key(match['port'], family)
+    aliases = device.get('port_aliases', {})
+    readings = {port_alias_key(p['name'], p.get('interface_type', device.get('interface_type', 'auto'))): p
+                for p in device.get('port_data', [])}
+    if key.startswith('auto:'):
+        # Legacy numeric-only events cannot choose between Giga and Ten.
+        number = key.split(':', 1)[1]
+        candidates = {k for k in readings.keys() | aliases.keys() if k.split(':', 1)[1] == number}
+        if len(candidates) != 1:
+            return value
+        key = candidates.pop()
+    name = aliases.get(key) or readings.get(key, {}).get('description', '')
+    if name:
+        prefix = f"{match['family']} " if match['family'] else ''
+        value['message'] = f"Porta {prefix}{match['port']} ({name}) {match['change']}"
+    return value
+
+
 def alert(db, device, level, message):
     db.execute('INSERT INTO alerts(device_id,device_name,at,level,message) VALUES(?,?,?,?,?)',
                (device['id'], device['name'], now(), level, message))
@@ -677,8 +706,8 @@ def check_ssh(device):
             for port in ports:
                 old = previous.get(port['identity'], {}).get('state')
                 label = (INTERFACE_LABELS[port['interface_type']] + ' ') if port['interface_type'] != 'auto' else ''
-                custom_name = aliases.get(port_alias_key(port['name'], port['interface_type']), '')
-                alias_label = f' ({custom_name})' if custom_name else ''
+                display_name = aliases.get(port_alias_key(port['name'], port['interface_type'])) or port.get('description', '')
+                alias_label = f' ({display_name})' if display_name else ''
                 if port['state'] == 'down' and old != 'down':
                     alert(db, current, 'critical', f"Porta {label}{port['name']}{alias_label} caiu (link down).")
                 elif port['state'] == 'up' and old == 'down':
@@ -761,7 +790,8 @@ def dashboard(demo: bool = False):
         return demo_dashboard()
     with LOCK, connect() as db:
         devices = [public_device(row) for row in db.execute('SELECT * FROM devices ORDER BY id')]
-        events = [dict(row) for row in db.execute('SELECT * FROM alerts ORDER BY id DESC LIMIT 60')]
+        by_id = {device['id']: device for device in devices}
+        events = [public_alert(row, by_id) for row in db.execute('SELECT * FROM alerts ORDER BY id DESC LIMIT 60')]
         samples = [dict(row) for row in db.execute('SELECT * FROM samples ORDER BY id DESC LIMIT 720')][::-1]
     return dict(devices=devices, alerts=events, samples=samples, demo=False, updated_at=now())
 
@@ -880,7 +910,7 @@ def demo_dashboard():
               ('Switch • Almoxarifado', '10.0.3.2', 'ping', 'offline', None),
               ('Datacom • Distribuição sul', '10.0.4.1', 'datacom', 'online', 4.1)]
     for i, (name, host, kind, state, latency) in enumerate(labels, 1):
-        ports = [] if kind == 'ping' else [dict(name=f'ge1/1/{p}', state='down' if i == 2 and p == 3 else 'up', rx=None if i == 2 and p == 3 else round(-8.3-p*1.2, 2), tx=-2.1,
+        ports = [] if kind == 'ping' else [dict(name=f'ge1/1/{p}', description=f'Enlace de demonstração {p}', state='down' if i == 2 and p == 3 else 'up', rx=None if i == 2 and p == 3 else round(-8.3-p*1.2, 2), tx=-2.1,
             rx_bps=0 if i == 2 and p == 3 else p*120e6, tx_bps=0 if i == 2 and p == 3 else p*30e6,
             l2_rx_bps=0 if i == 2 and p == 3 else p*115e6, l2_tx_bps=0 if i == 2 and p == 3 else p*28e6,
             utilization_enabled=True, utilization_output='Banda simulada para demonstração.',
@@ -890,4 +920,4 @@ def demo_dashboard():
     events = [dict(id=3, device_id=5, device_name=labels[4][0], at=now(), level='critical', message='Sem ping: 24 perdas consecutivas.'),
               dict(id=2, device_id=2, device_name=labels[1][0], at=now(), level='critical', message='Porta ge1/1/3 caiu (link down).'),
               dict(id=1, device_id=1, device_name=labels[0][0], at=now(), level='success', message='Ping restabelecido. Equipamento online.')]
-    return dict(devices=devices, alerts=events, samples=samples, demo=True, updated_at=now())
+    return dict(devices=devices, alerts=[public_alert(event, {d['id']: d for d in devices}) for event in events], samples=samples, demo=True, updated_at=now())

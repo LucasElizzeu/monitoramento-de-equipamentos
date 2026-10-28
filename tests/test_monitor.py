@@ -592,6 +592,63 @@ class MonitorTests(unittest.TestCase):
         self.assertEqual(result['port_data'][0]['description'], 'NOVA-DESCRICAO')
         self.assertIn('Circuito Anori', app.dashboard()['alerts'][0]['message'])
 
+    def test_port_description_is_saved_in_outage_and_recovery_events(self):
+        d = self.named_port_fixture()
+        with app.connect() as db:
+            stored = dict(db.execute('SELECT * FROM devices WHERE id=?', (d['id'],)).fetchone())
+        for state in ('Down', 'Down', 'Up'):
+            with patch.object(app.paramiko, 'SSHClient'), patch.object(app, 'ssh_read', side_effect=[
+                    f'Ten Gigabit Ethernet Interfaces:\n1/1/1 {state} false 10G full - - - ENLACE-ANORI',
+                    '', '']):
+                app.check_ssh(stored)
+        events = app.dashboard()['alerts']
+        self.assertEqual(len(events), 2)
+        self.assertIn('(ENLACE-ANORI) restabelecida.', events[0]['message'])
+        self.assertIn('(ENLACE-ANORI) caiu (link down).', events[1]['message'])
+        app.delete_device(d['id'])
+        self.assertIn('ENLACE-ANORI', app.dashboard()['alerts'][0]['message'])
+
+    def test_old_unnamed_events_use_aliases_without_rewriting_history(self):
+        d = self.named_port_fixture()
+        original = 'Porta Ten Gigabit Ethernet 1/1/1 caiu (link down).'
+        with app.connect() as db:
+            app.alert(db, d, 'critical', original)
+        app.update_port_alias(d['id'], app.PortAliasInput(port='1/1/1', interface_type='ten-gigabit-ethernet', display_name='Saída para Anori'))
+        shown = app.dashboard()['alerts'][0]
+        self.assertEqual(shown['message'], 'Porta Ten Gigabit Ethernet 1/1/1 (Saída para Anori) caiu (link down).')
+        app.update_port_alias(d['id'], app.PortAliasInput(port='1/1/1', interface_type='ten-gigabit-ethernet', display_name='Rota alternativa'))
+        self.assertIn('(Rota alternativa)', app.dashboard()['alerts'][0]['message'])
+        with app.connect() as db:
+            rows = db.execute('SELECT * FROM alerts').fetchall()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['message'], original)
+        self.assertEqual(rows[0]['id'], shown['id'])
+        self.assertEqual(rows[0]['at'], shown['at'])
+
+    def test_old_port_events_respect_families_and_do_not_guess_ambiguous_numbers(self):
+        d = self.named_port_fixture()
+        app.update_port_alias(d['id'], app.PortAliasInput(port='1/1/1', interface_type='gigabit-ethernet', display_name='Reserva Giga'))
+        with app.connect() as db:
+            app.alert(db, d, 'critical', 'Porta Gigabit Ethernet 1/1/1 caiu (link down).')
+            app.alert(db, d, 'success', 'Porta Ten Gigabit Ethernet 1/1/1 restabelecida.')
+            app.alert(db, d, 'critical', 'Porta 1/1/1 caiu (link down).')
+            app.alert(db, d, 'critical', 'Porta ge1/1/10 caiu (link down).')
+        messages = [a['message'] for a in app.dashboard()['alerts']]
+        self.assertEqual(messages[0], 'Porta ge1/1/10 caiu (link down).')
+        self.assertEqual(messages[1], 'Porta 1/1/1 caiu (link down).')
+        self.assertIn('(SWITCH_DM4380-CAA...) restabelecida.', messages[2])
+        self.assertIn('(Reserva Giga)', messages[3])
+
+    def test_already_named_events_and_ping_events_preserve_their_messages(self):
+        d = self.named_port_fixture()
+        originals = ['Porta Ten Gigabit Ethernet 1/1/1 (Nome na época) caiu (link down).',
+                     'Ping restabelecido. Equipamento online.']
+        with app.connect() as db:
+            for message in originals:
+                app.alert(db, d, 'success', message)
+        app.update_port_alias(d['id'], app.PortAliasInput(port='1/1/1', interface_type='ten-gigabit-ethernet', display_name='Nome atual'))
+        self.assertEqual([a['message'] for a in app.dashboard()['alerts']], list(reversed(originals)))
+
     def test_port_alias_validation_and_missing_device(self):
         for kwargs in [dict(port='1/1/1; reboot'), dict(port='1/1/1', interface_type='invalid'),
                        dict(port='1/1/1', display_name='x'*121), dict(port='1/1/1', display_name='line1\nline2')]:
