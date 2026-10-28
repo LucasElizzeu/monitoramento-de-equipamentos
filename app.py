@@ -90,6 +90,10 @@ def init_db():
             db.execute("ALTER TABLE devices ADD COLUMN interface_type TEXT NOT NULL DEFAULT 'auto'")
         if 'ssh_diagnostic' not in columns:
             db.execute("ALTER TABLE devices ADD COLUMN ssh_diagnostic TEXT NOT NULL DEFAULT '{}'")
+        if 'circuit_position' not in columns:
+            db.execute('ALTER TABLE devices ADD COLUMN circuit_position INTEGER')
+        if 'port_aliases' not in columns:
+            db.execute("ALTER TABLE devices ADD COLUMN port_aliases TEXT NOT NULL DEFAULT '{}'")
         # Correct only the old built-in typo; preserve custom commands and credentials.
         db.execute("UPDATE devices SET optics_command='show interface transceivers', "
                    "last_ssh=0, config_version=config_version+1 "
@@ -109,6 +113,7 @@ class DeviceInput(BaseModel):
     fingerprint: str = ''
     ports: list[str] = Field(default_factory=list, max_length=128)
     interface_type: str = 'auto'
+    circuit_position: int | None = Field(default=None, ge=1, le=10000)
     status_command: str = 'show interface link'
     optics_command: str = 'show interface transceivers'
 
@@ -162,12 +167,47 @@ class DeviceInput(BaseModel):
         return value
 
 
+class PortAliasInput(BaseModel):
+    port: str
+    interface_type: str = 'auto'
+    display_name: str = Field(default='', max_length=120)
+
+    @field_validator('port')
+    @classmethod
+    def valid_port(cls, value):
+        return DeviceInput.valid_ports([value])[0]
+
+    @field_validator('interface_type')
+    @classmethod
+    def valid_family(cls, value):
+        return DeviceInput.valid_interface_type(value)
+
+    @field_validator('display_name')
+    @classmethod
+    def valid_alias(cls, value):
+        value = value.strip()
+        if re.search(r'[\x00-\x1f\x7f]', value):
+            raise ValueError('O nome da porta deve ocupar uma única linha.')
+        return value
+
+
+def port_alias_key(port, interface_type='auto'):
+    number = re.search(r'(?<![\d/])\d+/\d+/\d+(?![\d/])', port)
+    prefix_family = interface_family(port[:number.start()]) if number else ''
+    return f"{prefix_family or interface_type}:{number.group() if number else port}"
+
+
 def public_device(row):
     value = dict(row)
     value['has_password'] = bool(value.pop('password'))
     value['ping_backend'] = 'Windows ping.exe' if IS_WINDOWS else 'ICMP (icmplib)'
     value['ports'] = json.loads(value['ports'] or '[]')
     value['port_data'] = json.loads(value['port_data'] or '[]')
+    value['port_aliases'] = json.loads(value['port_aliases'] or '{}')
+    for port in value['port_data']:
+        key = port_alias_key(port['name'], port.get('interface_type', value['interface_type']))
+        port['custom_name'] = value['port_aliases'].get(key, '')
+        port['display_name'] = port['custom_name'] or port.get('description', '')
     value['ssh_diagnostic'] = json.loads(value['ssh_diagnostic'] or '{}')
     return value
 
@@ -522,13 +562,16 @@ def check_ssh(device):
                        (error, time.time(), json.dumps(diagnostic), device['id']))
         else:
             previous = {p.get('identity', f"{p.get('interface_type', 'auto')}:{p['name']}"): p for p in json.loads(current['port_data'])}
+            aliases = json.loads(current['port_aliases'] or '{}')
             for port in ports:
                 old = previous.get(port['identity'], {}).get('state')
                 label = (INTERFACE_LABELS[port['interface_type']] + ' ') if port['interface_type'] != 'auto' else ''
+                custom_name = aliases.get(port_alias_key(port['name'], port['interface_type']), '')
+                alias_label = f' ({custom_name})' if custom_name else ''
                 if port['state'] == 'down' and old != 'down':
-                    alert(db, current, 'critical', f"Porta {label}{port['name']} caiu (link down).")
+                    alert(db, current, 'critical', f"Porta {label}{port['name']}{alias_label} caiu (link down).")
                 elif port['state'] == 'up' and old == 'down':
-                    alert(db, current, 'success', f"Porta {label}{port['name']} restabelecida.")
+                    alert(db, current, 'success', f"Porta {label}{port['name']}{alias_label} restabelecida.")
             db.execute("UPDATE devices SET ssh_error=NULL,last_ssh=?,port_data=?,ssh_diagnostic='{}' WHERE id=?",
                        (time.time(), json.dumps(ports), device['id']))
 
@@ -647,6 +690,8 @@ def update_device(device_id: int, device: DeviceInput):
         if not previous:
             raise HTTPException(404, 'Equipamento não encontrado.')
         values = device_values(device, previous)
+        if 'circuit_position' not in device.model_fields_set:
+            values['circuit_position'] = previous['circuit_position']
         if db.execute('SELECT id FROM devices WHERE host=? AND kind=? AND id<>?',
                       (device.host, device.kind, device_id)).fetchone():
             raise HTTPException(409, 'Este IP já está cadastrado para este tipo de monitoramento.')
@@ -661,6 +706,29 @@ def update_device(device_id: int, device: DeviceInput):
         values.update(config_version=previous['config_version'] + 1, last_ping=0, last_ssh=0)
         assignments = ','.join(f'{column}=?' for column in values)
         db.execute(f'UPDATE devices SET {assignments} WHERE id=?', (*values.values(), device_id))
+        return public_device(db.execute('SELECT * FROM devices WHERE id=?', (device_id,)).fetchone())
+
+
+@app.patch('/api/devices/{device_id}/port-name')
+def update_port_alias(device_id: int, entry: PortAliasInput):
+    with LOCK, connect() as db:
+        device = db.execute('SELECT * FROM devices WHERE id=?', (device_id,)).fetchone()
+        if not device:
+            raise HTTPException(404, 'Equipamento não encontrado.')
+        if device['kind'] != 'datacom':
+            raise HTTPException(422, 'Nomes de portas são configurados nos Datacoms.')
+        family = entry.interface_type
+        if family == 'auto' and device['interface_type'] != 'auto':
+            family = device['interface_type']
+        key = port_alias_key(entry.port, family)
+        aliases = json.loads(device['port_aliases'] or '{}')
+        if entry.display_name:
+            if key not in aliases and len(aliases) >= 512:
+                raise HTTPException(422, 'Limite de 512 nomes personalizados por Datacom.')
+            aliases[key] = entry.display_name
+        else:
+            aliases.pop(key, None)
+        db.execute('UPDATE devices SET port_aliases=? WHERE id=?', (json.dumps(aliases), device_id))
         return public_device(db.execute('SELECT * FROM devices WHERE id=?', (device_id,)).fetchone())
 
 

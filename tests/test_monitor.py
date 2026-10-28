@@ -251,6 +251,8 @@ class MonitorTests(unittest.TestCase):
             db.execute('ALTER TABLE devices DROP COLUMN ping_detail')
             db.execute('ALTER TABLE devices DROP COLUMN interface_type')
             db.execute('ALTER TABLE devices DROP COLUMN ssh_diagnostic')
+            db.execute('ALTER TABLE devices DROP COLUMN circuit_position')
+            db.execute('ALTER TABLE devices DROP COLUMN port_aliases')
         app.init_db()
         self.assertEqual(self.device_state()['name'], 'Local')
         self.assertEqual(self.device_state()['config_version'], 0)
@@ -258,6 +260,8 @@ class MonitorTests(unittest.TestCase):
         self.assertIsNone(self.device_state()['ping_detail'])
         self.assertEqual(self.device_state()['interface_type'], 'auto')
         self.assertEqual(self.device_state()['ssh_diagnostic'], '{}')
+        self.assertIsNone(self.device_state()['circuit_position'])
+        self.assertEqual(self.device_state()['port_aliases'], '{}')
 
 
     def test_transceiver_command_default_and_legacy_input(self):
@@ -538,6 +542,78 @@ class MonitorTests(unittest.TestCase):
         result = app.port_lines('1/1/1', output, 'ten-gigabit-ethernet')
         self.assertIn('1/1/1 Up', result)
         self.assertNotIn('1/1/1 Down', result)
+
+
+    def named_port_fixture(self):
+        d = app.create_device(app.DeviceInput(name='Alias Datacom', host='192.0.2.8', kind='datacom',
+            username='op', password='test-only', fingerprint='SHA256:'+'a'*43, ports=['1/1/1'],
+            interface_type='ten-gigabit-ethernet', circuit_position=2))
+        readings = [dict(name='1/1/1', interface_type=family, state='up', rx=-12, tx=-6,
+                         description='SWITCH_DM4380-CAA...', identity=family+':1/1/1')
+                    for family in ('ten-gigabit-ethernet', 'gigabit-ethernet')]
+        with app.connect() as db:
+            db.execute('UPDATE devices SET port_data=? WHERE id=?', (json.dumps(readings), d['id']))
+        return d
+
+    def test_custom_port_name_persists_without_touching_device_description_or_ssh(self):
+        d = self.named_port_fixture()
+        with patch.object(app.paramiko, 'SSHClient') as ssh:
+            renamed = app.update_port_alias(d['id'], app.PortAliasInput(port='1/1/1',
+                interface_type='ten-gigabit-ethernet', display_name='  Saída para Anori  '))
+            ssh.assert_not_called()
+        self.assertEqual(renamed['port_data'][0]['display_name'], 'Saída para Anori')
+        self.assertEqual(renamed['port_data'][0]['description'], 'SWITCH_DM4380-CAA...')
+        self.assertEqual(renamed['port_data'][1]['display_name'], 'SWITCH_DM4380-CAA...')
+        self.assertEqual(renamed['config_version'], d['config_version'])
+        self.assertEqual(renamed['circuit_position'], 2)
+        self.assertTrue(renamed['has_password'])
+        app.init_db()
+        persisted = next(x for x in app.dashboard()['devices'] if x['id'] == d['id'])
+        self.assertEqual(persisted['port_data'][0]['custom_name'], 'Saída para Anori')
+
+    def test_clearing_port_alias_restores_equipment_description(self):
+        d = self.named_port_fixture()
+        app.update_port_alias(d['id'], app.PortAliasInput(port='1/1/1', interface_type='ten-gigabit-ethernet', display_name='Entrada'))
+        result = app.update_port_alias(d['id'], app.PortAliasInput(port='1/1/1', interface_type='ten-gigabit-ethernet', display_name=''))
+        self.assertEqual(result['port_data'][0]['display_name'], 'SWITCH_DM4380-CAA...')
+        self.assertEqual(result['port_aliases'], {})
+
+    def test_new_ssh_readings_keep_custom_name_and_include_it_in_alerts(self):
+        d = self.named_port_fixture()
+        app.update_port_alias(d['id'], app.PortAliasInput(port='1/1/1', interface_type='ten-gigabit-ethernet', display_name='Circuito Anori'))
+        with app.connect() as db:
+            stored = dict(db.execute('SELECT * FROM devices WHERE id=?', (d['id'],)).fetchone())
+        with patch.object(app.paramiko, 'SSHClient'), patch.object(app, 'ssh_read', side_effect=[
+            'Ten Gigabit Ethernet Interfaces:\n1/1/1 Down false - - - - - NOVA-DESCRICAO',
+            'ten-gigabit-ethernet 1/1/1 | 40 C | 3 V | 19 mA | -2 dBm | -12 dBm']):
+            app.check_ssh(stored)
+        result = next(x for x in app.dashboard()['devices'] if x['id'] == d['id'])
+        self.assertEqual(result['port_data'][0]['display_name'], 'Circuito Anori')
+        self.assertEqual(result['port_data'][0]['description'], 'NOVA-DESCRICAO')
+        self.assertIn('Circuito Anori', app.dashboard()['alerts'][0]['message'])
+
+    def test_port_alias_validation_and_missing_device(self):
+        for kwargs in [dict(port='1/1/1; reboot'), dict(port='1/1/1', interface_type='invalid'),
+                       dict(port='1/1/1', display_name='x'*121), dict(port='1/1/1', display_name='line1\nline2')]:
+            with self.assertRaises(ValueError):
+                app.PortAliasInput(**kwargs)
+        with self.assertRaises(app.HTTPException) as error:
+            app.update_port_alias(999999, app.PortAliasInput(port='1/1/1', display_name='Name'))
+        self.assertEqual(error.exception.status_code, 404)
+        with self.assertRaises(app.HTTPException) as error:
+            app.update_port_alias(self.id, app.PortAliasInput(port='1/1/1', display_name='Name'))
+        self.assertEqual(error.exception.status_code, 422)
+
+    def test_position_is_optional_persisted_and_preserved_for_old_clients(self):
+        updated = app.update_device(self.id, app.DeviceInput(name='Positioned', host='127.0.0.1', circuit_position=10))
+        self.assertEqual(updated['circuit_position'], 10)
+        kept = app.update_device(self.id, app.DeviceInput(name='Renamed', host='127.0.0.1'))
+        self.assertEqual(kept['circuit_position'], 10)
+        cleared = app.update_device(self.id, app.DeviceInput(name='Renamed', host='127.0.0.1', circuit_position=None))
+        self.assertIsNone(cleared['circuit_position'])
+        for position in (0, -1, 10001, 2.5):
+            with self.assertRaises(ValueError):
+                app.DeviceInput(name='Invalid', host='127.0.0.1', circuit_position=position)
 
 
 
