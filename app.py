@@ -25,6 +25,7 @@ from icmplib import ping
 from pydantic import BaseModel, Field, field_validator
 from remote_ping import RemotePingError, parse_remote_ping, read_remote_ping
 from siae import SiaeError, read_counters, calculate_rates
+import traffic_history
 
 ROOT = Path(__file__).resolve().parent
 DATA = Path(os.environ.get('MONITOR_DATA_DIR', ROOT / '.data'))
@@ -94,6 +95,7 @@ def init_db():
           port_identity TEXT);
         CREATE UNIQUE INDEX IF NOT EXISTS circuit_target ON circuits(source_device_id, host);
         ''')
+        traffic_history.init_schema(db)
         columns = {row['name'] for row in db.execute('PRAGMA table_info(devices)')}
         for name, definition in (
                 ('siae_enabled', 'INTEGER NOT NULL DEFAULT 0'),
@@ -354,11 +356,21 @@ def public_device(row, db=None):
     def read_circuits(connection):
         return [dict(row) for row in connection.execute(
             'SELECT * FROM circuits WHERE source_device_id=? ORDER BY id', (value['id'],))]
+    def read_traffic(connection):
+        if value['kind'] != 'datacom':
+            return {}
+        return {row['identity']: row['id'] for row in connection.execute(
+            'SELECT id,identity FROM port_traffic_series WHERE device_id=? AND last_valid_at>=?',
+            (value['id'], time.time() - traffic_history.RETENTION_SECONDS))}
     if db is None:
         with connect() as connection:
             value['circuits'] = read_circuits(connection)
+            series = read_traffic(connection)
     else:
         value['circuits'] = read_circuits(db)
+        series = read_traffic(db)
+    for port in value['port_data']:
+        port['traffic_series_id'] = series.get(port_alias_key(port['name'], port.get('interface_type', value['interface_type'])))
     return value
 
 
@@ -818,11 +830,13 @@ def check_ssh(device):
         if not current or current['config_version'] != device.get('config_version', 0):
             return
         if error:
+            traffic_history.record(db, current, None, port_alias_key, time.time())
             if current['ssh_error'] != error:
                 alert(db, current, 'warning', error)
             db.execute('UPDATE devices SET ssh_error=?,last_ssh=?,ssh_diagnostic=? WHERE id=?',
                        (error, time.time(), json.dumps(diagnostic), device['id']))
         else:
+            traffic_history.record(db, current, ports, port_alias_key, time.time())
             previous = {p.get('identity', f"{p.get('interface_type', 'auto')}:{p['name']}"): p for p in json.loads(current['port_data'])}
             aliases = json.loads(current['port_aliases'] or '{}')
             for port in ports:
@@ -981,11 +995,15 @@ def run_check(device, kind):
 
 def monitor():
     # Remote CLI pings can take several seconds; keep them off the local ping pool.
+    next_traffic_cleanup = 0
     with (ThreadPoolExecutor(max_workers=12) as pool,
           ThreadPoolExecutor(max_workers=4) as remote_pool,
           ThreadPoolExecutor(max_workers=4) as web_pool):
         while not STOP.is_set():
             with LOCK, connect() as db:
+                if time.time() >= next_traffic_cleanup:
+                    traffic_history.prune(db, time.time())
+                    next_traffic_cleanup = time.time() + 300
                 devices = db.execute('SELECT * FROM devices').fetchall()
                 by_id = {row['id']: dict(row) for row in devices}
                 for row in devices:
@@ -1066,6 +1084,84 @@ def dashboard(demo: bool = False):
         events = [public_alert(row, by_id) for row in db.execute('SELECT * FROM alerts ORDER BY id DESC LIMIT 60')]
         samples = [dict(row) for row in db.execute('SELECT * FROM samples ORDER BY id DESC LIMIT 720')][::-1]
     return dict(devices=devices, alerts=events, samples=samples, demo=False, updated_at=now())
+
+
+def traffic_catalog(db, at, include_zero=False):
+    cutoff = at - traffic_history.RETENTION_SECONDS
+    devices = {row['id']: dict(row) for row in db.execute("SELECT * FROM devices WHERE kind='datacom'")}
+    metadata = {}
+    for device_id, device in devices.items():
+        active = set() if device['ssh_error'] else {port_alias_key(p['name'], p.get('interface_type', device['interface_type']))
+                                                   for p in json.loads(device['port_data'] or '[]')}
+        metadata[device_id] = (active, json.loads(device['port_aliases'] or '{}'))
+    result = []
+    for row in db.execute('SELECT * FROM port_traffic_series WHERE last_valid_at>=? '
+                          'AND (? OR last_positive_at>=?) ORDER BY id', (cutoff, int(include_zero), cutoff)):
+        device = devices.get(row['device_id'])
+        if device is None:
+            continue
+        active, aliases = metadata[device['id']]
+        result.append(dict(id=row['id'], device_id=device['id'], device_name=device['name'], host=device['host'],
+            circuit_position=device['circuit_position'], identity=row['identity'], port=row['port'],
+            interface_type=row['identity'].split(':', 1)[0],
+            display_name=aliases.get(row['identity']) or row['description'] or f"Porta {row['port']}",
+            last_valid_at=row['last_valid_at'] * 1000,
+            last_positive_at=row['last_positive_at'] * 1000 if row['last_positive_at'] is not None else None,
+            active=row['identity'] in active and row['last_valid_at'] >= at - 90))
+    result.sort(key=lambda item: (item['circuit_position'] if item['circuit_position'] is not None else math.inf,
+                                 item['device_id'], item['id']))
+    return result
+
+
+def demo_traffic_catalog(at):
+    result = []
+    for device in demo_dashboard()['devices']:
+        if device['kind'] != 'datacom':
+            continue
+        for index, port in enumerate(device['port_data'], 1):
+            identity = port_alias_key(port['name'], port.get('interface_type', 'auto'))
+            result.append(dict(id=device['id'] * 1000 + index, device_id=device['id'], device_name=device['name'],
+                host=device['host'], circuit_position=None, identity=identity, port=port['name'],
+                interface_type=identity.split(':', 1)[0], display_name=port['description'], active=True,
+                last_valid_at=at * 1000, last_positive_at=(at - (900 if port['state'] == 'down' else 0)) * 1000,
+                base_bps=port['rx_bps'] or 120e6, down=port['state'] == 'down'))
+    return result
+
+
+@app.get('/api/traffic/ports')
+def traffic_ports(include_zero: bool = False, demo: bool = False):
+    at = time.time()
+    if demo:
+        catalog = [{k: v for k, v in row.items() if k not in ('base_bps', 'down')} for row in demo_traffic_catalog(at)]
+    else:
+        with LOCK, connect() as db:
+            catalog = traffic_catalog(db, at, include_zero)
+    return dict(series=catalog, start=(at - traffic_history.RETENTION_SECONDS) * 1000, end=at * 1000, demo=demo)
+
+
+@app.get('/api/traffic/ports/{series_id}')
+def traffic_port_history(series_id: int, demo: bool = False):
+    at = time.time()
+    if demo:
+        metadata = next((row for row in demo_traffic_catalog(at) if row['id'] == series_id), None)
+        if metadata is None:
+            raise HTTPException(404, 'Porta de demonstração não encontrada.')
+        points = []
+        for i in range(1441):
+            stamp = at - traffic_history.RETENTION_SECONDS + i * 60
+            minutes_ago = (at - stamp) / 60
+            value = metadata['base_bps'] * (0.72 + 0.2 * math.sin(i / 33) + 0.08 * math.cos(i / 13))
+            if 60 < minutes_ago < 75:
+                value = None
+            elif metadata['down'] and minutes_ago <= 15:
+                value = 0
+            points.append([stamp * 1000, value])
+        return dict(start=(at - traffic_history.RETENTION_SECONDS) * 1000, end=at * 1000,
+                    expected_interval=60, points=points, stats=traffic_history.summarize(points), demo=True)
+    with LOCK, connect() as db:
+        if not db.execute('SELECT id FROM port_traffic_series WHERE id=?', (series_id,)).fetchone():
+            raise HTTPException(404, 'Histórico da porta não encontrado. Atualize a lista.')
+        return dict(traffic_history.history(db, series_id, at), demo=False)
 
 
 def device_values(device, previous=None):
@@ -1196,6 +1292,7 @@ def update_device(device_id: int, device: DeviceInput):
                           ('ssh_port', 'username', 'password', 'fingerprint', 'ports', 'interface_type', 'status_command', 'optics_command', 'utilization_command'))
         if changed_target:
             db.execute('DELETE FROM samples WHERE device_id=?', (device_id,))
+            db.execute('DELETE FROM port_traffic_series WHERE device_id=?', (device_id,))
             values.update(state='pending', failures=0, latency=None, last_check=None, ping_detail=None)
         if changed_target or changed_ssh:
             values.update(port_data='[]', ssh_error=None, ssh_diagnostic='{}')

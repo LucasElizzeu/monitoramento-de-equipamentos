@@ -32,6 +32,20 @@ Imagens das propostas: [1 · Equilibrado](docs/visual-equilibrado.png), [2 · Co
 
 Clique no **IP de uma BBU** para abrir seu site em uma nova aba, no endereço `http://IP/`. O atalho aparece na aba **BBU's** e na **Visão geral**, inclusive no celular; o monitoramento continua aberto na aba original. O endereço precisa disponibilizar uma interface web acessível pela sua rede.
 
+## Consumo das portas — últimas 24 horas
+
+Na aba **Datacoms**, abra **Consumo 24h** no cabeçalho da área de portas. Cada cartão com leitura de banda também tem **Ver gráfico 24h**, que abre o painel já filtrado pela interface escolhida.
+
+O painel mostra **RX**, a mesma medida de **Consumo na porta**, com **última leitura**, **média das leituras válidas** e **pico no período**. Os filtros permitem escolher Datacom, porta e buscar pelo nome personalizado ou número. Gigabit e Ten com o mesmo número têm históricos separados. Por padrão, entram as portas que tiveram tráfego positivo nas últimas 24 horas, inclusive se agora estiverem zeradas. Marque **Incluir portas com apenas leituras zeradas** para ver também portas sempre ociosas.
+
+Passe o mouse, toque no gráfico ou use as setas do teclado para consultar horário e valor. Os gráficos usam o fuso do navegador, mantêm a janela completa de 24 horas e são atualizados a cada 30 segundos enquanto o painel está aberto. **Atualizar** recarrega os dados imediatamente. São exibidos até seis gráficos por página para manter o painel leve.
+
+**O histórico começa após instalar esta atualização**, a partir das novas consultas de utilização do Datacom (a cada 30 segundos). Não há preenchimento retroativo. A primeira amostra aparece como um ponto; o traçado cresce conforme novas leituras chegam. Falhas de SSH, consumo indisponível, portas fora da seleção e intervalos sem medições formam **lacunas**, sem substituir dados ausentes por zero. A média usa somente amostras válidas; zero medido é um valor válido.
+
+As leituras ficam no SQLite existente (`.data/monitor.db`), continuam disponíveis depois de reiniciar o programa e são removidas periodicamente quando saem da janela de 24 horas. O programa precisa permanecer ligado para coletar o período inteiro. Renomear uma porta atualiza o título do gráfico e preserva as amostras. Trocar o IP ou tipo do equipamento reinicia seu histórico, evitando misturar fontes diferentes; remover o equipamento também remove suas séries.
+
+Para explorar um exemplo completo antes de acumular o dia inteiro, use **Ver demonstração → Datacoms → Consumo 24h**. Os gráficos de demonstração são simulados, identificados e separados da sua rede real.
+
 ## Rádios SIAE — ping e consumo de banda
 
 Na aba **Rádios SIAE**, cadastre o nome e o IP do ALFOplus2. O ping sai do computador que executa o programa, com a mesma regra de alerta na 21ª perda consecutiva. Cadastro, edição, remoção, histórico e listas de status estão disponíveis. O IP abre a interface web do rádio em outra aba.

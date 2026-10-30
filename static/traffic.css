@@ -1,0 +1,41 @@
+.traffic-panel-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.traffic-panel-actions .button{font-size:12px;min-height:34px;padding:8px 11px}
+.port-traffic-history{display:inline-flex;align-items:center;gap:6px;background:transparent;color:var(--accent);font:inherit;font-size:10px;min-height:26px;padding:4px 0;margin-top:5px;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.port-traffic-history svg{width:13px;height:13px}
+#traffic-dialog{width:min(1180px,calc(100vw - 24px));padding:24px;max-height:92vh}
+#traffic-dialog .dialog-heading h2{font-size:23px}
+.traffic-filters{display:grid;grid-template-columns:1fr 1fr 1fr auto;align-items:end;gap:12px;margin-bottom:16px}
+.traffic-filters .field{margin:0;font-size:12px;min-width:0}
+.traffic-filters select,.traffic-filters input{width:100%;min-width:0;min-height:40px;font-size:12px}
+.traffic-filters .button{min-height:40px;font-size:12px}
+.traffic-toggle{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted);line-height:1.6}
+.traffic-toggle input{width:16px;height:16px;accent-color:#85c4ff;flex-shrink:0}
+.traffic-history-note{font-size:11px;line-height:1.8;color:var(--muted);margin:12px 0 20px}
+.traffic-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;min-width:0}
+.traffic-chart-card{border:1px solid var(--line);border-radius:10px;background:var(--inset);padding:16px;min-width:0}
+.traffic-chart-card h3{font-size:14px;line-height:1.6;overflow-wrap:anywhere;color:var(--ink);margin:0}
+.traffic-chart-context{font-size:11px;line-height:1.8;color:var(--muted);overflow-wrap:anywhere;margin:4px 0 12px}
+.traffic-chart-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0 16px;border-top:1px solid var(--line);padding-top:12px}
+.traffic-chart-stats>span{font-size:10px;color:var(--muted);line-height:1.6;min-width:0}
+.traffic-chart-stats strong{display:block;font-size:18px;color:var(--accent);font-weight:650;overflow-wrap:anywhere;margin-top:4px;font-variant-numeric:tabular-nums}
+.traffic-chart-stats small{font-size:10px;font-weight:400}
+.traffic-plot{position:relative;min-width:0}
+.traffic-plot svg{display:block;width:100%;height:210px;overflow:visible;cursor:crosshair;outline-color:var(--accent)}
+.traffic-plot text{fill:var(--muted);font-family:system-ui,sans-serif;font-size:10px}
+.traffic-axis{stroke:var(--line);stroke-dasharray:3 5}
+.traffic-line{fill:none;stroke:var(--accent);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.traffic-dot{fill:var(--accent)}
+.traffic-cursor{stroke:#a9d7ff;stroke-width:1;stroke-dasharray:3 3}
+.traffic-cursor-dot{fill:#b9dfff;stroke:var(--inset);stroke-width:2}
+.traffic-tooltip{position:absolute;z-index:2;pointer-events:none;max-width:min(220px,100%);padding:8px 10px;background:#173c61;border:1px solid #709bc4;border-radius:7px;box-shadow:0 6px 24px #020a1566;color:var(--ink);font-size:11px;line-height:1.7;top:6px}
+.traffic-tooltip strong{display:block;font-size:13px}
+.traffic-tooltip small{font-size:10px}
+.traffic-chart-foot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:10px;color:var(--muted);line-height:1.7;margin-top:8px}
+.traffic-stale{color:var(--amber)}
+.traffic-empty,.traffic-chart-empty{grid-column:1/-1;color:var(--muted);font-size:13px;line-height:1.8;text-align:center;padding:28px 15px;overflow-wrap:anywhere}
+.traffic-chart-empty{font-size:12px;min-height:210px;display:grid;place-items:center}
+.traffic-pagination{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:20px;color:var(--muted);font-size:11px}
+.traffic-pagination>div{display:flex;gap:8px}
+.traffic-pagination .button{font-size:12px;min-height:34px}
+@media(max-width:900px){.traffic-filters{grid-template-columns:1fr 1fr}.traffic-grid{grid-template-columns:1fr}}
+@media(max-width:640px){#traffic-dialog{padding:20px 12px}#traffic-dialog .dialog-heading h2{font-size:20px}.traffic-filters{gap:12px;grid-template-columns:1fr}.traffic-chart-card{padding:12px}.traffic-chart-stats{gap:6px}.traffic-chart-stats strong{font-size:16px}.traffic-toggle{font-size:11px}.traffic-panel-actions .subtle-tag{display:none}.traffic-tooltip{max-width:190px}}
