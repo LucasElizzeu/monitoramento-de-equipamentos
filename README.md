@@ -18,7 +18,7 @@ Use somente **um processo/worker** do servidor, para evitar consultas e eventos 
 
 ## Abas do painel
 
-O painel principal usa o **visual Compacto**, com cartões menores, menos espaçamento e letras proporcionais. Sinais, consumo e pings permanecem juntos; os detalhes continuam disponíveis ao expandir cada saída.
+O painel principal usa o **visual Compacto**, com cartões menores, menos espaçamento e letras proporcionais. A largura dos cartões é padronizada entre os Datacoms na mesma tela: equipamentos com poucas portas mantêm o mesmo tamanho compacto dos que têm muitas portas, sem esticar os cartões para ocupar a linha inteira. No celular, a grade usa uma coluna. Sinais, consumo e pings permanecem juntos; os detalhes continuam disponíveis ao expandir cada saída.
 
 Para comparar propostas de cartões e letras menores, use **Comparar opções de visual** no rodapé ou abra `/static/design-options.html`. Os modelos **1 · Equilibrado**, **2 · Compacto** e **3 · Em lista** usam a interface real com dados de demonstração, sem alterar os equipamentos cadastrados ou salvar uma preferência de visual. O modelo em lista usa linhas no desktop e cartões em telas menores. Escolher um modelo nesta página muda apenas a prévia; o painel principal permanece no modelo Compacto.
 

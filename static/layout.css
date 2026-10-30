@@ -95,7 +95,8 @@ body[data-layout=compact] .metric-card{padding:10px 12px}
 body[data-layout=compact] .metric-value{font-size:25px;margin:5px 0}
 body[data-layout=compact] .metric-title{font-size:11px}
 body[data-layout=compact] .metric-bottom{display:none}
-body[data-layout=compact] .port-cards{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+/* Keep empty tracks so Datacoms with fewer ports use the same compact card width. */
+body[data-layout=compact] .port-cards{grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
 body[data-layout=compact] .port-device{padding:14px}
 body[data-layout=compact] .port-display-name{font-size:12px}
 body[data-layout=compact] .port-title-row{margin:6px 0}
