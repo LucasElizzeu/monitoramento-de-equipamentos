@@ -29,6 +29,8 @@ Imagens das propostas: [1 · Equilibrado](docs/visual-equilibrado.png), [2 · Co
 - **Visão geral:** resumo conjunto da rede.
 - **Eventos:** histórico conjunto de quedas, recuperações e erros de coleta.
 
+Clique no **IP de uma BBU** para abrir seu site em uma nova aba, no endereço `http://IP/`. O atalho aparece na aba **BBU's** e na **Visão geral**, inclusive no celular; o monitoramento continua aberto na aba original. O endereço precisa disponibilizar uma interface web acessível pela sua rede.
+
 Os equipamentos existentes aparecem na aba correspondente ao tipo já cadastrado, sem migração do banco ou novo cadastro. Cada aba possui sua lista e seus contadores; o botão de adicionar já seleciona o tipo correspondente. A regra de alerta permanece na 21ª perda consecutiva.
 
 Clique no ícone **!** de qualquer cartão de resumo para abrir a lista correspondente: equipamentos monitorados, online, sem ping, portas inativas ou BBU's instáveis. A lista respeita a aba atual e o total do cartão, independentemente do filtro de busca da tabela. Em **Portas inativas**, aparecem o nome personalizado da porta (ou a descrição original, se não houver nome), Datacom, IP, tipo de interface, número da porta e posição no circuito. Gigabit e Ten com o mesmo número permanecem separados. Portas de Datacoms com erro na consulta SSH não entram no total nem na lista como leituras atuais.
