@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from icmplib import ping
 from pydantic import BaseModel, Field, field_validator
 from remote_ping import RemotePingError, parse_remote_ping, read_remote_ping
-from siae import SiaeError, read_counters, calculate_rates
+from siae import SiaeError, SiaeSessionError, login as siae_login, read_counters, calculate_rates
 import traffic_history
 
 ROOT = Path(__file__).resolve().parent
@@ -104,6 +104,9 @@ def init_db():
                 ('siae_poll_interval', 'INTEGER NOT NULL DEFAULT 2'),
                 ('siae_interfaces', "TEXT NOT NULL DEFAULT '[3]'"),
                 ('siae_session', "TEXT NOT NULL DEFAULT ''"),
+                ('siae_auth_mode', "TEXT NOT NULL DEFAULT 'session'"),
+                ('siae_username', "TEXT NOT NULL DEFAULT ''"),
+                ('siae_password', "TEXT NOT NULL DEFAULT ''"),
                 ('last_siae', 'REAL NOT NULL DEFAULT 0'),
                 ('siae_data', "TEXT NOT NULL DEFAULT '{}'")):
             if name not in columns:
@@ -158,6 +161,16 @@ class DeviceInput(BaseModel):
     siae_poll_interval: int = Field(default=2, ge=2, le=5)
     siae_interfaces: list[int] = Field(default_factory=lambda: [3], min_length=1, max_length=2)
     siae_session: str = Field(default='', max_length=512)
+    siae_auth_mode: str = 'session'
+    siae_username: str = Field(default='', max_length=100)
+    siae_password: str = Field(default='', max_length=500)
+
+    @field_validator('siae_auth_mode')
+    @classmethod
+    def valid_siae_auth_mode(cls, value):
+        if value not in ('session', 'login'):
+            raise ValueError('Escolha login automático ou sessão manual para o rádio.')
+        return value
 
     @field_validator('siae_scheme')
     @classmethod
@@ -339,6 +352,7 @@ def public_device(row, db=None):
     value = dict(row)
     value['has_password'] = bool(value.pop('password'))
     value['has_siae_session'] = bool(value.pop('siae_session'))
+    value['has_siae_password'] = bool(value.pop('siae_password'))
     value['siae_interfaces'] = json.loads(value['siae_interfaces'])
     telemetry = json.loads(value.pop('siae_data') or '{}')
     value['ping_backend'] = 'Windows ping.exe' if IS_WINDOWS else 'ICMP (icmplib)'
@@ -933,10 +947,30 @@ def check_siae(device):
         if (STOP.is_set() or not current or current['config_version'] != version
                 or current['kind'] != 'siae' or not current['siae_enabled']):
             return
+        # The collector can renew a session without changing the user's config.
+        # Always use the latest saved session, including on subsequent jobs.
+        device = dict(current)
+    new_session = None
+    renewed = False
     try:
-        session = CIPHER.decrypt(device['siae_session'].encode()).decode()
+        session = CIPHER.decrypt(device['siae_session'].encode()).decode() if device['siae_session'] else ''
         indices = json.loads(device['siae_interfaces'])
-        counters = read_counters(device['host'], device['siae_scheme'], device['siae_port'], session, indices)
+        address = (device['host'], device['siae_scheme'], device['siae_port'])
+        automatic = device['siae_auth_mode'] == 'login'
+        def authenticate():
+            password = CIPHER.decrypt(device['siae_password'].encode()).decode()
+            return siae_login(*address, device['siae_username'], password)
+        if automatic and not session:
+            session = new_session = authenticate()
+            renewed = True
+        try:
+            counters = read_counters(*address, session, indices)
+        except SiaeSessionError:
+            if not automatic or renewed:
+                raise
+            session = new_session = authenticate()
+            renewed = True
+            counters = read_counters(*address, session, indices)
         measured_at = time.monotonic()
         error = None
     except Exception as exc:
@@ -956,10 +990,13 @@ def check_siae(device):
             if old_data.get('status') != 'error':
                 alert(db, current, 'warning', f'Falha ao ler banda SIAE: {error}')
         else:
+            if new_session:
+                db.execute('UPDATE devices SET siae_session=? WHERE id=?',
+                           (CIPHER.encrypt(new_session.encode()).decode(), device_id))
             baseline = SIAE_BASELINES.get(device_id)
             SIAE_BASELINES[device_id] = (version, measured_at, counters)
             rates = None
-            if baseline and baseline[0] == version:
+            if baseline and baseline[0] == version and not renewed:
                 rates, data['note'] = calculate_rates(baseline[2], counters, measured_at - baseline[1])
             else:
                 data['note'] = 'Primeira leitura recebida. Aguardando a próxima para calcular a banda.'
@@ -1015,8 +1052,10 @@ def monitor():
                             INFLIGHT.add(key)
                             pool.submit(run_check, device, kind)
                     key = (device['id'], 'siae')
+                    siae_delay = (30 if json.loads(device['siae_data'] or '{}').get('status') == 'error'
+                                  else device['siae_poll_interval'])
                     if (device['kind'] == 'siae' and device['siae_enabled']
-                            and time.time() - device['last_siae'] >= device['siae_poll_interval']
+                            and time.time() - device['last_siae'] >= siae_delay
                             and key not in INFLIGHT):
                         INFLIGHT.add(key)
                         web_pool.submit(run_siae_check, device)
@@ -1187,22 +1226,41 @@ def device_values(device, previous=None):
                 raise HTTPException(422, 'Identifique cada porta com ten:1/1/10 ou giga:1/1/19 no modo misto.')
     values['ports'] = json.dumps(values['ports'])
     values['password'] = (CIPHER.encrypt(password.encode()).decode() if password else saved_password) if device.kind == 'datacom' else ''
-    settings = ('siae_enabled', 'siae_scheme', 'siae_port', 'siae_poll_interval', 'siae_interfaces')
+    settings = ('siae_enabled', 'siae_scheme', 'siae_port', 'siae_poll_interval', 'siae_interfaces',
+                'siae_auth_mode', 'siae_username')
     if previous and previous['kind'] == 'siae' and device.kind == 'siae':
         for key in settings:
             if key not in device.model_fields_set:
                 values[key] = json.loads(previous[key]) if key == 'siae_interfaces' else previous[key]
     saved_session = ''
-    if (previous and previous['kind'] == 'siae' and device.kind == 'siae'
+    same_radio = (previous is not None and previous['kind'] == 'siae' and device.kind == 'siae'
             and previous['host'] == device.host and previous['siae_scheme'] == values['siae_scheme']
-            and previous['siae_port'] == values['siae_port']):
+            and previous['siae_port'] == values['siae_port'])
+    if same_radio and previous['siae_auth_mode'] == values['siae_auth_mode']:
         saved_session = previous['siae_session']
+    saved_siae_password = (previous['siae_password'] if same_radio
+                           and previous['siae_username'] == values['siae_username'] else '')
+    values['siae_password'] = ((CIPHER.encrypt(device.siae_password.encode()).decode()
+                               if device.siae_password else saved_siae_password)
+                              if device.kind == 'siae' and values['siae_auth_mode'] == 'login' else '')
     values['siae_session'] = (CIPHER.encrypt(device.siae_session.encode()).decode()
                               if device.siae_session else saved_session) if device.kind == 'siae' else ''
+    if device.kind == 'siae' and values['siae_auth_mode'] == 'login':
+        # New credentials invalidate the previous session, even if only the
+        # password changed. Login mode never accepts a manually supplied Id.
+        if device.siae_password or not same_radio or previous['siae_username'] != values['siae_username']:
+            values['siae_session'] = ''
+        else:
+            values['siae_session'] = saved_session
     if device.kind != 'siae':
         values['siae_enabled'] = False
-    if values['siae_enabled'] and not values['siae_session']:
-        raise HTTPException(422, 'Para ler a banda, cole a sessão Id do rádio. Ao trocar IP, protocolo ou porta, informe uma nova sessão.')
+        values.update(siae_auth_mode='session', siae_username='')
+    if values['siae_enabled']:
+        if values['siae_auth_mode'] == 'login':
+            if not values['siae_username'].strip() or not values['siae_password']:
+                raise HTTPException(422, 'Informe usuário e senha do rádio para o login automático. Ao trocar IP, protocolo, porta ou usuário, informe a senha novamente.')
+        elif not values['siae_session']:
+            raise HTTPException(422, 'Para ler a banda, cole a sessão Id do rádio. Ao trocar IP, protocolo ou porta, informe uma nova sessão.')
     values['siae_enabled'] = int(values['siae_enabled'])
     values['siae_interfaces'] = json.dumps(values['siae_interfaces'])
     return values
@@ -1284,7 +1342,8 @@ def update_device(device_id: int, device: DeviceInput):
             raise HTTPException(409, 'Este IP já está cadastrado para este tipo de monitoramento.')
         changed_target = device.host != previous['host'] or device.kind != previous['kind']
         changed_siae = changed_target or any(values[key] != previous[key] for key in (
-            'siae_enabled', 'siae_scheme', 'siae_port', 'siae_session', 'siae_interfaces', 'siae_poll_interval'))
+            'siae_enabled', 'siae_scheme', 'siae_port', 'siae_session', 'siae_interfaces', 'siae_poll_interval',
+            'siae_auth_mode', 'siae_username', 'siae_password'))
         if changed_siae:
             values.update(siae_data='{}', last_siae=0)
             SIAE_BASELINES.pop(device_id, None)

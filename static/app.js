@@ -346,8 +346,16 @@ function syncSiaeFields(){
  $('#siae-interface-a-label').textContent=pair?'Índice da interface TRX A':'Índice da interface TRX';
  for(const name of ['siae_port','siae_poll_interval','siae_interface_a'])$(`[name="${name}"]`).required=radio&&enabled;
  $('[name="siae_interface_b"]').required=radio&&enabled&&pair;
- const saved=state.editing?.kind==='siae'&&state.editing.has_siae_session;
- $('[name="siae_session"]').required=radio&&enabled&&!saved;
+ const saved=state.editing?.kind==='siae'&&state.editing.siae_auth_mode!=='login'&&state.editing.has_siae_session;
+ const automatic=$('[name="siae_auth_mode"]').value==='login';
+ $('#siae-login-fields').hidden=!automatic;$('#siae-session-field').hidden=automatic;
+ for(const name of ['siae_username','siae_password'])$(`[name="${name}"]`).disabled=!radio||!enabled||!automatic;
+ $('[name="siae_session"]').disabled=!radio||!enabled||automatic;
+ $('[name="siae_session"]').required=radio&&enabled&&!automatic&&!saved;
+ $('[name="siae_username"]').required=radio&&enabled&&automatic;
+ const savedPassword=state.editing?.kind==='siae'&&state.editing.has_siae_password;
+ $('[name="siae_password"]').required=radio&&enabled&&automatic&&!savedPassword;
+ $('#siae-password-help').textContent=savedPassword?'Senha salva. Deixe vazio para mantê-la. Se alterar IP, protocolo, porta ou usuário, informe a senha novamente.':'Informe a senha diretamente aqui. O programa entra no rádio e renova a sessão quando necessário.';
  $('#siae-session-help').textContent=saved?'Já existe uma sessão salva. Deixe vazio para mantê-la ou cole um novo Id para renovar.':'Copie no seu navegador e cole aqui. Não precisa enviar a sessão no chat.';
 }
 function openAdd(){
@@ -366,6 +374,7 @@ function openEdit(id){
  }
  $(`[name="kind"][value="${device.kind}"]`).checked=true;
  $('[name="siae_enabled"]').checked=Boolean(device.siae_enabled);$('#siae-config').open=Boolean(device.siae_enabled);
+ $('[name="siae_auth_mode"]').value=device.siae_auth_mode||'session';$('[name="siae_username"]').value=device.siae_username||'';
  $('[name="siae_scheme"]').value=device.siae_scheme||'http';$('[name="siae_port"]').value=device.siae_port||80;$('[name="siae_poll_interval"]').value=device.siae_poll_interval||2;
  $('[name="siae_mode"]').value=device.siae_interfaces?.length===2?'pair':'single';$('[name="siae_interface_a"]').value=device.siae_interfaces?.[0]||3;$('[name="siae_interface_b"]').value=device.siae_interfaces?.[1]||'';
  $('[name="ports"]').value=device.ports.join(', ');$('[name="password"]').value='';
@@ -384,7 +393,8 @@ $('#device-form').addEventListener('submit',async event=>{
  event.preventDefault();const form=new FormData(event.target);const d=Object.fromEntries(form);
  d.circuit_position=d.circuit_position===''?null:Number(d.circuit_position.trim().replace(',','.'));d.interval=Number(d.interval);d.ping_timeout=Number(d.ping_timeout);d.ssh_port=Number(d.ssh_port);d.ports=d.interface_type==='mixed'?[...normalizedPorts(d.ten_ports).map(port=>'ten:'+port),...normalizedPorts(d.giga_ports).map(port=>'giga:'+port)]:d.ports.split(',').map(p=>p.trim()).filter(Boolean);delete d.ten_ports;delete d.giga_ports;
  if(d.kind==='siae'){
-  d.siae_enabled=$('[name="siae_enabled"]').checked;d.siae_scheme=$('[name="siae_scheme"]').value;d.siae_session=$('[name="siae_session"]').value;
+  d.siae_enabled=$('[name="siae_enabled"]').checked;d.siae_scheme=$('[name="siae_scheme"]').value;d.siae_auth_mode=$('[name="siae_auth_mode"]').value;
+  if(d.siae_auth_mode==='session')d.siae_session=$('[name="siae_session"]').value;
   for(const name of ['siae_port','siae_poll_interval'])d[name]=Number($(`[name="${name}"]`).value);
   d.siae_interfaces=[$('[name="siae_interface_a"]').value,...($('[name="siae_mode"]').value==='pair'?[$('[name="siae_interface_b"]').value]:[])].map(Number);
  }
@@ -393,15 +403,15 @@ $('#device-form').addEventListener('submit',async event=>{
  const editingId=state.editing?.id;$('#save-device').disabled=true;$('#form-error').hidden=true;
  try{
   await api(editingId?`/api/devices/${editingId}`:'/api/devices',{method:editingId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
-  $('[name="siae_session"]').value='';$('#device-dialog').close();state.editing=null;state.demo=false;localStorage.setItem('nexo-demo','false');
+  $('[name="siae_session"]').value='';$('[name="siae_password"]').value='';$('#device-dialog').close();state.editing=null;state.demo=false;localStorage.setItem('nexo-demo','false');
   navigate(d.kind==='datacom'?'datacoms':d.kind==='siae'?'siae':'bbus');toast(editingId?'Alterações salvas. O monitoramento será atualizado.':'Equipamento adicionado à sua rede.');await load();
  }catch(e){$('#form-error').textContent=e.message;$('#form-error').hidden=false;}finally{$('#save-device').disabled=false;}
 });
  $('[name="interface_type"]').addEventListener('change',()=>syncInterfaceMode(true));
 document.querySelectorAll('[name="kind"]').forEach(el=>el.addEventListener('change',syncDeviceKind));
-for(const name of ['siae_enabled','siae_mode'])$(`[name="${name}"]`).addEventListener('change',syncSiaeFields);
+for(const name of ['siae_enabled','siae_mode','siae_auth_mode'])$(`[name="${name}"]`).addEventListener('change',syncSiaeFields);
 $('[name="siae_scheme"]').addEventListener('change',()=>{const port=$('[name="siae_port"]');if(['80','443'].includes(port.value))port.value=$('[name="siae_scheme"]').value==='https'?'443':'80';});
-$('#device-dialog').addEventListener('close',()=>$('[name="siae_session"]').value='');
+$('#device-dialog').addEventListener('close',()=>{for(const name of ['siae_session','siae_password'])$(`[name="${name}"]`).value='';});
 document.addEventListener('click',event=>{const button=event.target.closest('[data-configure-siae]');if(!button)return;openEdit(Number(button.dataset.configureSiae));if($('#device-dialog').open){$('#siae-config').open=true;$('[name="siae_enabled"]').focus();}});
 document.querySelectorAll('[data-page]').forEach(e=>e.addEventListener('click',()=>navigate(e.dataset.page)));
 $('#all-events').addEventListener('click',()=>navigate('alerts'));
