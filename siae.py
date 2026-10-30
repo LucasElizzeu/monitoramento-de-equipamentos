@@ -3,6 +3,9 @@ import ipaddress
 import json
 import math
 import re
+import socket
+import ssl
+from http.client import HTTPException
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
@@ -88,7 +91,21 @@ def post_json(host, scheme, port, endpoint, payload):
                 raise SiaeError('Login recusado pelo rádio. Confira usuário, senha e permissão de acesso.') from None
             raise SiaeSessionError('Sessão Id recusada ou expirada. Entre no rádio e atualize a sessão.') from None
         raise SiaeError(f'Falha HTTP {exc.code} ao consultar o rádio.') from None
-    except (URLError, TimeoutError, OSError):
+    except URLError as exc:
+        if isinstance(exc.reason, ssl.SSLCertVerificationError):
+            raise SiaeError('O certificado HTTPS do rádio não pôde ser validado. Confira o certificado e o protocolo configurado.') from None
+        if isinstance(exc.reason, TimeoutError):
+            raise SiaeError('O rádio não respondeu à consulta web em até 5 segundos. Confira o acesso pelo navegador neste computador.') from None
+        if isinstance(exc.reason, ConnectionRefusedError):
+            raise SiaeError('A conexão web foi recusada. Confira HTTP/HTTPS e a porta web do rádio.') from None
+        if isinstance(exc.reason, socket.gaierror):
+            raise SiaeError('Falha ao localizar o destino da conexão web. Confira a rede e o proxy configurado no computador.') from None
+        raise SiaeError('Não foi possível acessar o rádio. Confira IP, HTTP/HTTPS, porta e rede.') from None
+    except HTTPException as exc:
+        raise SiaeError(f'O rádio enviou uma resposta HTTP incompleta ou inválida ({type(exc).__name__}). Confira HTTP/HTTPS e a porta web.') from None
+    except TimeoutError:
+        raise SiaeError('O rádio não respondeu à consulta web em até 5 segundos. Confira o acesso pelo navegador neste computador.') from None
+    except OSError:
         raise SiaeError('Não foi possível acessar o rádio. Confira IP, HTTP/HTTPS, porta e rede.') from None
 
 

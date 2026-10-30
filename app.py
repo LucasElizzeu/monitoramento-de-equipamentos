@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import paramiko
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -952,30 +952,54 @@ def check_siae(device):
         device = dict(current)
     new_session = None
     renewed = False
+    stage = 'configuração'
     try:
-        session = CIPHER.decrypt(device['siae_session'].encode()).decode() if device['siae_session'] else ''
         indices = json.loads(device['siae_interfaces'])
         address = (device['host'], device['siae_scheme'], device['siae_port'])
         automatic = device['siae_auth_mode'] == 'login'
+        stage = 'sessão salva'
+        try:
+            session = CIPHER.decrypt(device['siae_session'].encode()).decode() if device['siae_session'] else ''
+        except InvalidToken:
+            if not automatic:
+                raise
+            # A replaced key or damaged cached Id must not prevent a fresh
+            # login when the separately saved password can still be read.
+            session = ''
         def authenticate():
+            nonlocal stage
+            stage = 'senha salva'
             password = CIPHER.decrypt(device['siae_password'].encode()).decode()
+            stage = 'login no rádio'
             return siae_login(*address, device['siae_username'], password)
         if automatic and not session:
             session = new_session = authenticate()
             renewed = True
         try:
+            stage = 'leitura das interfaces'
             counters = read_counters(*address, session, indices)
         except SiaeSessionError:
             if not automatic or renewed:
                 raise
             session = new_session = authenticate()
             renewed = True
+            stage = 'leitura das interfaces'
             counters = read_counters(*address, session, indices)
         measured_at = time.monotonic()
         error = None
     except Exception as exc:
         counters = None
-        error = str(exc) if isinstance(exc, SiaeError) else 'Não foi possível ler a banda do rádio. Confira a sessão e a conexão.'
+        if isinstance(exc, InvalidToken):
+            credential = 'senha' if stage == 'senha salva' else 'sessão Id'
+            error = (f'Não foi possível abrir a {credential} criptografada com a chave deste computador. '
+                     f'Abra Editar banda, informe novamente a {credential} e salve.')
+        elif isinstance(exc, SiaeError):
+            error = str(exc)
+        else:
+            # Never include str(exc), traceback, response bodies or credentials.
+            error = 'Falha inesperada no coletor de banda. Envie o diagnóstico abaixo para análise.'
+        error_type = type(exc).__name__
+        error += f' [Etapa: {stage}; erro: {error_type}]'
     with LOCK, connect() as db:
         current = db.execute('SELECT * FROM devices WHERE id=?', (device_id,)).fetchone()
         if (STOP.is_set() or not current or current['config_version'] != version
@@ -985,6 +1009,8 @@ def check_siae(device):
         recovering = old_data.get('status') == 'error' or old_data.get('recovering', False)
         data = dict(siae_consumption(), checked_at=now(), status='error' if error else 'warming_up', error=error,
                     recovering=recovering)
+        if error:
+            data.update(error_stage=stage, error_type=error_type)
         if error:
             SIAE_BASELINES.pop(device_id, None)
             if old_data.get('status') != 'error':

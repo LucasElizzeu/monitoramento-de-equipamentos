@@ -59,6 +59,29 @@ class LoginProtocolTests(unittest.TestCase):
         with self.assertRaises(siae.SiaeError):
             siae.NoRedirect().redirect_request(None, None, 307, '', {}, 'http://example.invalid')
 
+    def test_malformed_http_responses_are_reported_without_the_response_body(self):
+        from http.client import BadStatusLine, IncompleteRead
+        for cause in (BadStatusLine('private-response-body'), IncompleteRead(b'private-response-body')):
+            with self.subTest(cause=type(cause).__name__), patch.object(siae, 'build_opener') as opener:
+                opener.return_value.open.side_effect = cause
+                with self.assertRaises(siae.SiaeError) as error:
+                    siae.login('192.0.2.70', 'http', 80, 'test-user', 'test-password')
+                self.assertIn(type(cause).__name__, str(error.exception))
+                self.assertNotIn('private-response-body', str(error.exception))
+
+    def test_timeout_refused_connection_and_certificate_have_actionable_safe_messages(self):
+        import ssl
+        from urllib.error import URLError
+        for cause, expected in ((TimeoutError('private-value'), '5 segundos'),
+                                (ConnectionRefusedError('private-value'), 'recusada'),
+                                (ssl.SSLCertVerificationError('private-value'), 'certificado')):
+            with self.subTest(cause=type(cause).__name__), patch.object(siae, 'build_opener') as opener:
+                opener.return_value.open.side_effect = URLError(cause)
+                with self.assertRaises(siae.SiaeError) as error:
+                    siae.login('192.0.2.70', 'https', 443, 'test-user', 'test-password')
+                self.assertIn(expected, str(error.exception))
+                self.assertNotIn('private-value', str(error.exception))
+
 
 class AutomaticLoginTests(unittest.TestCase):
     def setUp(self):
@@ -187,6 +210,57 @@ class AutomaticLoginTests(unittest.TestCase):
         with patch.object(app, 'siae_login', side_effect=delete_during_login), patch.object(app, 'read_counters', return_value=self.counters()):
             self.check()
         self.assertEqual(app.dashboard()['devices'], [])
+
+    def test_wrong_credential_key_reports_password_reentry_without_attempting_login(self):
+        from cryptography.fernet import Fernet
+        with patch.object(app, 'CIPHER', Fernet(Fernet.generate_key())), patch.object(app, 'siae_login') as login:
+            self.check()
+        login.assert_not_called()
+        data = app.dashboard()['devices'][0]['siae_consumption']
+        self.assertEqual(data['error_type'], 'InvalidToken')
+        self.assertEqual(data['error_stage'], 'senha salva')
+        self.assertIn('informe novamente a senha', data['error'])
+        self.assertNotIn('test-password', json.dumps(app.dashboard()))
+        self.assertIsNone(data['total_bps'])
+
+    def test_corrupt_automatic_session_can_recover_using_valid_password(self):
+        with app.connect() as db:
+            db.execute('UPDATE devices SET siae_session=? WHERE id=?', ('invalid-encrypted-session', self.device_id))
+        with patch.object(app, 'siae_login', return_value='replacement-session') as login, \
+             patch.object(app, 'read_counters', return_value=self.counters()):
+            self.check()
+        login.assert_called_once()
+        data = app.dashboard()['devices'][0]['siae_consumption']
+        self.assertEqual(data['status'], 'warming_up')
+        self.assertNotIn('error_type', data)
+        self.assertEqual(app.CIPHER.decrypt(self.raw()['siae_session'].encode()).decode(), 'replacement-session')
+
+    def test_corrupt_manual_session_requests_new_id_without_automatic_login(self):
+        self.edit(siae_auth_mode='session', siae_session='test-manual-session')
+        with app.connect() as db:
+            db.execute('UPDATE devices SET siae_session=? WHERE id=?', ('invalid-encrypted-session', self.device_id))
+        with patch.object(app, 'siae_login') as login, patch.object(app, 'read_counters') as read:
+            self.check()
+        login.assert_not_called()
+        read.assert_not_called()
+        data = app.dashboard()['devices'][0]['siae_consumption']
+        self.assertEqual(data['error_stage'], 'sessão salva')
+        self.assertIn('informe novamente a sessão Id', data['error'])
+
+    def test_unexpected_login_and_read_errors_identify_stage_without_echoing_exception(self):
+        for source in ('login', 'read'):
+            with self.subTest(source=source), patch.object(app, 'siae_login',
+                    **({'side_effect': RuntimeError('private-password session-body')} if source == 'login'
+                       else {'return_value': 'simulated-session'})), patch.object(app, 'read_counters',
+                    side_effect=RuntimeError('private-password session-body')):
+                self.check()
+            data = app.dashboard()['devices'][0]['siae_consumption']
+            self.assertEqual(data['error_type'], 'RuntimeError')
+            self.assertEqual(data['error_stage'], 'login no rádio' if source == 'login' else 'leitura das interfaces')
+            self.assertIn('RuntimeError', data['error'])
+            self.assertNotIn('private-password', json.dumps(app.dashboard()))
+            self.assertNotIn('session-body', json.dumps(app.dashboard()))
+            self.assertEqual(app.dashboard()['devices'][0]['failures'], 0)
 
 
 if __name__ == '__main__':
