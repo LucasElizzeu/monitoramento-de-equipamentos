@@ -18,7 +18,9 @@ Use somente **um processo/worker** do servidor, para evitar consultas e eventos 
 
 ## Abas do painel
 
-Para comparar propostas de cartões e letras menores, use **Comparar opções de visual** no rodapé ou abra `/static/design-options.html`. Os modelos **1 · Equilibrado**, **2 · Compacto** e **3 · Em lista** usam a interface real com dados de demonstração, sem alterar os equipamentos cadastrados ou salvar uma preferência de visual. O modelo em lista usa linhas no desktop e cartões em telas menores. Escolher um modelo nesta página muda apenas a prévia; a aplicação do visual ao painel principal será feita após a escolha.
+O painel principal usa o **visual Compacto**, com cartões menores, menos espaçamento e letras proporcionais. Sinais, consumo e pings permanecem juntos; os detalhes continuam disponíveis ao expandir cada saída.
+
+Para comparar propostas de cartões e letras menores, use **Comparar opções de visual** no rodapé ou abra `/static/design-options.html`. Os modelos **1 · Equilibrado**, **2 · Compacto** e **3 · Em lista** usam a interface real com dados de demonstração, sem alterar os equipamentos cadastrados ou salvar uma preferência de visual. O modelo em lista usa linhas no desktop e cartões em telas menores. Escolher um modelo nesta página muda apenas a prévia; o painel principal permanece no modelo Compacto.
 
 Imagens das propostas: [1 · Equilibrado](docs/visual-equilibrado.png), [2 · Compacto](docs/visual-compacto.png) e [3 · Em lista](docs/visual-lista.png).
 

@@ -1,0 +1,176 @@
+/* Shared layouts. The main monitor uses compact; previews can select another model. */
+body[data-layout]{--layout-gap:14px;--layout-padding:16px}
+body[data-layout] .sidebar{width:210px;padding:25px 18px}
+body[data-layout] .app-shell{margin-left:210px}
+body[data-layout] .topbar{height:56px;padding:0 26px}
+body[data-layout] main{padding:24px 26px}
+body[data-layout] .brand-copy strong{font-size:17px}
+body[data-layout] .brand-copy small{font-size:8px}
+body[data-layout] .brand-icon{width:32px;height:36px}
+body[data-layout] h1{font-size:27px;letter-spacing:-.6px}
+body[data-layout] .page-heading{margin-bottom:18px}
+body[data-layout] .page-heading p{font-size:13px;margin-top:7px}
+body[data-layout] .eyebrow{font-size:9px}
+body[data-layout] .demo-banner{padding:10px 13px;margin-bottom:16px}
+body[data-layout] .demo-banner strong{font-size:12px}
+body[data-layout] .demo-banner div>span{font-size:11px}
+body[data-layout] .status-strip{margin-bottom:14px;font-size:11px}
+body[data-layout] .network-subtitle{font-size:11px}
+body[data-layout] .metrics{gap:12px;margin-bottom:18px}
+body[data-layout] .metric-card{padding:13px 15px;border-radius:9px}
+body[data-layout] .metric-title{font-size:12px;line-height:1.4}
+body[data-layout] .metric-icon{width:27px;height:27px}
+body[data-layout] .metric-icon svg{width:15px;height:15px}
+body[data-layout] .metric-value{font-size:29px;line-height:1.2;margin:9px 0 7px}
+body[data-layout] .metric-bottom{font-size:10px;line-height:1.6}
+body[data-layout] h2{font-size:16px}
+body[data-layout] .panel-heading{padding:18px 18px 0;margin-bottom:14px}
+body[data-layout] .panel-heading p{font-size:11px;margin-top:5px}
+body[data-layout] .table-heading{gap:14px}
+body[data-layout] .search{padding:8px 10px}
+body[data-layout] .search input{font-size:12px}
+body[data-layout] .table-controls select{font-size:12px;padding:8px 26px 8px 10px}
+body[data-layout] th{font-size:10px;padding:10px 13px}
+body[data-layout] td{font-size:12px;padding:11px 13px}
+body[data-layout] .device-cell strong{font-size:12px}
+body[data-layout] .device-cell small{font-size:9px;line-height:1.5;margin-top:3px}
+body[data-layout] .device-icon{width:28px;height:28px}
+body[data-layout] .device-actions button{width:28px;height:28px}
+body[data-layout] .device-actions svg{width:14px;height:14px}
+body[data-layout] .table-footer{padding:11px 18px;font-size:10px}
+body[data-layout] #ports-section{margin-top:18px}
+body[data-layout] .port-device{padding:18px}
+body[data-layout] .datacom-heading{margin-bottom:15px;gap:14px}
+body[data-layout] .port-device-title{gap:9px}
+body[data-layout] .port-device-title h3{font-size:15px;line-height:1.5}
+body[data-layout] .circuit-position{width:27px;height:27px;font-size:12px}
+body[data-layout] .datacom-meta{font-size:11px;gap:10px;margin-top:5px}
+body[data-layout] .datacom-meta .ip{font-size:11px}
+body[data-layout] .status-pill{font-size:10px;padding:4px 7px}
+body[data-layout] .datacom-section-heading{margin:0 0 12px;gap:10px}
+body[data-layout] .datacom-section-heading h4{font-size:12px}
+body[data-layout] .datacom-section-heading p{font-size:10px;margin-top:4px}
+body[data-layout] .datacom-section-heading .button{min-height:30px;font-size:11px;padding:7px 10px}
+body[data-layout] .port-cards{grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:var(--layout-gap);align-items:start}
+body[data-layout] .port-card{padding:var(--layout-padding);min-width:0;border-radius:8px}
+body[data-layout] .port-card-header{flex-direction:row;align-items:center;gap:8px}
+body[data-layout] .port-card-header strong{font-size:12px}
+body[data-layout] .port-family{font-size:10px!important;margin-top:5px;line-height:1.5}
+body[data-layout] .port-title-row{margin:7px 0;gap:6px}
+body[data-layout] .port-display-name{font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+body[data-layout] .port-title-row .icon-button{width:26px;height:26px;flex-shrink:0}
+body[data-layout] .port-title-row svg{width:13px;height:13px}
+body[data-layout] .optical-heading{font-size:10px;padding-top:10px}
+body[data-layout] .optical{gap:10px;margin-top:7px}
+body[data-layout] .optical span{font-size:9px;line-height:1.5}
+body[data-layout] .optical strong{font-size:18px;margin-top:6px;line-height:1.3}
+body[data-layout] .optical small{font-size:9px}
+body[data-layout] .port-traffic{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:5px 8px;margin:10px 0 6px;padding:8px 0 0;border-bottom:0}
+body[data-layout] .traffic-heading{font-size:11px}
+body[data-layout] .traffic-values{margin:0}
+body[data-layout] .traffic-values strong{font-size:21px;line-height:1.3}
+body[data-layout] .traffic-values small{font-size:10px}
+body[data-layout] .port-card>small{font-size:10px;margin-top:6px}
+body[data-layout] .signal-note{font-size:10px;line-height:1.5;margin:6px 0}
+body[data-layout] .port-card>details{font-size:10px;margin-top:10px;padding-top:10px}
+body[data-layout] .port-ping{margin-top:11px;padding-top:10px}
+body[data-layout] .port-ping-heading>strong{font-size:11px;line-height:1.5}
+body[data-layout] .port-ping-heading .status-pill{font-size:9px;padding:3px 5px}
+body[data-layout] .port-ping-meta{margin:5px 0 8px}
+body[data-layout] .port-ping-ip,body[data-layout] .port-ping-time{font-size:10px}
+body[data-layout] .port-ping-values{gap:8px}
+body[data-layout] .port-ping-values>span{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px;font-size:10px}
+body[data-layout] .port-ping-values strong{font-size:15px;margin:0}
+body[data-layout] .port-ping details{font-size:10px;margin-top:8px}
+body[data-layout] .standalone-circuit .port-ping{margin:0;padding:0}
+body[data-layout] .event-body strong{font-size:13px}
+body[data-layout] .event-body p{font-size:11px}
+body[data-layout] .footer{font-size:10px;margin-top:20px}
+
+/* More equipment on screen, without scaling the entire browser. */
+body[data-layout=compact]{--layout-gap:10px;--layout-padding:12px}
+body[data-layout=compact] main{padding:18px 20px}
+body[data-layout=compact] h1{font-size:24px}
+body[data-layout=compact] .metric-card{padding:10px 12px}
+body[data-layout=compact] .metric-value{font-size:25px;margin:5px 0}
+body[data-layout=compact] .metric-title{font-size:11px}
+body[data-layout=compact] .metric-bottom{display:none}
+body[data-layout=compact] .port-cards{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+body[data-layout=compact] .port-device{padding:14px}
+body[data-layout=compact] .port-display-name{font-size:12px}
+body[data-layout=compact] .port-title-row{margin:6px 0}
+body[data-layout=compact] .optical-heading{padding-top:8px}
+body[data-layout=compact] .optical strong{font-size:16px;margin-top:3px}
+body[data-layout=compact] .port-traffic{margin-top:8px;padding-top:8px}
+body[data-layout=compact] .traffic-values strong{font-size:18px}
+body[data-layout=compact] .port-ping{margin-top:8px;padding-top:8px}
+body[data-layout=compact] .port-ping-values strong{font-size:14px}
+
+/* Rows keep the same port and ping markup and all its existing actions. */
+@media(min-width:1200px){
+ body[data-layout=list] .port-cards{grid-template-columns:1fr;gap:8px}
+ body[data-layout=list] .port-card:not(.standalone-circuit){display:grid;grid-template-columns:115px minmax(145px,1fr) 170px 125px minmax(185px,1fr);column-gap:18px;row-gap:3px;align-items:center;padding:12px 14px}
+ body[data-layout=list] .port-card-header{grid-column:1;grid-row:1;flex-wrap:wrap;justify-content:flex-start;gap:5px}
+ body[data-layout=list] .port-card-header .status-pill{font-size:9px;padding:3px 5px}
+ body[data-layout=list] .port-family{grid-column:1;grid-row:2;margin:0}
+ body[data-layout=list] .port-title-row{grid-column:2;grid-row:1/3;margin:0}
+ body[data-layout=list] .optical-heading{display:none}
+ body[data-layout=list] .optical{grid-column:3;grid-row:1/3;margin:0;gap:12px}
+ body[data-layout=list] .optical strong{font-size:16px;margin-top:3px}
+ body[data-layout=list] .port-traffic{display:block;grid-column:4;grid-row:1/3;margin:0;padding:0;border:0}
+ body[data-layout=list] .traffic-values strong{font-size:18px}
+ body[data-layout=list] .port-ping{grid-column:5;grid-row:1/4;margin:0;padding:0 0 0 14px;border-top:0;border-left:1px solid var(--line)}
+ body[data-layout=list] .port-ping-heading>strong{font-size:11px}
+ body[data-layout=list] .port-ping-meta{margin:3px 0}
+ body[data-layout=list] .port-ping-values{display:flex;flex-wrap:wrap;gap:12px}
+ body[data-layout=list] .port-ping-values>span{display:flex;align-items:baseline;gap:5px}
+ body[data-layout=list] .port-ping-values strong{font-size:13px;margin:0}
+ body[data-layout=list] .port-ping details{margin-top:4px}
+ body[data-layout=list] .port-card>small{grid-column:1/3;grid-row:3;margin:0}
+ body[data-layout=list] .port-card>.signal-note{grid-column:3/5;grid-row:3}
+ body[data-layout=list] .port-card>details{grid-column:1/-1;margin-top:5px;padding-top:6px}
+ body[data-layout=list] .port-card:not(:has(.port-ping))::after{content:'Sem ping configurado';grid-column:5;grid-row:1/4;border-left:1px solid var(--line);padding-left:14px;font-size:11px;color:var(--muted)}
+ body[data-layout=list] .standalone-circuit{max-width:380px}
+ body[data-layout=list] .port-card .port-ping~.port-ping{grid-row:auto}
+}
+@media(max-width:1199px){body[data-layout=list] .port-cards{grid-template-columns:1fr}body[data-layout=list] .port-card{padding:14px}body[data-layout=list] .port-ping{max-width:none}}
+@media(max-width:1100px){
+ body[data-layout] .sidebar{width:190px;padding:22px 12px}
+ body[data-layout] .app-shell{margin-left:190px}
+ body[data-layout] .brand-copy strong{font-size:15px}
+ body[data-layout] .brand-copy small{font-size:7px}
+ body[data-layout] .brand-icon{width:28px}
+ body[data-layout] .brand{gap:7px}
+ body[data-layout] .devices-panel tbody{padding:12px;gap:10px}
+ body[data-layout] .device-row{padding:12px;gap:10px}
+ body[data-layout] .device-row td{font-size:12px;padding:0}
+ body[data-layout] .device-row .device-name-cell{padding-bottom:10px}
+ body[data-layout] .device-row td[data-label]::before{font-size:10px;margin-bottom:4px}
+ body[data-layout] .device-actions-cell{padding-top:9px!important}
+ body[data-layout] .device-actions button{width:auto;height:32px;font-size:11px}
+}
+@media(max-width:900px){body[data-layout] .sidebar{width:76px;padding:22px 13px}body[data-layout] .app-shell{margin-left:76px}body[data-layout] .brand-copy{display:none}}
+@media(max-width:640px){
+ body[data-layout] .sidebar{display:flex;position:sticky;top:0;width:100%;height:57px;padding:8px 14px;flex-direction:row;justify-content:space-between}
+ body[data-layout] .app-shell{margin-left:0}
+ body[data-layout] .topbar{padding:0 14px}
+ body[data-layout] main,body[data-layout=compact] main{padding:18px 12px}
+ body[data-layout] h1{font-size:24px}
+ body[data-layout] .metrics{gap:8px}
+ body[data-layout] .metric-card{padding:11px}
+ body[data-layout] .metric-title{font-size:11px}
+ body[data-layout] .metric-value{font-size:25px}
+ body[data-layout] .metric-bottom{font-size:10px}
+ body[data-layout] .panel-heading{padding:14px 12px 0}
+ body[data-layout] .port-device{padding:14px 12px}
+ body[data-layout] .datacom-heading{flex-direction:row;align-items:flex-start;flex-wrap:wrap;gap:10px}
+ body[data-layout] .datacom-port-counts{gap:6px}
+ body[data-layout] .datacom-section-heading{flex-direction:row;flex-wrap:wrap;align-items:center}
+ body[data-layout] .datacom-section-heading .button{width:auto}
+ body[data-layout] .port-cards{grid-template-columns:1fr}
+ body[data-layout] .port-title-row .icon-button{width:30px;height:30px}
+ body[data-layout] .table-controls select{max-width:none}
+ body[data-layout] .demo-banner{align-items:flex-start}
+ body[data-layout] .demo-banner div{min-width:0}
+ body[data-layout] .device-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+}

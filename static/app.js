@@ -31,6 +31,7 @@ const previewParam=new URLSearchParams(location.search).get('design-preview');
 const designPreview=['balanced','compact','list'].includes(previewParam)?previewParam:null;
 if(designPreview){
  document.body.dataset.designPreview=designPreview;
+ document.body.dataset.layout=designPreview;
  const sheet=document.createElement('link');sheet.rel='stylesheet';sheet.href='/static/design-preview.css';document.head.append(sheet);
 }
 const state = {demo:Boolean(designPreview)||localStorage.getItem('nexo-demo')==='true', page:'overview', data:{devices:[],alerts:[],samples:[]}, loading:false, selected:null, deleting:null, editing:null, portNaming:null, removingCircuit:null, metricCards:{}, metricView:null, dataRevision:0};
