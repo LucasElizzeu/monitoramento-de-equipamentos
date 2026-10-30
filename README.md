@@ -46,15 +46,18 @@ Configure os destinos dentro do cadastro do Datacom que deve executar os pings:
 1. Na aba **Datacoms**, clique no **lápis** do Datacom de origem.
 2. Abra **Ping de circuitos (opcional)** e clique em **Adicionar IP**. Informe o destino, por exemplo **10.91.0.2**, e um nome opcional. Se o nome ficar vazio, será usado `Circuito IP`.
 3. Escolha o intervalo entre testes: **30 segundos por padrão**, de 10 a 300 segundos.
+   Em **Porta do cartão (opcional)**, selecione onde o ping deve aparecer junto do sinal óptico e do consumo. Por exemplo, associe o circuito MAMIRAUÁ à porta **1/1/5 · Giga · MAMIRAUA**.
 4. Repita para os demais IPs e clique em **Salvar alterações**. A consulta começa automaticamente; **Testar agora**, no cartão do circuito, solicita uma nova leitura.
 
-**Somente Datacoms com IPs configurados mostram a seção Circuitos no painel.** Os demais exibem suas portas sem uma caixa vazia ou botão de adicionar circuito. A lista pode ser configurada tanto no cadastro inicial quanto na edição. Circuitos já cadastrados aparecem nesse mesmo formulário. O atalho **Configurar IPs**, nos Datacoms que já têm circuitos, abre a configuração correspondente.
+**Os pings aparecem na mesma grade das portas e sinais.** Quando uma porta é escolhida, o resumo do ping fica dentro do cartão dela, junto dos sinais e do consumo. Pings sem vínculo aparecem em cartões pequenos separados nessa mesma grade. A escolha organiza a exibição; o comando `ping IP` continua usando a rota configurada no Datacom. O vínculo identifica a origem, o tipo de interface e o número da porta, mantendo Gigabit e Ten com o mesmo número separados. Se a porta sair das leituras atuais ou a consulta de sinais falhar, o ping permanece visível em um cartão separado, preservando o vínculo para quando a porta voltar.
+
+Os Datacoms sem IPs de circuito exibem somente suas portas, sem uma caixa vazia de circuitos. A lista pode ser configurada tanto no cadastro inicial quanto na edição. Os IPs existentes são preservados e aparecem nesse formulário; o vínculo com uma porta é opcional. O atalho **Configurar IPs**, nos Datacoms que já têm circuitos, abre a configuração correspondente.
 
 Os IPs são salvos junto com o Datacom: **Cancelar** não altera a lista. **Remover IP** retira uma linha do formulário; a remoção só é aplicada ao salvar. Para desativar todos os circuitos desse Datacom, remova as linhas e salve. A mudança afeta apenas essa origem e preserva os eventos anteriores. Nomes e intervalos podem ser editados sem perder a última leitura; trocar o destino limpa os resultados antigos. Listas inválidas não salvam alterações parciais. Se outra janela alterar os IPs durante a edição, o formulário solicita reabertura para evitar sobrescrever a configuração mais recente.
 
 O servidor conecta por SSH ao Datacom escolhido, verifica a impressão digital cadastrada e executa **`ping IP`**, usando as mesmas credenciais do equipamento. O ping de disponibilidade do próprio Datacom, na lista de equipamentos, continua saindo do computador do programa. Os cartões de circuito testam o destino a partir da rede do Datacom. O mesmo IP pode ser monitorado por Datacoms diferentes; dentro de um Datacom, o IP não pode ser duplicado.
 
-Cada circuito mostra estado, latência média, perdas consecutivas, quantidade de respostas do último teste e horário. Os botões permitem editar, remover e solicitar um novo teste. **Ver saída do ping → Copiar saída** mostra o resultado original; a atualização visual pausa durante a leitura. A seção também está disponível em **Ver detalhes** do Datacom.
+O resumo compacto de cada ping mostra nome, IP, estado, latência média, perdas e horário. Abra **Detalhes do ping** para ver a quantidade de respostas do último teste, intervalo, botões de testar/editar/remover e **Copiar saída** com o resultado original. A atualização visual pausa durante a leitura. A mesma organização aparece em **Ver detalhes** do Datacom.
 
 A leitura reconhece a saída fornecida para `ping 10.91.0.2`: cinco respostas, **0% de perda** e média **3,204 ms**. No firmware informado, o comando termina após cinco pacotes. As perdas são contadas **por pacote**, usando `icmp_seq`, e uma resposta zera a sequência de perdas. **Mais de 20 perdas consecutivas** geram um evento com nome do circuito, IP e Datacom de origem. Por exemplo, quatro testes sem nenhuma resposta somam 20 perdas; ao receber o resultado do quinto, o contador chega a 25 e o evento registra a passagem pela 21ª perda. A recuperação também gera evento. Falha de autenticação, chave inválida, consulta interrompida ou saída não reconhecida aparecem como **Erro de coleta**, sem aumentar perdas.
 
@@ -66,7 +69,7 @@ Os circuitos ficam no mesmo SQLite, na pasta `.data`. A tabela é criada automat
 
 ## Organização da interface
 
-O tema azul-marinho e a marca **VELOSONET MONITORAMENTO** foram mantidos. As informações de equipamentos, eventos, sinais e consumo usam letras maiores. Em telas menores, a lista de equipamentos vira cartões com status, IP, latência, perdas e última checagem visíveis juntos, além dos botões **Editar**, **Detalhes** e **Remover**. Nos Datacoms, os circuitos e as portas têm seções próprias; o cabeçalho resume portas ativas e inativas. Os nomes das portas ganham destaque, com sinal óptico e consumo separados.
+O tema azul-marinho e a marca **VELOSONET MONITORAMENTO** foram mantidos. As informações de equipamentos, eventos, sinais e consumo usam letras maiores. Em telas menores, a lista de equipamentos vira cartões com status, IP, latência, perdas e última checagem visíveis juntos, além dos botões **Editar**, **Detalhes** e **Remover**. Nos Datacoms, pings e portas compartilham a mesma grade; pings vinculados aparecem dentro do cartão da porta. O cabeçalho resume portas ativas e inativas. Os nomes das portas ganham destaque, com sinal óptico e consumo separados.
 
 ## Ping
 

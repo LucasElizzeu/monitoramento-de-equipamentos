@@ -88,10 +88,14 @@ def init_db():
           state TEXT NOT NULL DEFAULT 'pending', failures INTEGER NOT NULL DEFAULT 0,
           latency REAL, last_check TEXT, last_poll REAL NOT NULL DEFAULT 0,
           output TEXT NOT NULL DEFAULT '', error TEXT,
-          transmitted INTEGER, received INTEGER, config_version INTEGER NOT NULL DEFAULT 0);
+          transmitted INTEGER, received INTEGER, config_version INTEGER NOT NULL DEFAULT 0,
+          port_identity TEXT);
         CREATE UNIQUE INDEX IF NOT EXISTS circuit_target ON circuits(source_device_id, host);
         ''')
         columns = {row['name'] for row in db.execute('PRAGMA table_info(devices)')}
+        circuit_columns = {row['name'] for row in db.execute('PRAGMA table_info(circuits)')}
+        if 'port_identity' not in circuit_columns:
+            db.execute('ALTER TABLE circuits ADD COLUMN port_identity TEXT')
         if 'config_version' not in columns:
             db.execute('ALTER TABLE devices ADD COLUMN config_version INTEGER NOT NULL DEFAULT 0')
         if 'ping_timeout' not in columns:
@@ -236,6 +240,16 @@ class CircuitInput(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     host: str
     interval: int = Field(default=30, ge=10, le=300)
+    port_identity: str | None = Field(default=None, max_length=80)
+
+    @field_validator('port_identity', mode='before')
+    @classmethod
+    def valid_port_identity(cls, value):
+        if value is None or value == '':
+            return None
+        if not isinstance(value, str) or not re.fullmatch(r'(?:auto|gigabit-ethernet|ten-gigabit-ethernet|hundred-gigabit-ethernet):\d+/\d+/\d+', value):
+            raise ValueError('Selecione uma porta válida para o cartão do ping.')
+        return value
 
     @field_validator('name')
     @classmethod
@@ -976,15 +990,16 @@ def save_device_circuits(db, device_id, entries):
             db.execute('DELETE FROM circuits WHERE id=?', (circuit_id,))
     for entry in entries:
         old = existing.get(entry.id)
+        binding = entry.port_identity if 'port_identity' in entry.model_fields_set else old.get('port_identity') if old else None
         if old is None:
-            db.execute('INSERT INTO circuits(source_device_id,name,host,interval) VALUES(?,?,?,?)',
-                       (device_id, entry.name, entry.host, entry.interval))
+            db.execute('INSERT INTO circuits(source_device_id,name,host,interval,port_identity) VALUES(?,?,?,?,?)',
+                       (device_id, entry.name, entry.host, entry.interval, binding))
         elif old['host'] != entry.host:
-            db.execute('INSERT INTO circuits(id,source_device_id,name,host,interval,config_version) VALUES(?,?,?,?,?,?)',
-                       (entry.id, device_id, entry.name, entry.host, entry.interval, old['config_version'] + 1))
-        elif old['name'] != entry.name or old['interval'] != entry.interval:
-            db.execute('UPDATE circuits SET name=?,interval=?,last_poll=0,config_version=config_version+1 WHERE id=?',
-                       (entry.name, entry.interval, entry.id))
+            db.execute('INSERT INTO circuits(id,source_device_id,name,host,interval,config_version,port_identity) VALUES(?,?,?,?,?,?,?)',
+                       (entry.id, device_id, entry.name, entry.host, entry.interval, old['config_version'] + 1, binding))
+        elif old['name'] != entry.name or old['interval'] != entry.interval or old['port_identity'] != binding:
+            db.execute('UPDATE circuits SET name=?,interval=?,port_identity=?,last_poll=0,config_version=config_version+1 WHERE id=?',
+                       (entry.name, entry.interval, binding, entry.id))
 
 
 @app.post('/api/devices', status_code=201)
@@ -1051,8 +1066,8 @@ def create_circuit(device_id: int, entry: CircuitInput):
             raise HTTPException(409, 'Este IP já está monitorado por este Datacom.')
         if db.execute('SELECT count(*) FROM circuits').fetchone()[0] >= 100 or db.execute('SELECT count(*) FROM circuits WHERE source_device_id=?', (device_id,)).fetchone()[0] >= 20:
             raise HTTPException(422, 'Limite de 20 circuitos por Datacom e 100 circuitos no painel.')
-        cursor = db.execute('INSERT INTO circuits(source_device_id,name,host,interval) VALUES(?,?,?,?)',
-                            (device_id, entry.name, entry.host, entry.interval))
+        cursor = db.execute('INSERT INTO circuits(source_device_id,name,host,interval,port_identity) VALUES(?,?,?,?,?)',
+                            (device_id, entry.name, entry.host, entry.interval, entry.port_identity))
         return dict(db.execute('SELECT * FROM circuits WHERE id=?', (cursor.lastrowid,)).fetchone())
 
 
@@ -1065,8 +1080,9 @@ def update_circuit(circuit_id: int, entry: CircuitInput):
         if db.execute('SELECT id FROM circuits WHERE source_device_id=? AND host=? AND id<>?',
                       (current['source_device_id'], entry.host, circuit_id)).fetchone():
             raise HTTPException(409, 'Este IP já está monitorado por este Datacom.')
-        db.execute('UPDATE circuits SET name=?,host=?,interval=?,last_poll=0,config_version=config_version+1 WHERE id=?',
-                   (entry.name, entry.host, entry.interval, circuit_id))
+        binding = entry.port_identity if 'port_identity' in entry.model_fields_set else current['port_identity']
+        db.execute('UPDATE circuits SET name=?,host=?,interval=?,port_identity=?,last_poll=0,config_version=config_version+1 WHERE id=?',
+                   (entry.name, entry.host, entry.interval, binding, circuit_id))
         if current['host'] != entry.host:
             db.execute("UPDATE circuits SET state='pending',failures=0,latency=NULL,last_check=NULL,output='',error=NULL,transmitted=NULL,received=NULL WHERE id=?", (circuit_id,))
         return dict(db.execute('SELECT * FROM circuits WHERE id=?', (circuit_id,)).fetchone())
@@ -1147,6 +1163,8 @@ def demo_dashboard():
             id=i, source_device_id=i, name='Circuito de demonstração', host=f'10.91.{i-1}.2',
             interval=30, state='online', failures=0, latency=3.204, last_check=now(),
             transmitted=5, received=5, error=None, output='Exemplo de ping simulado: 5 respostas, 0% de perda.')]
+        if devices[-1]['circuits']:
+            devices[-1]['circuits'][0]['port_identity'] = 'gigabit-ethernet:1/1/1'
     samples = [dict(device_id=1, at=datetime.fromtimestamp(time.time()-(59-i)*5, timezone.utc).isoformat(), latency=round(3 + math.sin(i*.55)*.7 + math.cos(i*.17)*.45, 2), success=1) for i in range(60)]
     events = [dict(id=3, device_id=5, device_name=labels[4][0], at=now(), level='critical', message='Sem ping: 24 perdas consecutivas.'),
               dict(id=2, device_id=2, device_name=labels[1][0], at=now(), level='critical', message='Porta ge1/1/3 caiu (link down).'),

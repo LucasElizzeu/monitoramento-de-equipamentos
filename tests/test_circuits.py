@@ -289,6 +289,52 @@ class CircuitTests(unittest.TestCase):
         self.assertEqual(updated['circuits'][0]['state'], 'pending')
         self.assertEqual(updated['circuits'][0]['id'], old['id'])
 
+    def test_port_binding_is_saved_without_losing_ping_readings(self):
+        self.record(SUCCESS)
+        current, _ = self.stored()
+        updated = app.update_device(self.parent['id'], self.config([
+            dict(id=current['id'], name=current['name'], host=current['host'], port_identity='gigabit-ethernet:1/1/5')]))
+        circuit = updated['circuits'][0]
+        self.assertEqual(circuit['port_identity'], 'gigabit-ethernet:1/1/5')
+        self.assertEqual((circuit['state'], circuit['latency'], circuit['output']), ('online', 3.204, SUCCESS))
+
+    def test_older_edit_requests_keep_binding_and_explicit_empty_clears_it(self):
+        app.update_circuit(self.circuit['id'], app.CircuitInput(name='Vinculado', host='10.91.0.2', port_identity='ten-gigabit-ethernet:1/1/5'))
+        legacy = app.update_circuit(self.circuit['id'], app.CircuitInput(name='Nome novo', host='10.91.0.2'))
+        self.assertEqual(legacy['port_identity'], 'ten-gigabit-ethernet:1/1/5')
+        updated = app.update_device(self.parent['id'], self.config([
+            dict(id=self.circuit['id'], name='Destino novo', host='10.91.0.3')]))
+        self.assertEqual(updated['circuits'][0]['port_identity'], 'ten-gigabit-ethernet:1/1/5')
+        cleared = app.update_device(self.parent['id'], self.config([
+            dict(id=self.circuit['id'], name='Sem vínculo', host='10.91.0.3', port_identity=None)]))
+        self.assertIsNone(cleared['circuits'][0]['port_identity'])
+
+    def test_giga_and_ten_binding_keys_remain_separate(self):
+        first = app.update_circuit(self.circuit['id'], app.CircuitInput(name='Giga', host='10.91.0.2', port_identity='gigabit-ethernet:1/1/5'))
+        second = app.create_circuit(self.parent['id'], app.CircuitInput(name='Ten', host='10.91.0.3', port_identity='ten-gigabit-ethernet:1/1/5'))
+        self.assertNotEqual(first['port_identity'], second['port_identity'])
+        app.init_db()
+        self.assertEqual([c['port_identity'] for c in app.dashboard()['devices'][0]['circuits']],
+                         ['gigabit-ethernet:1/1/5', 'ten-gigabit-ethernet:1/1/5'])
+
+    def test_port_binding_migration_preserves_existing_configuration_and_telemetry(self):
+        self.record(SUCCESS)
+        before, source_before = self.stored()
+        with app.connect() as db:
+            db.execute('ALTER TABLE circuits DROP COLUMN port_identity')
+        app.init_db()
+        after, source_after = self.stored()
+        self.assertIsNone(after.pop('port_identity'))
+        before.pop('port_identity')
+        self.assertEqual(before, after)
+        self.assertEqual(source_before['password'], source_after['password'])
+
+    def test_port_binding_validation_only_accepts_canonical_interface_keys(self):
+        for key in ['1/1/5', 'mixed:1/1/5', 'ten:1/1/5', 'gigabit-ethernet:1/1/5; reboot', 'gigabit-ethernet:5']:
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                app.CircuitInput(name='Circuito', host='10.91.0.2', port_identity=key)
+        self.assertIsNone(app.CircuitInput(name='Circuito', host='10.91.0.2', port_identity='').port_identity)
+
     def test_host_and_interval_validation_blocks_command_injection(self):
         for host in ['10.91.0.2; reboot','10.91.0.2\nreboot','example.com','10.91.0.2 -c 10000','']:
             with self.subTest(host=host), self.assertRaises(ValueError):

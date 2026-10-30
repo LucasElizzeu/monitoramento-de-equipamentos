@@ -145,13 +145,24 @@ function utilizationHTML(p){
  const note=p.utilization_error||(p.rx_bps==null&&p.rx_percent==null?'Consumo não informado ou formato não reconhecido.':'');
  return `<div class="port-traffic"><div class="traffic-heading">Consumo na porta</div><div class="traffic-values"><span><strong>${bandwidth(p.rx_bps)}</strong>${p.rx_percent!=null?`<small>${number(p.rx_percent,2)}%</small>`:''}</span></div>${note?`<p class="signal-note">${esc(note)}</p>`:''}</div>`;
 }
-function circuitsHTML(d){
- const circuits=d.circuits||[];if(!circuits.length)return '';
- return `<section class="datacom-circuits"><div class="datacom-section-heading"><div><h4>Circuitos <span class="count-chip">${circuits.length}</span></h4><p>Ping a partir de ${esc(d.name)} via SSH.</p></div><button type="button" class="button secondary" data-configure-circuits="${d.id}">${icon('edit')}Configurar IPs</button></div><div class="circuit-cards">${circuits.map(c=>`<article class="circuit-card"><div class="circuit-card-header"><h5>${esc(c.name)}</h5>${badge(c.state)}</div><code class="circuit-target">${esc(c.host)}</code><div class="circuit-values"><span>Latência média<strong>${number(c.latency,2)} <small>ms</small></strong></span><span>Perdas consecutivas<strong>${c.failures} <small>/ 21</small></strong></span></div><p class="circuit-batch">${c.transmitted!=null?`${c.received} de ${c.transmitted} respostas no último teste`:'Aguardando resultado válido'}</p><small class="circuit-time">Último teste: ${ago(c.last_check)} · intervalo ${c.interval}s</small>${c.error?`<p class="ssh-warning">${esc(c.error)} O erro não conta como perda de ping.</p>`:''}<div class="circuit-actions"><button type="button" class="button secondary" data-test-circuit="${c.id}" aria-label="Testar circuito ${esc(c.name)}">${icon('refresh')}Testar agora</button><button type="button" class="icon-button" data-edit-circuit="${c.id}" title="Editar circuito" aria-label="Editar circuito ${esc(c.name)}">${icon('edit')}</button><button type="button" class="icon-button" data-remove-circuit="${c.id}" title="Remover circuito" aria-label="Remover circuito ${esc(c.name)}">${icon('trash')}</button></div><details data-port-key="${d.id}:circuit:${c.id}"><summary>Ver saída do ping</summary><button type="button" class="button secondary output-copy" data-copy-output>${icon('copy')}Copiar saída</button><pre>${esc(c.output||'Aguardando a primeira consulta pelo Datacom.')}</pre></details></article>`).join('')}</div></section>`;
+function makePortIdentity(name,family='auto'){
+ const match=String(name).match(/^(.*?)([0-9]+\/[0-9]+\/[0-9]+)$/);if(!match)return '';
+ const prefix=match[1].toLowerCase().replace(/[^a-z0-9]/g,'');
+ const aliases={'gigabit-ethernet':['gigabitethernet','1gigabitethernet','1ge','ge','gi','giga'],'ten-gigabit-ethernet':['tengigabitethernet','10gigabitethernet','10ge','xge','xgigabitethernet','xe','te','ten'],'hundred-gigabit-ethernet':['hundredgigabitethernet','100gigabitethernet','100ge','hu','ce']};
+ for(const [type,names]of Object.entries(aliases))if(names.includes(prefix))family=type;
+ if(!['gigabit-ethernet','ten-gigabit-ethernet','hundred-gigabit-ethernet'].includes(family))family='auto';
+ return `${family}:${match[2]}`;
+}
+function portIdentity(port,device){return makePortIdentity(port.name,port.interface_type||device.interface_type);}
+function shortPortLabel(identity){
+ const [family,number]=identity.split(':');return `${number} · ${{'gigabit-ethernet':'Giga','ten-gigabit-ethernet':'Ten','hundred-gigabit-ethernet':'100G','auto':'Interface'}[family]||family}`;
+}
+function portPingHTML(c,d){
+ return `<section class="port-ping" data-ping-id="${c.id}"><div class="port-ping-heading"><strong>Ping · ${esc(c.name)}</strong>${badge(c.state)}</div><div class="port-ping-meta"><code class="port-ping-ip">${esc(c.host)}</code><small class="port-ping-time">${ago(c.last_check)}</small></div><div class="port-ping-values"><span>Latência<strong>${number(c.latency,2)} <small>ms</small></strong></span><span>Perdas<strong>${c.failures} <small>/ 21</small></strong></span></div>${c.error?`<p class="signal-note">${esc(c.error)}</p>`:''}<details data-port-key="${d.id}:circuit:${c.id}"><summary>Detalhes do ping</summary><p class="port-ping-batch">${c.transmitted!=null?`${c.received} de ${c.transmitted} respostas`:'Aguardando resultado válido'} · intervalo ${c.interval}s</p><div class="port-ping-actions"><button type="button" class="button secondary" data-test-circuit="${c.id}" aria-label="Testar circuito ${esc(c.name)}">${icon('refresh')}Testar agora</button><button type="button" class="icon-button" data-edit-circuit="${c.id}" title="Configurar ping" aria-label="Configurar circuito ${esc(c.name)}">${icon('edit')}</button><button type="button" class="icon-button" data-remove-circuit="${c.id}" title="Remover ping" aria-label="Remover circuito ${esc(c.name)}">${icon('trash')}</button></div><button type="button" class="button secondary output-copy" data-copy-output>${icon('copy')}Copiar saída</button><pre>${esc(c.output||'Aguardando a primeira consulta pelo Datacom.')}</pre></details></section>`;
 }
 function datacomHTML(d){
- const ports=d.ssh_error?[]:d.port_data;
- return `<div class="port-device" data-datacom="${d.id}"><div class="datacom-heading"><div><div class="port-device-title"><span class="circuit-position" title="Posição no circuito">${d.circuit_position??'—'}</span><h3>${esc(d.name)}</h3></div><p class="datacom-meta"><span class="ip">${esc(d.host)}</span><span>${esc(interfaceLabels[d.interface_type]||'Automático')}</span></p></div><div class="datacom-port-counts">${d.ssh_error?badge('error'):`<span class="status-pill up">${ports.filter(p=>p.state==='up').length} ativas</span><span class="status-pill down">${ports.filter(p=>p.state==='down').length} inativas</span>`}</div></div>${circuitsHTML(d)}<div class="datacom-section-heading ports-subheading"><div><h4>Portas e sinais <span class="count-chip">${ports.length}</span></h4><p>${d.ports.length?'Portas selecionadas para este Datacom.':'Detecção automática de portas.'}</p></div></div>${portsHTML(d)}</div>`;
+ const ports=d.ssh_error?[]:d.port_data,circuits=d.circuits||[];
+ return `<div class="port-device" data-datacom="${d.id}"><div class="datacom-heading"><div><div class="port-device-title"><span class="circuit-position" title="Posição no circuito">${d.circuit_position??'—'}</span><h3>${esc(d.name)}</h3></div><p class="datacom-meta"><span class="ip">${esc(d.host)}</span><span>${esc(interfaceLabels[d.interface_type]||'Automático')}</span></p></div><div class="datacom-port-counts">${d.ssh_error?badge('error'):`<span class="status-pill up">${ports.filter(p=>p.state==='up').length} ativas</span><span class="status-pill down">${ports.filter(p=>p.state==='down').length} inativas</span>`}</div></div><div class="datacom-section-heading ports-subheading"><div><h4>Portas, sinais e pings</h4><p>${ports.length} portas${circuits.length?` · ${circuits.length} ${circuits.length===1?'destino':'destinos'} de ping`:''}</p></div>${circuits.length?`<button type="button" class="button secondary" data-configure-circuits="${d.id}">${icon('edit')}Configurar IPs</button>`:''}</div>${portsHTML(d)}</div>`;
 }
 function findCircuit(id){
  for(const device of state.data.devices){const circuit=(device.circuits||[]).find(c=>c.id===id);if(circuit)return{device,circuit};}
@@ -160,10 +171,25 @@ function findCircuit(id){
 function updateCircuitDraftCount(){
  $('#device-circuit-count').textContent=$('#device-circuit-rows').children.length;
 }
+function circuitPortOptions(selected=''){
+ const choices=new Map(),device=state.editing;
+ for(const port of device?.port_data||[]){const key=portIdentity(port,device);if(key)choices.set(key,`${shortPortLabel(key)} · ${port.display_name||port.description||port.name}`);}
+ const mode=$('[name="interface_type"]').value;
+ const lists=mode==='mixed'?[...normalizedPorts($('[name="ten_ports"]').value).map(name=>[name,'ten-gigabit-ethernet']),...normalizedPorts($('[name="giga_ports"]').value).map(name=>[name,'gigabit-ethernet'])]:$('[name="ports"]').value.split(',').map(name=>[name.trim(),mode]);
+ for(const [name,family]of lists){const key=makePortIdentity(name,family);if(key&&!key.startsWith('auto:')&&!choices.has(key))choices.set(key,shortPortLabel(key));}
+ if(selected&&!choices.has(selected))choices.set(selected,`${shortPortLabel(selected)} · fora da lista atual`);
+ return `<option value="">Sem vínculo · cartão separado</option>`+[...choices].map(([key,label])=>`<option value="${esc(key)}"${key===selected?' selected':''}>${esc(label)}</option>`).join('');
+}
+function refreshCircuitPortOptions(){
+ $('#device-circuit-rows').querySelectorAll('[data-circuit-field="port_identity"]').forEach(select=>{select.innerHTML=circuitPortOptions(select.value);});
+}
 function appendCircuitDraft(circuit={}){
  const row=document.createElement('div');row.className='device-circuit-row';row.dataset.circuitId=circuit.id??'';
  row.innerHTML=`<div class="form-grid"><label class="field">IP do circuito<input data-circuit-field="host" required placeholder="Ex.: 10.91.0.2" autocomplete="off" value="${esc(circuit.host||'')}"></label><label class="field">Nome (opcional)<input data-circuit-field="name" maxlength="80" placeholder="Ex.: Circuito Anori" value="${esc(circuit.name||'')}"></label></div><div class="device-circuit-row-footer"><label class="field">Intervalo dos testes (segundos)<input data-circuit-field="interval" type="number" min="10" max="300" required value="${circuit.interval??30}"></label><button type="button" class="button secondary remove-device-circuit" aria-label="Remover IP desta configuração">${icon('trash')}Remover IP</button></div>`;
- row.querySelectorAll('input').forEach(input=>input.disabled=$('[name="kind"]:checked').value!=='datacom');
+ const binding=document.createElement('label');binding.className='field';
+ binding.innerHTML=`Porta do cartão (opcional)<select data-circuit-field="port_identity">${circuitPortOptions(circuit.port_identity||'')}</select><small>Escolha a porta para mostrar o ping junto dos sinais e do consumo. Sem vínculo, o ping fica em um cartão pequeno separado.</small>`;
+ row.insertBefore(binding,row.querySelector('.device-circuit-row-footer'));
+ row.querySelectorAll('input,select').forEach(input=>input.disabled=$('[name="kind"]:checked').value!=='datacom');
  $('#device-circuit-rows').append(row);updateCircuitDraftCount();return row;
 }
 function renderCircuitDrafts(circuits=[]){
@@ -174,10 +200,12 @@ function readCircuitDrafts(){
   const host=row.querySelector('[data-circuit-field="host"]').value.trim();
   const name=row.querySelector('[data-circuit-field="name"]').value.trim()||`Circuito ${host}`;
   const interval=Number(row.querySelector('[data-circuit-field="interval"]').value);
-  return {...(row.dataset.circuitId?{id:Number(row.dataset.circuitId)}:{}),host,name,interval};
+  const port_identity=row.querySelector('[data-circuit-field="port_identity"]').value||null;
+  return {...(row.dataset.circuitId?{id:Number(row.dataset.circuitId)}:{}),host,name,interval,port_identity};
  });
 }
 function configureCircuitIps(deviceId,circuitId=null){
+ document.querySelectorAll('.port-ping details[open]').forEach(details=>details.open=false);
  openEdit(deviceId);if(!$('#device-dialog').open||state.editing?.id!==deviceId)return;
  $('#device-circuit-config').open=true;
  requestAnimationFrame(()=>{const row=circuitId?$(`#device-circuit-rows [data-circuit-id="${circuitId}"]`):null;const target=row?.querySelector('[data-circuit-field="host"]')||$('#device-circuit-config');target.scrollIntoView({block:'center'});if(row)target.focus({preventScroll:true});});
@@ -193,9 +221,17 @@ document.addEventListener('click',async event=>{
  const test=event.target.closest('[data-test-circuit]');if(test){if(state.demo){toast('Os circuitos da demonstração são exemplos.');return;}test.disabled=true;try{await api(`/api/circuits/${Number(test.dataset.testCircuit)}/check`,{method:'POST'});toast('Teste solicitado ao Datacom. Aguarde alguns segundos pelo resultado.');}catch(error){toast(error.message);}finally{test.disabled=false;}}
  const remove=event.target.closest('[data-remove-circuit]');if(remove){if(state.demo){toast('Os circuitos da demonstração são exemplos.');return;}const target=findCircuit(Number(remove.dataset.removeCircuit));if(!target)return;state.removingCircuit=target.circuit.id;state.deleting=null;$('#confirm-dialog h2').textContent='Remover circuito?';$('#confirm-description').textContent=`Remover ${target.circuit.name} (${target.circuit.host}) de ${target.device.name}?`;$('#confirm-note').textContent='O monitoramento deste circuito será removido. Os eventos anteriores serão preservados.';$('#confirm-dialog').showModal();}
 });
-function portsHTML(d){if(d.ssh_error)return `<p class="ssh-warning">${icon('warning')} ${esc(d.ssh_error)} As leituras anteriores não são exibidas como atuais.</p>${sshDiagnosticHTML(d)}`;
- if(!d.port_data.length)return '<p class="muted">Aguardando a primeira consulta SSH. Intervalo: 30 segundos.</p>';
- return `<div class="port-cards">${d.port_data.map(p=>`<article class="port-card"><div class="port-card-header"><strong>${esc(p.name)}</strong>${badge(p.state)}</div>${p.interface_type&&p.interface_type!=='auto'?`<small class="port-family">${esc(interfaceLabels[p.interface_type]||p.interface_type)}</small>`:''}<div class="port-title-row"><p class="port-display-name">${esc(p.display_name||p.description||'Nomear porta')}</p><button type="button" class="icon-button" data-port-alias="${d.id}" data-port="${esc(p.name)}" data-family="${esc(p.interface_type||d.interface_type||'auto')}" title="Editar nome da porta" aria-label="Editar nome da porta ${esc(p.name)}">${icon('edit')}</button></div><div class="optical-heading">Sinal óptico</div><div class="optical"><span>RX · RECEPÇÃO<strong>${number(p.rx,2)} <small>dBm</small></strong></span><span>TX · TRANSMISSÃO<strong>${number(p.tx,2)} <small>dBm</small></strong></span></div>${utilizationHTML(p)}<small>Leitura ${ago(p.checked_at)}</small>${p.rx==null&&p.tx==null?'<p class="signal-note">Sinal não informado ou formato não reconhecido.</p>':''}<details data-port-key="${d.id}:${esc(p.interface_type||d.interface_type||'auto')}:${esc(p.name)}"><summary>Ver saída do equipamento</summary><button type="button" class="button secondary output-copy" data-copy-output>${icon('copy')}Copiar saída</button><pre>${esc(p.status_output)}</pre><pre>${esc(p.optics_output)}</pre><pre>${esc(p.utilization_output)}</pre></details></article>`).join('')}</div>`;}
+function portCardHTML(d,p){
+ const linked=(d.circuits||[]).filter(c=>c.port_identity===portIdentity(p,d));
+ return `<article class="port-card" data-port-identity="${esc(portIdentity(p,d))}"><div class="port-card-header"><strong>${esc(p.name)}</strong>${badge(p.state)}</div>${p.interface_type&&p.interface_type!=='auto'?`<small class="port-family">${esc(interfaceLabels[p.interface_type]||p.interface_type)}</small>`:''}<div class="port-title-row"><p class="port-display-name">${esc(p.display_name||p.description||'Nomear porta')}</p><button type="button" class="icon-button" data-port-alias="${d.id}" data-port="${esc(p.name)}" data-family="${esc(p.interface_type||d.interface_type||'auto')}" title="Editar nome da porta" aria-label="Editar nome da porta ${esc(p.name)}">${icon('edit')}</button></div><div class="optical-heading">Sinal óptico</div><div class="optical"><span>RX · RECEPÇÃO<strong>${number(p.rx,2)} <small>dBm</small></strong></span><span>TX · TRANSMISSÃO<strong>${number(p.tx,2)} <small>dBm</small></strong></span></div>${utilizationHTML(p)}<small>Leitura ${ago(p.checked_at)}</small>${p.rx==null&&p.tx==null?'<p class="signal-note">Sinal não informado ou formato não reconhecido.</p>':''}${linked.map(c=>portPingHTML(c,d)).join('')}<details data-port-key="${d.id}:${esc(p.interface_type||d.interface_type||'auto')}:${esc(p.name)}"><summary>Ver saída do equipamento</summary><button type="button" class="button secondary output-copy" data-copy-output>${icon('copy')}Copiar saída</button><pre>${esc(p.status_output)}</pre><pre>${esc(p.optics_output)}</pre><pre>${esc(p.utilization_output)}</pre></details></article>`;
+}
+function portsHTML(d){
+ const ports=d.ssh_error?[]:(d.port_data||[]),keys=new Set(ports.map(p=>portIdentity(p,d)));
+ const unbound=(d.circuits||[]).filter(c=>!c.port_identity||!keys.has(c.port_identity));
+ const warning=d.ssh_error?`<p class="ssh-warning">${icon('warning')} ${esc(d.ssh_error)} As leituras anteriores não são exibidas como atuais.</p>${sshDiagnosticHTML(d)}`:!ports.length?'<p class="muted">Aguardando a primeira consulta SSH. Intervalo: 30 segundos.</p>':'';
+ if(!ports.length&&!unbound.length)return warning;
+ return `${warning}<div class="port-cards">${ports.map(p=>portCardHTML(d,p)).join('')}${unbound.map(c=>`<article class="port-card standalone-circuit">${c.port_identity?`<p class="unbound-port-note">${esc(shortPortLabel(c.port_identity))} · porta fora das leituras atuais</p>`:''}${portPingHTML(c,d)}</article>`).join('')}</div>`;
+}
 function readingOutput(){
  return (state.page==='datacoms'&&Boolean($('#ports-content').querySelector('details[open]')))
   ||($('#detail-dialog').open&&Boolean($('#detail-content').querySelector('details[open]')));
@@ -229,7 +265,7 @@ function navigate(page){
  render();
 }
 function toggleDemo(value){
- document.querySelectorAll('.port-card details[open], .circuit-card details[open], .ssh-diagnostic[open]').forEach(e=>e.open=false);
+ document.querySelectorAll('.port-card details[open], .port-ping details[open], .ssh-diagnostic[open]').forEach(e=>e.open=false);
  window.getSelection()?.removeAllRanges();
  state.demo=value;state.selected=null;localStorage.setItem('nexo-demo',String(value));load();
 }
@@ -255,7 +291,7 @@ function syncInterfaceMode(carry=false){
   const source=mode==='ten-gigabit-ethernet'?'ten_ports':mode==='gigabit-ethernet'?'giga_ports':null;
   $('[name="ports"]').value=source?normalizedPorts($(`[name="${source}"]`).value).join(', '):'';
  }
- $('#single-port-field').hidden=mode==='mixed';$('#mixed-port-fields').hidden=mode!=='mixed';selector.dataset.previousMode=mode;
+ $('#single-port-field').hidden=mode==='mixed';$('#mixed-port-fields').hidden=mode!=='mixed';selector.dataset.previousMode=mode;refreshCircuitPortOptions();
 }
 function syncDeviceKind(){
  const ssh=$('[name="kind"]:checked').value==='datacom';
@@ -268,7 +304,7 @@ function syncDeviceKind(){
  $('#device-dialog-title').textContent=state.editing?(ssh?'Editar Datacom':'Editar BBU'):(ssh?'Adicionar Datacom':'Adicionar BBU');
  $('#save-device').innerHTML=state.editing?`${icon('check')}Salvar alterações`:`${icon('plus')}Adicionar equipamento`;
  $('[name="name"]').placeholder=ssh?'Ex.: Datacom • Core principal':'Ex.: BBU • Torre central';
- syncInterfaceMode();$('#device-circuit-rows').querySelectorAll('input').forEach(input=>input.disabled=!ssh);
+ syncInterfaceMode();$('#device-circuit-rows').querySelectorAll('input,select').forEach(input=>input.disabled=!ssh);
 }
 function openAdd(){
  state.editing=null;$('#device-form').reset();renderCircuitDrafts();
@@ -290,10 +326,11 @@ function openEdit(id){
 }
 function renderDetail(){const d=state.data.devices.find(d=>d.id===state.selected);if(!d){$('#detail-dialog').close();state.selected=null;return;}
  const opened=[...$('#detail-content').querySelectorAll('details')].map(e=>e.open);
- $('#detail-content').innerHTML=`<div class="dialog-heading"><div><div class="eyebrow">${d.kind==='datacom'?'DATACOM · SSH + ICMP':'MONITORAMENTO ICMP'}</div><h2>${esc(d.name)}</h2></div><button class="icon-button" data-close-detail aria-label="Fechar">${icon('close')}</button></div><p class="dialog-description">${esc(d.host)} · Intervalo ${d.interval}s ${state.demo?'· Demonstração':''}</p><div class="detail-summary"><div class="detail-stat">Disponibilidade<strong>${badge(d.state)}</strong></div><div class="detail-stat">Latência<strong>${number(d.latency)} <small>ms</small></strong></div><div class="detail-stat">Perdas consecutivas<strong>${d.failures} <small>/ 21</small></strong></div></div>${d.state==='error'?'<p class="ssh-warning">O coletor não conseguiu executar o ping. Veja o diagnóstico abaixo. Este erro não é contado como perda.</p>':''}<h2>Última tentativa de ping</h2><p class="dialog-description">${esc(d.ping_backend||'ICMP')} · espera máxima ${number(d.ping_timeout??4)}s</p><pre class="ping-diagnostic">${esc(d.ping_detail||'Aguardando a primeira tentativa.')}</pre><h2>Histórico de ping</h2><div class="chart-container detail-chart" id="detail-chart"></div>${d.kind==='datacom'?`${circuitsHTML(d)}<div class="section-divider">PORTAS E SINAIS ÓPTICOS</div>${portsHTML(d)}`:''}`;
+ $('#detail-content').innerHTML=`<div class="dialog-heading"><div><div class="eyebrow">${d.kind==='datacom'?'DATACOM · SSH + ICMP':'MONITORAMENTO ICMP'}</div><h2>${esc(d.name)}</h2></div><button class="icon-button" data-close-detail aria-label="Fechar">${icon('close')}</button></div><p class="dialog-description">${esc(d.host)} · Intervalo ${d.interval}s ${state.demo?'· Demonstração':''}</p><div class="detail-summary"><div class="detail-stat">Disponibilidade<strong>${badge(d.state)}</strong></div><div class="detail-stat">Latência<strong>${number(d.latency)} <small>ms</small></strong></div><div class="detail-stat">Perdas consecutivas<strong>${d.failures} <small>/ 21</small></strong></div></div>${d.state==='error'?'<p class="ssh-warning">O coletor não conseguiu executar o ping. Veja o diagnóstico abaixo. Este erro não é contado como perda.</p>':''}<h2>Última tentativa de ping</h2><p class="dialog-description">${esc(d.ping_backend||'ICMP')} · espera máxima ${number(d.ping_timeout??4)}s</p><pre class="ping-diagnostic">${esc(d.ping_detail||'Aguardando a primeira tentativa.')}</pre><h2>Histórico de ping</h2><div class="chart-container detail-chart" id="detail-chart"></div>${d.kind==='datacom'?`<div class="section-divider">PORTAS, SINAIS E PINGS</div>${portsHTML(d)}`:''}`;
  $('#detail-content').querySelectorAll('details').forEach((e,i)=>e.open=Boolean(opened[i]));chart(state.detailSamples||[], $('#detail-chart'));
 }
 async function openDetail(id){state.selected=id;state.detailSamples=[];renderDetail();$('#detail-dialog').showModal();try{state.detailSamples=state.demo?state.data.samples.filter(s=>s.device_id===id):await api(`/api/devices/${id}/history`);if(state.selected===id)renderDetail();}catch(e){toast(e.message);}}
+$('#device-form').addEventListener('input',event=>{if(event.target.matches('[name="ports"],[name="ten_ports"],[name="giga_ports"]'))refreshCircuitPortOptions();});
 $('#device-form').addEventListener('invalid',event=>{if(event.target.closest('#device-circuit-config'))$('#device-circuit-config').open=true;},true);
 $('#device-form').addEventListener('submit',async event=>{
  event.preventDefault();const form=new FormData(event.target);const d=Object.fromEntries(form);
@@ -354,11 +391,11 @@ async function copyOutput(button){
  }
 }
 $('#resume-live').addEventListener('click',()=>{
- document.querySelectorAll('.port-card details[open], .circuit-card details[open], .ssh-diagnostic[open]').forEach(e=>e.open=false);
+ document.querySelectorAll('.port-card details[open], .port-ping details[open], .ssh-diagnostic[open]').forEach(e=>e.open=false);
  window.getSelection()?.removeAllRanges();render();
 });
 document.addEventListener('toggle',event=>{
- if(event.target.matches('.port-card details, .circuit-card details, .ssh-diagnostic'))render();
+ if(event.target.matches('.port-card details, .port-ping details, .ssh-diagnostic'))render();
 },true);
 document.addEventListener('selectionchange',()=>{
  const selected=Boolean(window.getSelection()?.toString());
