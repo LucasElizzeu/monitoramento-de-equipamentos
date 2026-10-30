@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#081628">
+  <title>Escolha o visual · VELOSONET</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/design-options.css">
+  <script src="/static/design-options.js" defer></script>
+</head>
+<body>
+  <main>
+    <header class="choice-heading">
+      <div><p class="brand">VELOSONET MONITORAMENTO</p><h1>Menos espaço. Mais rede à vista.</h1><p>Compare três propostas de visual com os mesmos dados de demonstração.</p></div>
+      <a href="/" class="back-link">Voltar ao monitoramento ↗</a>
+    </header>
+    <div class="choices" role="group" aria-label="Escolher modelo de visual">
+      <button type="button" data-model="balanced" aria-pressed="true"><span class="model-number">01</span><span><strong>Equilibrado <small>Recomendado</small></strong><span>Cartões menores, letras proporcionais e boa separação das informações.</span></span></button>
+      <button type="button" data-model="compact" aria-pressed="false"><span class="model-number">02</span><span><strong>Compacto</strong><span>Menos margens e valores menores para acompanhar mais portas na tela.</span></span></button>
+      <button type="button" data-model="list" aria-pressed="false"><span class="model-number">03</span><span><strong>Em lista</strong><span>Uma porta por linha, com sinais, consumo e ping alinhados lado a lado.</span></span></button>
+    </div>
+    <div class="preview-heading"><p id="model-description" aria-live="polite">Modelo 1 · Equilibrado</p><a id="full-preview" href="/?design-preview=balanced" target="_blank" rel="noopener">Abrir modelo em tela inteira ↗</a></div>
+    <iframe id="design-frame" src="/?design-preview=balanced" title="Prévia do modelo Equilibrado"></iframe>
+    <p class="choice-note">Escolha o número do modelo que prefere e me diga no chat. Você também pode combinar partes dos modelos.</p>
+  </main>
+</body>
+</html>

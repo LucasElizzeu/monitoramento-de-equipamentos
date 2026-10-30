@@ -22,6 +22,7 @@
 }
 
 body { background: var(--bg); }
+.design-options-link { color: var(--accent); text-underline-offset: 3px; }
 body, input, select, button { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
 ::selection { background: #275b91; color: #fff; }
 button, a, input, select, summary { outline-color: var(--accent); }

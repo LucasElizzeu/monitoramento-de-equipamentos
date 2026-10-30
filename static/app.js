@@ -27,12 +27,18 @@ const esc = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'
 const number = (n,digits=1) => n==null?'—':Number(n).toLocaleString('pt-BR',{maximumFractionDigits:digits});
 const interfaceLabels={'auto':'Automático','mixed':'Gigabit + Ten (portas selecionadas)','gigabit-ethernet':'Gigabit Ethernet','ten-gigabit-ethernet':'Ten Gigabit Ethernet','hundred-gigabit-ethernet':'Hundred Gigabit Ethernet'};
 const labels = {online:'Online',offline:'Sem ping',unstable:'Instável',pending:'Aguardando',error:'Erro de coleta',up:'Ativa',down:'Inativa',unknown:'Não identificado'};
-const state = {demo:localStorage.getItem('nexo-demo')==='true', page:'overview', data:{devices:[],alerts:[],samples:[]}, loading:false, selected:null, deleting:null, editing:null, portNaming:null, removingCircuit:null, metricCards:{}, metricView:null, dataRevision:0};
+const previewParam=new URLSearchParams(location.search).get('design-preview');
+const designPreview=['balanced','compact','list'].includes(previewParam)?previewParam:null;
+if(designPreview){
+ document.body.dataset.designPreview=designPreview;
+ const sheet=document.createElement('link');sheet.rel='stylesheet';sheet.href='/static/design-preview.css';document.head.append(sheet);
+}
+const state = {demo:Boolean(designPreview)||localStorage.getItem('nexo-demo')==='true', page:'overview', data:{devices:[],alerts:[],samples:[]}, loading:false, selected:null, deleting:null, editing:null, portNaming:null, removingCircuit:null, metricCards:{}, metricView:null, dataRevision:0};
 function badge(status){return `<span class="status-pill ${esc(status)}"><i></i>${esc(labels[status]||status)}</span>`;}
 function formatTime(date){return date?new Date(date).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'Aguardando';}
 function ago(date){if(!date)return 'Aguardando';const seconds=Math.max(0,Math.floor((Date.now()-new Date(date))/1000));return seconds<10?'Agora':seconds<60?`há ${seconds}s`:seconds<3600?`há ${Math.floor(seconds/60)}min`:`há ${Math.floor(seconds/3600)}h`;}
 function toast(message){$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('#toast').hidden=true,4500);}
-async function api(path,options){const response=await fetch(path,options);if(!response.ok){let message='Não foi possível concluir a solicitação.';try{const result=await response.json();message=Array.isArray(result.detail)?result.detail.map(e=>e.msg.replace('Value error, ','')).join(' '):result.detail||message;}catch{}throw new Error(message);}if(options?.method&&!['GET','HEAD'].includes(options.method.toUpperCase()))state.dataRevision++;return response.status===204?null:response.json();}
+async function api(path,options){if(designPreview&&options?.method&&!['GET','HEAD'].includes(options.method.toUpperCase()))throw new Error('Esta prévia usa dados de demonstração. Volte ao monitoramento para alterar sua rede.');const response=await fetch(path,options);if(!response.ok){let message='Não foi possível concluir a solicitação.';try{const result=await response.json();message=Array.isArray(result.detail)?result.detail.map(e=>e.msg.replace('Value error, ','')).join(' '):result.detail||message;}catch{}throw new Error(message);}if(options?.method&&!['GET','HEAD'].includes(options.method.toUpperCase()))state.dataRevision++;return response.status===204?null:response.json();}
 async function load(){if(state.loading)return;state.loading=true;const revision=state.dataRevision;try{const data=await api(`/api/dashboard?demo=${state.demo}`);if(revision!==state.dataRevision)return;state.data=data;$('#connection-error').hidden=true;render();}catch(error){$('#connection-error').textContent='Conexão com o monitor interrompida. Os dados podem estar desatualizados. Tentaremos novamente automaticamente.';$('#connection-error').hidden=false;}finally{state.loading=false;}}
 function orderedDatacoms(devices=state.data.devices){
  return devices.filter(d=>d.kind==='datacom').sort((a,b)=>(a.circuit_position??Infinity)-(b.circuit_position??Infinity)||a.id-b.id);
@@ -265,6 +271,7 @@ function navigate(page){
  render();
 }
 function toggleDemo(value){
+ if(designPreview)return;
  document.querySelectorAll('.port-card details[open], .port-ping details[open], .ssh-diagnostic[open]').forEach(e=>e.open=false);
  window.getSelection()?.removeAllRanges();
  state.demo=value;state.selected=null;localStorage.setItem('nexo-demo',String(value));load();
@@ -307,6 +314,7 @@ function syncDeviceKind(){
  syncInterfaceMode();$('#device-circuit-rows').querySelectorAll('input,select').forEach(input=>input.disabled=!ssh);
 }
 function openAdd(){
+ if(designPreview){toast('Esta prévia usa dados de demonstração. Volte ao monitoramento para adicionar equipamentos.');return;}
  state.editing=null;$('#device-form').reset();renderCircuitDrafts();
  $(`[name="kind"][value="${state.page==='datacoms'?'datacom':'ping'}"]`).checked=true;
  syncDeviceKind();$('#form-error').hidden=true;$('#device-dialog').showModal();
@@ -404,4 +412,11 @@ document.addEventListener('selectionchange',()=>{
 });
 $('#confirm-remove').addEventListener('click',async()=>{$('#confirm-remove').disabled=true;try{await api(state.removingCircuit?`/api/circuits/${state.removingCircuit}`:`/api/devices/${state.deleting}`,{method:'DELETE'});$('#confirm-dialog').close();toast(state.removingCircuit?'Circuito removido.':'Equipamento removido.');state.removingCircuit=null;state.deleting=null;await load();}catch(e){toast(e.message);}finally{$('#confirm-remove').disabled=false;}});
 for(const dialog of document.querySelectorAll('dialog'))dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});
+if(designPreview){
+ const names={balanced:'1 · Equilibrado',compact:'2 · Compacto',list:'3 · Em lista'};
+ $('#demo-banner strong').textContent=`Prévia de visual: ${names[designPreview]}`;
+ $('#demo-banner div>span').textContent='Dados de demonstração · compare os tamanhos dos cartões, das letras e dos valores.';
+ $('#exit-demo').hidden=true;$('#demo-toggle').hidden=true;$('#add-device').hidden=true;
+ navigate('datacoms');
+}
 hydrateIcons();load();setInterval(load,1000);

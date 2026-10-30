@@ -18,6 +18,10 @@ Use somente **um processo/worker** do servidor, para evitar consultas e eventos 
 
 ## Abas do painel
 
+Para comparar propostas de cartões e letras menores, use **Comparar opções de visual** no rodapé ou abra `/static/design-options.html`. Os modelos **1 · Equilibrado**, **2 · Compacto** e **3 · Em lista** usam a interface real com dados de demonstração, sem alterar os equipamentos cadastrados ou salvar uma preferência de visual. O modelo em lista usa linhas no desktop e cartões em telas menores. Escolher um modelo nesta página muda apenas a prévia; a aplicação do visual ao painel principal será feita após a escolha.
+
+Imagens das propostas: [1 · Equilibrado](docs/visual-equilibrado.png), [2 · Compacto](docs/visual-compacto.png) e [3 · Em lista](docs/visual-lista.png).
+
 - **BBU's:** equipamentos cadastrados como ping, com disponibilidade, latência e perdas consecutivas.
 - **Datacoms:** equipamentos SSH, com disponibilidade, portas, descrições e sinais RX/TX.
 - **Visão geral:** resumo conjunto da rede.
