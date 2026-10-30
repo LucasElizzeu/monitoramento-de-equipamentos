@@ -133,7 +133,9 @@ function empty(title,description,action=false){return `<div class="empty-state">
 function deviceAddressHTML(device){
  if(!['ping','siae'].includes(device.kind))return esc(device.host);
  const host=device.host.includes(':')?`[${device.host}]`:device.host;
- return `<a class="device-web-link" href="http://${esc(host)}/" target="_blank" rel="noopener noreferrer" title="Abrir site de ${esc(deviceKindLabel(device))} em nova aba" aria-label="Abrir site de ${esc(device.name)} (${esc(device.host)}) em nova aba"><span>${esc(device.host)}</span>${icon('arrow')}</a>`;
+ const scheme=device.kind==='siae'?(device.siae_scheme||'http'):'http',port=device.kind==='siae'?(device.siae_port||(scheme==='https'?443:80)):80;
+ const suffix=port===(scheme==='https'?443:80)?'':`:${port}`;
+ return `<a class="device-web-link" href="${esc(scheme)}://${esc(host)}${suffix}/" target="_blank" rel="noopener noreferrer" title="Abrir site de ${esc(deviceKindLabel(device))} em nova aba" aria-label="Abrir site de ${esc(device.name)} (${esc(device.host)}) em nova aba"><span>${esc(device.host)}</span>${icon('arrow')}</a>`;
 }
 function renderDevices(){
  const q=$('#search').value.toLowerCase(),filter=$('#state-filter').value,all=pageDevices();
@@ -158,13 +160,14 @@ function bandwidth(value){
 }
 function siaeCardHTML(device){
  const consumption=device.siae_consumption||{};
- const note=consumption.status==='demo'?'Dados simulados · TRX A + TRX B':consumption.total_bps==null?'Consumo aguardando configuração.':'Consumo total = TRX A + TRX B';
- return `<article class="port-card siae-card" data-siae="${device.id}"><div class="port-card-header"><h3>${esc(device.name)}</h3>${badge(device.state)}</div><p class="siae-address ip">${deviceAddressHTML(device)}</p><div class="port-ping-values siae-ping"><span>Latência<strong>${number(device.latency,2)} <small>ms</small></strong></span><span>Perdas<strong>${device.failures} <small>/ 21</small></strong></span></div><small>Ping ${ago(device.last_check)}</small><div class="port-traffic"><div class="traffic-heading">Consumo total</div><div class="traffic-values"><strong>${bandwidth(consumption.total_bps)}</strong></div></div><div class="siae-trx"><span>TRX A<strong>${bandwidth(consumption.trx_a_bps)}</strong></span><span>TRX B<strong>${bandwidth(consumption.trx_b_bps)}</strong></span></div><p class="siae-note ${consumption.total_bps==null?'pending':''}">${esc(note)}</p></article>`;
+ const pair=consumption.status==='demo'||device.siae_interfaces?.length===2;
+ const note=consumption.status==='demo'?'Dados simulados · TRX A + TRX B':consumption.error||consumption.note||(consumption.total_bps==null?'Ative a leitura em Configurar banda.':pair?'RX total = TRX A + TRX B':'RX da interface TRX selecionada.');
+ return `<article class="port-card siae-card" data-siae="${device.id}"><div class="port-card-header"><h3>${esc(device.name)}</h3>${badge(device.state)}</div><p class="siae-address ip">${deviceAddressHTML(device)}</p><div class="port-ping-values siae-ping"><span>Latência<strong>${number(device.latency,2)} <small>ms</small></strong></span><span>Perdas<strong>${device.failures} <small>/ 21</small></strong></span></div><small>Ping ${ago(device.last_check)}</small><div class="port-traffic"><div class="traffic-heading">Consumo total · RX</div><div class="traffic-values"><strong>${bandwidth(consumption.total_bps)}</strong></div></div>${pair?`<div class="siae-trx"><span>TRX A<strong>${bandwidth(consumption.trx_a_bps)}</strong></span><span>TRX B<strong>${bandwidth(consumption.trx_b_bps)}</strong></span></div>`:`<p class="siae-source">Interface TRX · índice ${esc((device.siae_interfaces||[3])[0])}</p>`}${consumption.checked_at?`<small>Banda ${ago(consumption.checked_at)}</small>`:''}<p class="siae-note ${consumption.total_bps==null?'pending':''} ${consumption.status==='error'?'error':''}">${esc(note)}</p><button type="button" class="button secondary siae-configure" data-configure-siae="${device.id}">${icon('edit')}${device.siae_enabled?'Editar banda':'Configurar banda'}</button></article>`;
 }
 function renderSiae(){
  const radios=pageDevices('siae'),q=$('#search').value.toLowerCase(),filter=$('#state-filter').value;
  const visible=radios.filter(d=>(d.name.toLowerCase().includes(q)||d.host.includes(q))&&(filter==='all'||d.state===filter));
- $('#siae-content').innerHTML=visible.length?visible.map(siaeCardHTML).join(''):empty(radios.length?'Nenhum rádio neste filtro':'Cadastre seu primeiro rádio SIAE',radios.length?'Tente outro nome, IP ou status.':'Adicione um rádio para acompanhar seu ping. A coleta dos TRX aguarda a configuração do modelo.',!radios.length);
+ $('#siae-content').innerHTML=visible.length?visible.map(siaeCardHTML).join(''):empty(radios.length?'Nenhum rádio neste filtro':'Cadastre seu primeiro rádio SIAE',radios.length?'Tente outro nome, IP ou status.':'Adicione um rádio para acompanhar ping e banda pela consulta web do ALFOplus2.',!radios.length);
 }
 function utilizationHTML(p){
  if(p.utilization_enabled===false)return '';
@@ -275,7 +278,7 @@ function render(){
  $('#ports-content').querySelectorAll('details').forEach(e=>e.open=openPorts.has(e.dataset.portKey));
  if(state.selected&&$('#detail-dialog').open){if(state.demo){state.detailSamples=samples.filter(s=>s.device_id===state.selected);renderDetail();}else{const selected=state.selected;api(`/api/devices/${selected}/history`).then(history=>{if(state.selected===selected){state.detailSamples=history;renderDetail();}}).catch(()=>{});}}
 }
-const pages={overview:['Visão geral','Tudo conectado. Tudo sob controle.'],bbus:["BBU's","Monitore o ping, a latência e as perdas das suas BBU's."],datacoms:['Datacoms','Disponibilidade, portas e sinais ópticos dos seus Datacoms.'],siae:['Rádios SIAE','Disponibilidade por ping e consumo total dos TRX A + B.'],alerts:['Eventos','Cada mudança na rede, registrada em um só lugar.']};
+const pages={overview:['Visão geral','Tudo conectado. Tudo sob controle.'],bbus:["BBU's","Monitore o ping, a latência e as perdas das suas BBU's."],datacoms:['Datacoms','Disponibilidade, portas e sinais ópticos dos seus Datacoms.'],siae:['Rádios SIAE','Disponibilidade por ping e consumo real de banda do rádio.'],alerts:['Eventos','Cada mudança na rede, registrada em um só lugar.']};
 function navigate(page){
  window.getSelection()?.removeAllRanges();state.page=page;
  document.querySelectorAll('[data-page]').forEach(e=>{
@@ -322,7 +325,7 @@ function syncInterfaceMode(carry=false){
 }
 function syncDeviceKind(){
  const kind=$('[name="kind"]:checked').value,ssh=kind==='datacom';
- $('#siae-setup-note').hidden=kind!=='siae';
+ $('#siae-fields').hidden=kind!=='siae';syncSiaeFields();
  $('#ssh-fields').hidden=!ssh;
  for(const name of ['username','fingerprint'])$(`[name="${name}"]`).required=ssh;
  const keepPassword=state.editing?.kind==='datacom'&&state.editing.has_password;
@@ -333,6 +336,19 @@ function syncDeviceKind(){
  $('#save-device').innerHTML=state.editing?`${icon('check')}Salvar alterações`:`${icon('plus')}Adicionar equipamento`;
  $('[name="name"]').placeholder=ssh?'Ex.: Datacom • Core principal':kind==='siae'?'Ex.: SIAE • Enlace Coari':'Ex.: BBU • Torre central';
  syncInterfaceMode();$('#device-circuit-rows').querySelectorAll('input,select').forEach(input=>input.disabled=!ssh);
+}
+function syncSiaeFields(){
+ const radio=$('[name="kind"]:checked').value==='siae',enabled=$('[name="siae_enabled"]').checked;
+ $('#siae-fields').querySelectorAll('input,select').forEach(input=>input.disabled=!radio||(input.name!=='siae_enabled'&&!enabled));
+ const pair=$('[name="siae_mode"]').value==='pair';
+ $('#siae-interface-b-field').hidden=!pair;
+ $('[name="siae_interface_b"]').disabled=!radio||!enabled||!pair;
+ $('#siae-interface-a-label').textContent=pair?'Índice da interface TRX A':'Índice da interface TRX';
+ for(const name of ['siae_port','siae_poll_interval','siae_interface_a'])$(`[name="${name}"]`).required=radio&&enabled;
+ $('[name="siae_interface_b"]').required=radio&&enabled&&pair;
+ const saved=state.editing?.kind==='siae'&&state.editing.has_siae_session;
+ $('[name="siae_session"]').required=radio&&enabled&&!saved;
+ $('#siae-session-help').textContent=saved?'Já existe uma sessão salva. Deixe vazio para mantê-la ou cole um novo Id para renovar.':'Copie no seu navegador e cole aqui. Não precisa enviar a sessão no chat.';
 }
 function openAdd(){
  if(designPreview){toast('Esta prévia usa dados de demonstração. Volte ao monitoramento para adicionar equipamentos.');return;}
@@ -345,10 +361,13 @@ function openEdit(id){
  const device=state.data.devices.find(d=>d.id===id);
  if(!device)return;
  state.editing=device;$('#device-form').reset();
- for(const name of ['name','host','interval','ping_timeout','interface_type','circuit_position','ssh_port','username','fingerprint','status_command','optics_command','utilization_command']){
+ for(const name of ['name','host','interval','ping_timeout','interface_type','circuit_position','ssh_port','username','fingerprint','status_command','optics_command','utilization_command','siae_scheme','siae_port','siae_poll_interval']){
   $(`[name="${name}"]`).value=device[name]??(name==='ping_timeout'?4:name==='interface_type'?'auto':'');
  }
  $(`[name="kind"][value="${device.kind}"]`).checked=true;
+ $('[name="siae_enabled"]').checked=Boolean(device.siae_enabled);$('#siae-config').open=Boolean(device.siae_enabled);
+ $('[name="siae_scheme"]').value=device.siae_scheme||'http';$('[name="siae_port"]').value=device.siae_port||80;$('[name="siae_poll_interval"]').value=device.siae_poll_interval||2;
+ $('[name="siae_mode"]').value=device.siae_interfaces?.length===2?'pair':'single';$('[name="siae_interface_a"]').value=device.siae_interfaces?.[0]||3;$('[name="siae_interface_b"]').value=device.siae_interfaces?.[1]||'';
  $('[name="ports"]').value=device.ports.join(', ');$('[name="password"]').value='';
  const lists=mixedPortLists(device.ports);$('[name="ten_ports"]').value=lists.ten.join(', ');$('[name="giga_ports"]').value=lists.giga.join(', ');
  renderCircuitDrafts(device.circuits||[]);syncDeviceKind();$('#form-error').hidden=true;$('#device-dialog').showModal();
@@ -360,20 +379,30 @@ function renderDetail(){const d=state.data.devices.find(d=>d.id===state.selected
 }
 async function openDetail(id){state.selected=id;state.detailSamples=[];renderDetail();$('#detail-dialog').showModal();try{state.detailSamples=state.demo?state.data.samples.filter(s=>s.device_id===id):await api(`/api/devices/${id}/history`);if(state.selected===id)renderDetail();}catch(e){toast(e.message);}}
 $('#device-form').addEventListener('input',event=>{if(event.target.matches('[name="ports"],[name="ten_ports"],[name="giga_ports"]'))refreshCircuitPortOptions();});
-$('#device-form').addEventListener('invalid',event=>{if(event.target.closest('#device-circuit-config'))$('#device-circuit-config').open=true;},true);
+$('#device-form').addEventListener('invalid',event=>{if(event.target.closest('#device-circuit-config'))$('#device-circuit-config').open=true;if(event.target.closest('#siae-config'))$('#siae-config').open=true;},true);
 $('#device-form').addEventListener('submit',async event=>{
  event.preventDefault();const form=new FormData(event.target);const d=Object.fromEntries(form);
  d.circuit_position=d.circuit_position===''?null:Number(d.circuit_position.trim().replace(',','.'));d.interval=Number(d.interval);d.ping_timeout=Number(d.ping_timeout);d.ssh_port=Number(d.ssh_port);d.ports=d.interface_type==='mixed'?[...normalizedPorts(d.ten_ports).map(port=>'ten:'+port),...normalizedPorts(d.giga_ports).map(port=>'giga:'+port)]:d.ports.split(',').map(p=>p.trim()).filter(Boolean);delete d.ten_ports;delete d.giga_ports;
+ if(d.kind==='siae'){
+  d.siae_enabled=$('[name="siae_enabled"]').checked;d.siae_scheme=$('[name="siae_scheme"]').value;d.siae_session=$('[name="siae_session"]').value;
+  for(const name of ['siae_port','siae_poll_interval'])d[name]=Number($(`[name="${name}"]`).value);
+  d.siae_interfaces=[$('[name="siae_interface_a"]').value,...($('[name="siae_mode"]').value==='pair'?[$('[name="siae_interface_b"]').value]:[])].map(Number);
+ }
+ for(const name of ['siae_mode','siae_interface_a','siae_interface_b'])delete d[name];
  if(d.kind==='datacom'){d.circuits=readCircuitDrafts();d.circuits_snapshot=Object.fromEntries((state.editing?.circuits||[]).map(c=>[c.id,c.config_version]));}
  const editingId=state.editing?.id;$('#save-device').disabled=true;$('#form-error').hidden=true;
  try{
   await api(editingId?`/api/devices/${editingId}`:'/api/devices',{method:editingId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
-  $('#device-dialog').close();state.editing=null;state.demo=false;localStorage.setItem('nexo-demo','false');
+  $('[name="siae_session"]').value='';$('#device-dialog').close();state.editing=null;state.demo=false;localStorage.setItem('nexo-demo','false');
   navigate(d.kind==='datacom'?'datacoms':d.kind==='siae'?'siae':'bbus');toast(editingId?'Alterações salvas. O monitoramento será atualizado.':'Equipamento adicionado à sua rede.');await load();
  }catch(e){$('#form-error').textContent=e.message;$('#form-error').hidden=false;}finally{$('#save-device').disabled=false;}
 });
  $('[name="interface_type"]').addEventListener('change',()=>syncInterfaceMode(true));
 document.querySelectorAll('[name="kind"]').forEach(el=>el.addEventListener('change',syncDeviceKind));
+for(const name of ['siae_enabled','siae_mode'])$(`[name="${name}"]`).addEventListener('change',syncSiaeFields);
+$('[name="siae_scheme"]').addEventListener('change',()=>{const port=$('[name="siae_port"]');if(['80','443'].includes(port.value))port.value=$('[name="siae_scheme"]').value==='https'?'443':'80';});
+$('#device-dialog').addEventListener('close',()=>$('[name="siae_session"]').value='');
+document.addEventListener('click',event=>{const button=event.target.closest('[data-configure-siae]');if(!button)return;openEdit(Number(button.dataset.configureSiae));if($('#device-dialog').open){$('#siae-config').open=true;$('[name="siae_enabled"]').focus();}});
 document.querySelectorAll('[data-page]').forEach(e=>e.addEventListener('click',()=>navigate(e.dataset.page)));
 $('#all-events').addEventListener('click',()=>navigate('alerts'));
 $('#add-device').addEventListener('click',openAdd);

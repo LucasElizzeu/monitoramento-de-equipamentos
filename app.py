@@ -24,6 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from icmplib import ping
 from pydantic import BaseModel, Field, field_validator
 from remote_ping import RemotePingError, parse_remote_ping, read_remote_ping
+from siae import SiaeError, read_counters, calculate_rates
 
 ROOT = Path(__file__).resolve().parent
 DATA = Path(os.environ.get('MONITOR_DATA_DIR', ROOT / '.data'))
@@ -41,6 +42,7 @@ DB = DATA / 'monitor.db'
 LOCK = threading.RLock()
 STOP = threading.Event()
 INFLIGHT = set()
+SIAE_BASELINES = {}
 IS_WINDOWS = sys.platform == 'win32'
 INTERFACE_LABELS = {
     'auto': 'Automático',
@@ -93,6 +95,17 @@ def init_db():
         CREATE UNIQUE INDEX IF NOT EXISTS circuit_target ON circuits(source_device_id, host);
         ''')
         columns = {row['name'] for row in db.execute('PRAGMA table_info(devices)')}
+        for name, definition in (
+                ('siae_enabled', 'INTEGER NOT NULL DEFAULT 0'),
+                ('siae_scheme', "TEXT NOT NULL DEFAULT 'http'"),
+                ('siae_port', 'INTEGER NOT NULL DEFAULT 80'),
+                ('siae_poll_interval', 'INTEGER NOT NULL DEFAULT 2'),
+                ('siae_interfaces', "TEXT NOT NULL DEFAULT '[3]'"),
+                ('siae_session', "TEXT NOT NULL DEFAULT ''"),
+                ('last_siae', 'REAL NOT NULL DEFAULT 0'),
+                ('siae_data', "TEXT NOT NULL DEFAULT '{}'")):
+            if name not in columns:
+                db.execute(f'ALTER TABLE devices ADD COLUMN {name} {definition}')
         circuit_columns = {row['name'] for row in db.execute('PRAGMA table_info(circuits)')}
         if 'port_identity' not in circuit_columns:
             db.execute('ALTER TABLE circuits ADD COLUMN port_identity TEXT')
@@ -137,6 +150,39 @@ class DeviceInput(BaseModel):
     utilization_command: str = 'show interface utilization'
     circuits: list['CircuitConfigInput'] | None = Field(default=None, max_length=20)
     circuits_snapshot: dict[int, int] | None = None
+    siae_enabled: bool = False
+    siae_scheme: str = 'http'
+    siae_port: int = Field(default=80, ge=1, le=65535)
+    siae_poll_interval: int = Field(default=2, ge=2, le=5)
+    siae_interfaces: list[int] = Field(default_factory=lambda: [3], min_length=1, max_length=2)
+    siae_session: str = Field(default='', max_length=512)
+
+    @field_validator('siae_scheme')
+    @classmethod
+    def valid_siae_scheme(cls, value):
+        if value not in ('http', 'https'):
+            raise ValueError('Escolha HTTP ou HTTPS para o rádio.')
+        return value
+
+    @field_validator('siae_interfaces')
+    @classmethod
+    def valid_siae_interfaces(cls, value):
+        if len(set(value)) != len(value) or any(not 1 <= index <= 2147483647 for index in value):
+            raise ValueError('Use um ou dois índices distintos de interface, maiores que zero.')
+        return value
+
+    @field_validator('siae_session')
+    @classmethod
+    def valid_siae_session(cls, value):
+        value = value.strip()
+        if value.startswith('"') and value.endswith('"'):
+            try:
+                value = json.loads(value)
+            except ValueError:
+                raise ValueError('Cole somente o valor do campo Id da sessão do rádio.') from None
+        if value and not re.fullmatch(r'[!-~]{1,512}', value):
+            raise ValueError('Cole somente o valor do campo Id da sessão do rádio.')
+        return value
 
     @field_validator('circuit_position', mode='before')
     @classmethod
@@ -290,6 +336,9 @@ def siae_consumption(trx_a_bps=None, trx_b_bps=None):
 def public_device(row, db=None):
     value = dict(row)
     value['has_password'] = bool(value.pop('password'))
+    value['has_siae_session'] = bool(value.pop('siae_session'))
+    value['siae_interfaces'] = json.loads(value['siae_interfaces'])
+    telemetry = json.loads(value.pop('siae_data') or '{}')
     value['ping_backend'] = 'Windows ping.exe' if IS_WINDOWS else 'ICMP (icmplib)'
     value['ports'] = json.loads(value['ports'] or '[]')
     value['port_data'] = json.loads(value['port_data'] or '[]')
@@ -300,8 +349,8 @@ def public_device(row, db=None):
         port['display_name'] = port['custom_name'] or port.get('description', '')
     value['ssh_diagnostic'] = json.loads(value['ssh_diagnostic'] or '{}')
     if value['kind'] == 'siae':
-        # Web login and the TRX source still need to be identified for this model.
-        value['siae_consumption'] = dict(siae_consumption(), status='unconfigured')
+        value['siae_consumption'] = telemetry or dict(siae_consumption(),
+            status='warming_up' if value['siae_enabled'] else 'unconfigured')
     def read_circuits(connection):
         return [dict(row) for row in connection.execute(
             'SELECT * FROM circuits WHERE source_device_id=? ORDER BY id', (value['id'],))]
@@ -862,6 +911,66 @@ def run_circuit_check(circuit, device):
             INFLIGHT.discard((circuit['id'], 'circuit'))
 
 
+def check_siae(device):
+    version = device['config_version']
+    device_id = device['id']
+    with LOCK, connect() as db:
+        current = db.execute('SELECT * FROM devices WHERE id=?', (device_id,)).fetchone()
+        if (STOP.is_set() or not current or current['config_version'] != version
+                or current['kind'] != 'siae' or not current['siae_enabled']):
+            return
+    try:
+        session = CIPHER.decrypt(device['siae_session'].encode()).decode()
+        indices = json.loads(device['siae_interfaces'])
+        counters = read_counters(device['host'], device['siae_scheme'], device['siae_port'], session, indices)
+        measured_at = time.monotonic()
+        error = None
+    except Exception as exc:
+        counters = None
+        error = str(exc) if isinstance(exc, SiaeError) else 'Não foi possível ler a banda do rádio. Confira a sessão e a conexão.'
+    with LOCK, connect() as db:
+        current = db.execute('SELECT * FROM devices WHERE id=?', (device_id,)).fetchone()
+        if (STOP.is_set() or not current or current['config_version'] != version
+                or current['kind'] != 'siae' or not current['siae_enabled']):
+            return
+        old_data = json.loads(current['siae_data'] or '{}')
+        recovering = old_data.get('status') == 'error' or old_data.get('recovering', False)
+        data = dict(siae_consumption(), checked_at=now(), status='error' if error else 'warming_up', error=error,
+                    recovering=recovering)
+        if error:
+            SIAE_BASELINES.pop(device_id, None)
+            if old_data.get('status') != 'error':
+                alert(db, current, 'warning', f'Falha ao ler banda SIAE: {error}')
+        else:
+            baseline = SIAE_BASELINES.get(device_id)
+            SIAE_BASELINES[device_id] = (version, measured_at, counters)
+            rates = None
+            if baseline and baseline[0] == version:
+                rates, data['note'] = calculate_rates(baseline[2], counters, measured_at - baseline[1])
+            else:
+                data['note'] = 'Primeira leitura recebida. Aguardando a próxima para calcular a banda.'
+            if rates is not None:
+                data['status'] = 'online'
+                if len(indices) == 1:
+                    data['total_bps'] = rates[indices[0]]['rx_bps']
+                else:
+                    data.update(siae_consumption(rates[indices[0]]['rx_bps'], rates[indices[1]]['rx_bps']))
+                data['interfaces'] = indices
+                if recovering:
+                    alert(db, current, 'success', 'Leitura de banda SIAE restabelecida.')
+                data['recovering'] = False
+        db.execute('UPDATE devices SET siae_data=?,last_siae=? WHERE id=?',
+                   (json.dumps(data), time.time(), device_id))
+
+
+def run_siae_check(device):
+    try:
+        check_siae(device)
+    finally:
+        with LOCK:
+            INFLIGHT.discard((device['id'], 'siae'))
+
+
 def run_check(device, kind):
     try:
         (check_ping if kind == 'ping' else check_ssh)(device)
@@ -872,7 +981,9 @@ def run_check(device, kind):
 
 def monitor():
     # Remote CLI pings can take several seconds; keep them off the local ping pool.
-    with ThreadPoolExecutor(max_workers=12) as pool, ThreadPoolExecutor(max_workers=4) as remote_pool:
+    with (ThreadPoolExecutor(max_workers=12) as pool,
+          ThreadPoolExecutor(max_workers=4) as remote_pool,
+          ThreadPoolExecutor(max_workers=4) as web_pool):
         while not STOP.is_set():
             with LOCK, connect() as db:
                 devices = db.execute('SELECT * FROM devices').fetchall()
@@ -885,6 +996,12 @@ def monitor():
                         if due and key not in INFLIGHT:
                             INFLIGHT.add(key)
                             pool.submit(run_check, device, kind)
+                    key = (device['id'], 'siae')
+                    if (device['kind'] == 'siae' and device['siae_enabled']
+                            and time.time() - device['last_siae'] >= device['siae_poll_interval']
+                            and key not in INFLIGHT):
+                        INFLIGHT.add(key)
+                        web_pool.submit(run_siae_check, device)
                 for row in db.execute('SELECT * FROM circuits'):
                     circuit = dict(row)
                     device = by_id.get(circuit['source_device_id'])
@@ -974,6 +1091,24 @@ def device_values(device, previous=None):
                 raise HTTPException(422, 'Identifique cada porta com ten:1/1/10 ou giga:1/1/19 no modo misto.')
     values['ports'] = json.dumps(values['ports'])
     values['password'] = (CIPHER.encrypt(password.encode()).decode() if password else saved_password) if device.kind == 'datacom' else ''
+    settings = ('siae_enabled', 'siae_scheme', 'siae_port', 'siae_poll_interval', 'siae_interfaces')
+    if previous and previous['kind'] == 'siae' and device.kind == 'siae':
+        for key in settings:
+            if key not in device.model_fields_set:
+                values[key] = json.loads(previous[key]) if key == 'siae_interfaces' else previous[key]
+    saved_session = ''
+    if (previous and previous['kind'] == 'siae' and device.kind == 'siae'
+            and previous['host'] == device.host and previous['siae_scheme'] == values['siae_scheme']
+            and previous['siae_port'] == values['siae_port']):
+        saved_session = previous['siae_session']
+    values['siae_session'] = (CIPHER.encrypt(device.siae_session.encode()).decode()
+                              if device.siae_session else saved_session) if device.kind == 'siae' else ''
+    if device.kind != 'siae':
+        values['siae_enabled'] = False
+    if values['siae_enabled'] and not values['siae_session']:
+        raise HTTPException(422, 'Para ler a banda, cole a sessão Id do rádio. Ao trocar IP, protocolo ou porta, informe uma nova sessão.')
+    values['siae_enabled'] = int(values['siae_enabled'])
+    values['siae_interfaces'] = json.dumps(values['siae_interfaces'])
     return values
 
 
@@ -1052,6 +1187,11 @@ def update_device(device_id: int, device: DeviceInput):
                       (device.host, device.kind, device_id)).fetchone():
             raise HTTPException(409, 'Este IP já está cadastrado para este tipo de monitoramento.')
         changed_target = device.host != previous['host'] or device.kind != previous['kind']
+        changed_siae = changed_target or any(values[key] != previous[key] for key in (
+            'siae_enabled', 'siae_scheme', 'siae_port', 'siae_session', 'siae_interfaces', 'siae_poll_interval'))
+        if changed_siae:
+            values.update(siae_data='{}', last_siae=0)
+            SIAE_BASELINES.pop(device_id, None)
         changed_ssh = any(values[key] != previous[key] for key in
                           ('ssh_port', 'username', 'password', 'fingerprint', 'ports', 'interface_type', 'status_command', 'optics_command', 'utilization_command'))
         if changed_target:
@@ -1062,7 +1202,7 @@ def update_device(device_id: int, device: DeviceInput):
         changed_source = any(values[key] != previous[key] for key in ('host', 'kind', 'ssh_port', 'username', 'password', 'fingerprint'))
         if changed_source:
             db.execute("UPDATE circuits SET state='pending',failures=0,latency=NULL,last_check=NULL,last_poll=0,output='',error=NULL,transmitted=NULL,received=NULL,config_version=config_version+1 WHERE source_device_id=?", (device_id,))
-        values.update(config_version=previous['config_version'] + 1, last_ping=0, last_ssh=0)
+        values.update(config_version=previous['config_version'] + 1, last_ping=0, last_ssh=0, last_siae=0)
         assignments = ','.join(f'{column}=?' for column in values)
         db.execute(f'UPDATE devices SET {assignments} WHERE id=?', (*values.values(), device_id))
         save_device_circuits(db, device_id, device.circuits)
@@ -1151,6 +1291,7 @@ def delete_device(device_id: int):
         if not db.execute('DELETE FROM devices WHERE id=?', (device_id,)).rowcount:
             raise HTTPException(404, 'Equipamento não encontrado.')
         db.execute('DELETE FROM samples WHERE device_id=?', (device_id,))
+        SIAE_BASELINES.pop(device_id, None)
 
 
 @app.get('/api/devices/{device_id}/history')

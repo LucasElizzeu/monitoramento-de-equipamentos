@@ -26,25 +26,32 @@ Imagens das propostas: [1 · Equilibrado](docs/visual-equilibrado.png), [2 · Co
 
 - **BBU's:** equipamentos cadastrados como ping, com disponibilidade, latência e perdas consecutivas.
 - **Datacoms:** equipamentos SSH, com disponibilidade, portas, descrições e sinais RX/TX.
-- **Rádios SIAE:** cadastro separado, ping local e cartões preparados para o consumo dos TRX A + B.
+- **Rádios SIAE:** cadastro separado, ping local e leitura de banda por sessão web do ALFOplus2.
 - **Visão geral:** resumo conjunto da rede.
 - **Eventos:** histórico conjunto de quedas, recuperações e erros de coleta.
 
 Clique no **IP de uma BBU** para abrir seu site em uma nova aba, no endereço `http://IP/`. O atalho aparece na aba **BBU's** e na **Visão geral**, inclusive no celular; o monitoramento continua aberto na aba original. O endereço precisa disponibilizar uma interface web acessível pela sua rede.
 
-## Rádios SIAE — etapa inicial
+## Rádios SIAE — ping e consumo de banda
 
-Na aba **Rádios SIAE**, use **Adicionar rádio SIAE**, informe nome e IP e escolha o intervalo e o tempo máximo do ping. O ping sai do computador que executa o programa, com a mesma regra de alerta na 21ª perda consecutiva. Cadastro, edição, remoção, histórico e listas de status estão disponíveis. O IP também abre a interface web do rádio em outra aba.
+Na aba **Rádios SIAE**, cadastre o nome e o IP do ALFOplus2. O ping sai do computador que executa o programa, com a mesma regra de alerta na 21ª perda consecutiva. Cadastro, edição, remoção, histórico e listas de status estão disponíveis. O IP abre a interface web do rádio em outra aba.
 
-**A coleta automática de consumo ainda não está habilitada.** O modelo informado é **ALFOplus2 — SIAE Microelettronica**, com acesso por IP e login. Os campos **ETH Capacity** de TX/RX dos TRX A/B representam capacidade disponível conforme a modulação; eles não são usados como consumo. O indicador desejado é o **tráfego real**. Falta identificar a página/consulta que fornece essas taxas ou contadores de tráfego, suas unidades e a autenticação necessária. Na rede real, os cartões exibem **—** e **Consumo aguardando configuração**, independentemente de o ping estar online. Esta etapa não acessa a página autenticada nem consulta os TRX do equipamento.
+Para configurar a banda, clique em **Configurar banda** no cartão (ou edite o rádio) e abra **Consumo de banda · ALFOplus2**:
 
-Os cartões estão preparados para mostrar **TRX A**, **TRX B** e **consumo total = A + B**, com as duas taxas normalizadas em bps antes da soma. Um TRX sem leitura mantém o total indisponível. O modo demonstração usa exemplos explícitos de **120 Mbps + 80 Mbps = 200 Mbps**; esses números não são leituras reais.
+1. Marque **Ativar leitura automática de banda**.
+2. Informe **HTTP/HTTPS** e a **porta web** usados para acessar esse rádio. Na captura fornecida, o acesso era HTTP, porta 80. O destino sempre usa o IP cadastrado.
+3. No navegador onde você já entrou no rádio, abra **F12 → Network → Snmp.GetTable → Payload**. Copie **somente o valor de `Id`** e cole em **Sessão da interface web (Id)** diretamente no programa, sem enviar a sessão pelo chat. Não copie o payload inteiro.
+4. Escolha **Uma interface TRX** e o índice **3** para a interface **Gi0/3 — TRX** mostrada na captura. Essa opção mede uma interface, sem inventar leituras separadas para A/B. Verifique na configuração do seu rádio se esse contador representa o enlace completo.
+5. Se o equipamento apresentar **duas interfaces distintas** para os TRX, escolha **TRX A + B** e informe os dois índices correspondentes. O mesmo índice não pode ser usado duas vezes. Nunca some duas cópias do contador agregado.
+6. Mantenha o intervalo de **2 segundos** (aceita 2 a 5) e salve. A primeira consulta prepara a medição; o consumo aparece após a próxima leitura válida.
 
-Os equipamentos existentes aparecem na aba correspondente ao tipo já cadastrado, sem migração do banco ou novo cadastro. Cada aba possui sua lista e seus contadores; o botão de adicionar já seleciona o tipo correspondente. A regra de alerta permanece na 21ª perda consecutiva.
+O coletor usa o POST de leitura **`/Snmp.GetTable`**, com o formato observado: `rad: 1.3.6.1.2.1.2.2.1`, folhas `1,10,11,12,13,14,16,17,18,19` e a sessão `Id`. O campo **Received Octets** é convertido em taxa: **(bytes atuais − bytes anteriores) × 8 ÷ segundos entre as leituras**. O cartão mostra **RX**; no modo com dois índices, soma RX A + RX B. Os campos **ETH Capacity** e a soma de RX + TX não são usados como consumo.
 
-Clique no ícone **!** de qualquer cartão de resumo para abrir a lista correspondente: equipamentos monitorados, online, sem ping, portas inativas ou BBU's instáveis. A lista respeita a aba atual e o total do cartão, independentemente do filtro de busca da tabela. Em **Portas inativas**, aparecem o nome personalizado da porta (ou a descrição original, se não houver nome), Datacom, IP, tipo de interface, número da porta e posição no circuito. Gigabit e Ten com o mesmo número permanecem separados. Portas de Datacoms com erro na consulta SSH não entram no total nem na lista como leituras atuais.
+A sessão é armazenada criptografada no mesmo banco e com a mesma chave de credenciais do programa. As respostas da API nunca retornam seu valor. Deixe o campo vazio na edição para manter a sessão salva. **Não há login automático por usuário e senha nesta etapa**: se o `Id` expirar ou você sair da sessão no rádio, entre novamente na interface e atualize o campo no programa. Ao trocar IP, protocolo ou porta, informe uma nova sessão para evitar enviá-la a outro destino. Desmarcar a coleta interrompe as consultas de banda e mantém o ping independente.
 
-As listas permanecem estáveis para leitura enquanto o monitoramento continua; use **Atualizar lista** para trazer o estado mais recente. O horário da lista aparece no cabeçalho. **Ver equipamento** abre os detalhes do equipamento escolhido. Cartões com total zero também podem ser abertos e mostram uma mensagem de lista vazia. O botão de fechar ou a tecla Esc retornam ao painel.
+Falhas de sessão/conexão, interfaces ausentes ou tabelas incompletas deixam o consumo **indisponível**, sem contar como perda de ping. A leitura e seu horário aparecem no cartão. Os contadores observados são de 32 bits: quando diminuem (reinício ou volta do contador), o programa descarta essa diferença e aguarda a próxima amostra, evitando picos falsos. Intervalos acima de 10 segundos também reiniciam a medição para reduzir ambiguidades. O coletor limita as respostas e não segue redirecionamentos com a sessão. Consultas web usam uma fila separada dos pings.
+
+O modo demonstração usa exemplos explícitos de **120 Mbps + 80 Mbps = 200 Mbps**; esses números não são leituras reais. A validação automatizada usa respostas no formato enviado e um rádio HTTP simulado localmente; a leitura no equipamento físico depende da conexão e de uma sessão válida na sua rede.
 
 ## Ordem do circuito e nomes personalizados
 
