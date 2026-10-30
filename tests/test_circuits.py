@@ -127,7 +127,7 @@ class CircuitTests(unittest.TestCase):
     def test_changing_source_clears_circuit_results_and_rejects_old_probe(self):
         self.record(SUCCESS)
         circuit, parent = self.stored()
-        values = {**self.parent, 'host': '192.0.2.11'}
+        values = {**{k: v for k, v in self.parent.items() if k != 'circuits'}, 'host': '192.0.2.11'}
         updated = app.update_device(self.parent['id'], app.DeviceInput(**values))
         self.assertEqual(updated['circuits'][0]['state'], 'pending')
         self.assertEqual(updated['circuits'][0]['output'], '')
@@ -139,7 +139,7 @@ class CircuitTests(unittest.TestCase):
         self.record(SUCCESS)
         edited = app.update_circuit(self.circuit['id'], app.CircuitInput(name='Circuito renomeado', host='10.91.0.2', interval=60))
         self.assertEqual((edited['state'], edited['latency']), ('online', 3.204))
-        parent = app.update_device(self.parent['id'], app.DeviceInput(**{**self.parent, 'circuit_position': 2.1}))
+        parent = app.update_device(self.parent['id'], app.DeviceInput(**{**{k: v for k, v in self.parent.items() if k != 'circuits'}, 'circuit_position': 2.1}))
         self.assertEqual(parent['circuits'][0]['name'], 'Circuito renomeado')
         self.assertEqual(parent['circuits'][0]['state'], 'online')
         self.assertTrue(parent['has_password'])
@@ -204,6 +204,90 @@ class CircuitTests(unittest.TestCase):
             self.assertNotIn(key, app.INFLIGHT)
         finally:
             app.STOP.clear()
+
+    def config(self, entries, **changes):
+        return app.DeviceInput(**{**self.parent, 'circuits': entries, **changes})
+
+    def test_new_datacom_can_save_its_circuit_ips_in_the_same_request(self):
+        created = app.create_device(app.DeviceInput(name='Origem nova', host='192.0.2.20', kind='datacom',
+            username='test', password='fake', fingerprint='SHA256:'+'a'*43,
+            circuits=[dict(name='Rota A', host='10.91.0.2'), dict(name='Rota B', host='10.91.0.3', interval=60)]))
+        self.assertEqual([c['host'] for c in created['circuits']], ['10.91.0.2', '10.91.0.3'])
+        self.assertTrue(all(c['source_device_id'] == created['id'] for c in created['circuits']))
+        self.assertEqual(len(app.dashboard()['devices'][0]['circuits']), 1)
+
+    def test_parent_config_preserves_existing_id_readings_and_password(self):
+        self.record(SUCCESS)
+        updated = app.update_device(self.parent['id'], self.config([
+            dict(id=self.circuit['id'], name='Rota renomeada', host='10.91.0.2', interval=60),
+            dict(name='Outra rota', host='10.91.0.3')], circuit_position=2.1))
+        first, second = updated['circuits']
+        self.assertEqual((first['id'], first['name'], first['state'], first['latency']),
+                         (self.circuit['id'], 'Rota renomeada', 'online', 3.204))
+        self.assertEqual((second['host'], second['state']), ('10.91.0.3', 'pending'))
+        self.assertTrue(updated['has_password'])
+        self.assertEqual(updated['circuit_position'], 2.1)
+
+    def test_invalid_ip_list_rolls_back_parent_and_circuits_together(self):
+        before, parent_before = self.stored()
+        with self.assertRaises(app.HTTPException) as error:
+            app.update_device(self.parent['id'], self.config([
+                dict(id=before['id'], name='Rota', host='10.91.0.2'),
+                dict(name='Duplicado', host='10.91.0.2')], name='NÃO SALVAR'))
+        self.assertEqual(error.exception.status_code, 422)
+        after, parent_after = self.stored()
+        self.assertEqual(after, before)
+        self.assertEqual(parent_after, parent_before)
+
+    def test_parent_config_cannot_take_or_modify_another_datacom_circuit(self):
+        other = app.create_device(app.DeviceInput(name='Outro', host='192.0.2.21', kind='datacom',
+            username='test', password='fake', fingerprint='SHA256:'+'a'*43))
+        foreign = app.create_circuit(other['id'], app.CircuitInput(name='Circuito alheio', host='10.91.0.3'))
+        with self.assertRaises(app.HTTPException):
+            app.update_device(self.parent['id'], self.config([dict(id=foreign['id'], name='Alterado', host='10.91.0.4')]))
+        self.assertEqual(self.stored()[0]['id'], self.circuit['id'])
+        result = next(d for d in app.dashboard()['devices'] if d['id'] == other['id'])
+        self.assertEqual(result['circuits'][0]['name'], 'Circuito alheio')
+
+    def test_parent_config_supports_address_swaps_and_discards_old_result(self):
+        self.record(SUCCESS)
+        original, source = self.stored()
+        second = app.create_circuit(source['id'], app.CircuitInput(name='Rota B', host='10.91.0.3'))
+        updated = app.update_device(source['id'], self.config([
+            dict(id=original['id'], name=original['name'], host='10.91.0.3'),
+            dict(id=second['id'], name=second['name'], host='10.91.0.2')]))
+        self.assertEqual([(c['id'], c['host']) for c in updated['circuits']],
+                         [(original['id'], '10.91.0.3'), (second['id'], '10.91.0.2')])
+        self.assertTrue(all(c['state'] == 'pending' and not c['output'] for c in updated['circuits']))
+        app.record_circuit(original, source, result=app.parse_remote_ping(original['host'], SUCCESS), output=SUCCESS)
+        self.assertEqual(self.stored()[0]['state'], 'pending')
+
+    def test_empty_ip_list_removes_only_selected_datacom_circuits(self):
+        with app.connect() as db:
+            app.alert(db, self.parent, 'critical', 'Evento preservado do circuito.')
+        other = app.create_device(app.DeviceInput(name='Outro', host='192.0.2.22', kind='datacom',
+            username='test', password='fake', fingerprint='SHA256:'+'a'*43))
+        app.create_circuit(other['id'], app.CircuitInput(name='Outra origem', host='10.91.0.2'))
+        updated = app.update_device(self.parent['id'], self.config([]))
+        self.assertEqual(updated['circuits'], [])
+        self.assertEqual(next(d for d in app.dashboard()['devices'] if d['id'] == other['id'])['circuits'][0]['name'], 'Outra origem')
+        self.assertEqual(app.dashboard()['alerts'][0]['message'], 'Evento preservado do circuito.')
+
+    def test_stale_config_does_not_delete_circuit_added_while_form_was_open(self):
+        old, _ = self.stored()
+        app.create_circuit(self.parent['id'], app.CircuitInput(name='Adicionado depois', host='10.91.0.3'))
+        with self.assertRaises(app.HTTPException) as error:
+            app.update_device(self.parent['id'], self.config([], circuits_snapshot={old['id']: old['config_version']}))
+        self.assertEqual(error.exception.status_code, 409)
+        self.assertEqual(len(app.dashboard()['devices'][0]['circuits']), 2)
+
+    def test_own_source_change_and_config_snapshot_work_together(self):
+        old, _ = self.stored()
+        updated = app.update_device(self.parent['id'], self.config([
+            dict(id=old['id'], name=old['name'], host=old['host'])],
+            host='192.0.2.23', circuits_snapshot={old['id']: old['config_version']}))
+        self.assertEqual(updated['circuits'][0]['state'], 'pending')
+        self.assertEqual(updated['circuits'][0]['id'], old['id'])
 
     def test_host_and_interval_validation_blocks_command_injection(self):
         for host in ['10.91.0.2; reboot','10.91.0.2\nreboot','example.com','10.91.0.2 -c 10000','']:

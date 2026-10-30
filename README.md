@@ -41,12 +41,16 @@ Os nomes são vinculados ao Datacom, ao tipo de interface e ao número da porta;
 
 ## Circuitos: ping a partir do Datacom
 
-Na aba **Datacoms**, cada equipamento tem a seção **Circuitos**:
+Configure os destinos dentro do cadastro do Datacom que deve executar os pings:
 
-1. No Datacom de origem, clique em **Adicionar circuito**.
-2. Informe o nome do circuito e o IP de destino, por exemplo **10.91.0.2**.
+1. Na aba **Datacoms**, clique no **lápis** do Datacom de origem.
+2. Abra **Ping de circuitos (opcional)** e clique em **Adicionar IP**. Informe o destino, por exemplo **10.91.0.2**, e um nome opcional. Se o nome ficar vazio, será usado `Circuito IP`.
 3. Escolha o intervalo entre testes: **30 segundos por padrão**, de 10 a 300 segundos.
-4. Salve. A consulta começa automaticamente; **Testar agora** solicita uma nova leitura.
+4. Repita para os demais IPs e clique em **Salvar alterações**. A consulta começa automaticamente; **Testar agora**, no cartão do circuito, solicita uma nova leitura.
+
+**Somente Datacoms com IPs configurados mostram a seção Circuitos no painel.** Os demais exibem suas portas sem uma caixa vazia ou botão de adicionar circuito. A lista pode ser configurada tanto no cadastro inicial quanto na edição. Circuitos já cadastrados aparecem nesse mesmo formulário. O atalho **Configurar IPs**, nos Datacoms que já têm circuitos, abre a configuração correspondente.
+
+Os IPs são salvos junto com o Datacom: **Cancelar** não altera a lista. **Remover IP** retira uma linha do formulário; a remoção só é aplicada ao salvar. Para desativar todos os circuitos desse Datacom, remova as linhas e salve. A mudança afeta apenas essa origem e preserva os eventos anteriores. Nomes e intervalos podem ser editados sem perder a última leitura; trocar o destino limpa os resultados antigos. Listas inválidas não salvam alterações parciais. Se outra janela alterar os IPs durante a edição, o formulário solicita reabertura para evitar sobrescrever a configuração mais recente.
 
 O servidor conecta por SSH ao Datacom escolhido, verifica a impressão digital cadastrada e executa **`ping IP`**, usando as mesmas credenciais do equipamento. O ping de disponibilidade do próprio Datacom, na lista de equipamentos, continua saindo do computador do programa. Os cartões de circuito testam o destino a partir da rede do Datacom. O mesmo IP pode ser monitorado por Datacoms diferentes; dentro de um Datacom, o IP não pode ser duplicado.
 

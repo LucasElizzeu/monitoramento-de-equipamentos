@@ -131,6 +131,8 @@ class DeviceInput(BaseModel):
     status_command: str = 'show interface link'
     optics_command: str = 'show interface transceivers'
     utilization_command: str = 'show interface utilization'
+    circuits: list['CircuitConfigInput'] | None = Field(default=None, max_length=20)
+    circuits_snapshot: dict[int, int] | None = None
 
     @field_validator('circuit_position', mode='before')
     @classmethod
@@ -244,6 +246,13 @@ class CircuitInput(BaseModel):
     @classmethod
     def valid_host(cls, value):
         return DeviceInput.valid_host(value)
+
+
+class CircuitConfigInput(CircuitInput):
+    id: int | None = Field(default=None, ge=1)
+
+
+DeviceInput.model_rebuild()
 
 
 def port_alias_key(port, interface_type='auto'):
@@ -914,7 +923,9 @@ def dashboard(demo: bool = False):
 
 
 def device_values(device, previous=None):
-    values = device.model_dump()
+    values = device.model_dump(exclude={'circuits', 'circuits_snapshot'})
+    if device.kind != 'datacom' and device.circuits:
+        raise HTTPException(422, 'IPs de circuitos devem ser configurados em um Datacom.')
     password = device.password
     saved_password = previous['password'] if previous and previous['kind'] == 'datacom' else ''
     if device.kind == 'datacom' and (not device.username or not (password or saved_password)
@@ -937,6 +948,45 @@ def device_values(device, previous=None):
     return values
 
 
+def check_circuit_snapshot(db, device_id, snapshot):
+    if snapshot is not None:
+        current = {row['id']: row['config_version'] for row in db.execute('SELECT id,config_version FROM circuits WHERE source_device_id=?', (device_id,))}
+        if current != snapshot:
+            raise HTTPException(409, 'Os IPs deste Datacom foram alterados em outra consulta. Reabra a edição para atualizar a lista.')
+
+
+def save_device_circuits(db, device_id, entries):
+    if entries is None:
+        return  # Older clients that omit the list must keep existing circuits.
+    existing = {row['id']: dict(row) for row in db.execute('SELECT * FROM circuits WHERE source_device_id=?', (device_id,))}
+    ids = [entry.id for entry in entries if entry.id is not None]
+    if len(ids) != len(set(ids)) or any(circuit_id not in existing for circuit_id in ids):
+        raise HTTPException(422, 'A lista contém um circuito inválido ou de outro Datacom. Reabra a edição.')
+    if len({entry.host for entry in entries}) != len(entries):
+        raise HTTPException(422, 'Cada IP deve aparecer apenas uma vez neste Datacom.')
+    total = db.execute('SELECT count(*) FROM circuits').fetchone()[0]
+    if total - len(existing) + len(entries) > 100:
+        raise HTTPException(422, 'Limite de 100 circuitos no painel.')
+    selected = {entry.id: entry for entry in entries if entry.id is not None}
+    # Remove changed targets first so two retained circuits can swap addresses
+    # without violating the unique source/IP index. IDs and version guards stay.
+    for circuit_id, old in existing.items():
+        entry = selected.get(circuit_id)
+        if entry is None or entry.host != old['host']:
+            db.execute('DELETE FROM circuits WHERE id=?', (circuit_id,))
+    for entry in entries:
+        old = existing.get(entry.id)
+        if old is None:
+            db.execute('INSERT INTO circuits(source_device_id,name,host,interval) VALUES(?,?,?,?)',
+                       (device_id, entry.name, entry.host, entry.interval))
+        elif old['host'] != entry.host:
+            db.execute('INSERT INTO circuits(id,source_device_id,name,host,interval,config_version) VALUES(?,?,?,?,?,?)',
+                       (entry.id, device_id, entry.name, entry.host, entry.interval, old['config_version'] + 1))
+        elif old['name'] != entry.name or old['interval'] != entry.interval:
+            db.execute('UPDATE circuits SET name=?,interval=?,last_poll=0,config_version=config_version+1 WHERE id=?',
+                       (entry.name, entry.interval, entry.id))
+
+
 @app.post('/api/devices', status_code=201)
 def create_device(device: DeviceInput):
     values = device_values(device)
@@ -947,6 +997,8 @@ def create_device(device: DeviceInput):
             raise HTTPException(422, 'Limite desta versão: 100 equipamentos.')
         columns = ','.join(values)
         cursor = db.execute(f"INSERT INTO devices({columns}) VALUES({','.join('?' for _ in values)})", tuple(values.values()))
+        check_circuit_snapshot(db, cursor.lastrowid, device.circuits_snapshot)
+        save_device_circuits(db, cursor.lastrowid, device.circuits)
         result = public_device(db.execute('SELECT * FROM devices WHERE id=?', (cursor.lastrowid,)).fetchone(), db)
     return result
 
@@ -957,6 +1009,8 @@ def update_device(device_id: int, device: DeviceInput):
         previous = db.execute('SELECT * FROM devices WHERE id=?', (device_id,)).fetchone()
         if not previous:
             raise HTTPException(404, 'Equipamento não encontrado.')
+        if device.circuits is not None:
+            check_circuit_snapshot(db, device_id, device.circuits_snapshot)
         if device.kind != 'datacom' and db.execute('SELECT 1 FROM circuits WHERE source_device_id=?', (device_id,)).fetchone():
             raise HTTPException(422, 'Remova os circuitos vinculados antes de converter o Datacom em BBU.')
         values = device_values(device, previous)
@@ -981,6 +1035,7 @@ def update_device(device_id: int, device: DeviceInput):
         values.update(config_version=previous['config_version'] + 1, last_ping=0, last_ssh=0)
         assignments = ','.join(f'{column}=?' for column in values)
         db.execute(f'UPDATE devices SET {assignments} WHERE id=?', (*values.values(), device_id))
+        save_device_circuits(db, device_id, device.circuits)
         return public_device(db.execute('SELECT * FROM devices WHERE id=?', (device_id,)).fetchone(), db)
 
 
@@ -1088,7 +1143,7 @@ def demo_dashboard():
             utilization_enabled=True, utilization_output='Banda simulada para demonstração.',
             checked_at=now(), status_output='Exemplo de saída simulada', optics_output='Dados de demonstração') for p in range(1, 5)]
         devices.append(dict(id=i, name=name, host=host, kind=kind, state=state, failures=24 if state == 'offline' else 7 if state == 'unstable' else 0, latency=latency, last_check=now(), interval=5, ports=[p['name'] for p in ports], port_data=ports, ssh_error=None))
-        devices[-1]['circuits'] = [] if kind == 'ping' else [dict(
+        devices[-1]['circuits'] = [] if kind == 'ping' or i != 1 else [dict(
             id=i, source_device_id=i, name='Circuito de demonstração', host=f'10.91.{i-1}.2',
             interval=30, state='online', failures=0, latency=3.204, last_check=now(),
             transmitted=5, received=5, error=None, output='Exemplo de ping simulado: 5 respostas, 0% de perda.')]

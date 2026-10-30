@@ -27,7 +27,7 @@ const esc = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'
 const number = (n,digits=1) => n==null?'—':Number(n).toLocaleString('pt-BR',{maximumFractionDigits:digits});
 const interfaceLabels={'auto':'Automático','mixed':'Gigabit + Ten (portas selecionadas)','gigabit-ethernet':'Gigabit Ethernet','ten-gigabit-ethernet':'Ten Gigabit Ethernet','hundred-gigabit-ethernet':'Hundred Gigabit Ethernet'};
 const labels = {online:'Online',offline:'Sem ping',unstable:'Instável',pending:'Aguardando',error:'Erro de coleta',up:'Ativa',down:'Inativa',unknown:'Não identificado'};
-const state = {demo:localStorage.getItem('nexo-demo')==='true', page:'overview', data:{devices:[],alerts:[],samples:[]}, loading:false, selected:null, deleting:null, editing:null, portNaming:null, circuitEditing:null, removingCircuit:null, metricCards:{}, metricView:null, dataRevision:0};
+const state = {demo:localStorage.getItem('nexo-demo')==='true', page:'overview', data:{devices:[],alerts:[],samples:[]}, loading:false, selected:null, deleting:null, editing:null, portNaming:null, removingCircuit:null, metricCards:{}, metricView:null, dataRevision:0};
 function badge(status){return `<span class="status-pill ${esc(status)}"><i></i>${esc(labels[status]||status)}</span>`;}
 function formatTime(date){return date?new Date(date).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'Aguardando';}
 function ago(date){if(!date)return 'Aguardando';const seconds=Math.max(0,Math.floor((Date.now()-new Date(date))/1000));return seconds<10?'Agora':seconds<60?`há ${seconds}s`:seconds<3600?`há ${Math.floor(seconds/60)}min`:`há ${Math.floor(seconds/3600)}h`;}
@@ -146,8 +146,8 @@ function utilizationHTML(p){
  return `<div class="port-traffic"><div class="traffic-heading">Consumo na porta</div><div class="traffic-values"><span><strong>${bandwidth(p.rx_bps)}</strong>${p.rx_percent!=null?`<small>${number(p.rx_percent,2)}%</small>`:''}</span></div>${note?`<p class="signal-note">${esc(note)}</p>`:''}</div>`;
 }
 function circuitsHTML(d){
- const circuits=d.circuits||[];
- return `<section class="datacom-circuits"><div class="datacom-section-heading"><div><h4>Circuitos <span class="count-chip">${circuits.length}</span></h4><p>Ping a partir de ${esc(d.name)} via SSH.</p></div><button type="button" class="button secondary" data-add-circuit="${d.id}">${icon('plus')}Adicionar circuito</button></div>${circuits.length?`<div class="circuit-cards">${circuits.map(c=>`<article class="circuit-card"><div class="circuit-card-header"><h5>${esc(c.name)}</h5>${badge(c.state)}</div><code class="circuit-target">${esc(c.host)}</code><div class="circuit-values"><span>Latência média<strong>${number(c.latency,2)} <small>ms</small></strong></span><span>Perdas consecutivas<strong>${c.failures} <small>/ 21</small></strong></span></div><p class="circuit-batch">${c.transmitted!=null?`${c.received} de ${c.transmitted} respostas no último teste`:'Aguardando resultado válido'}</p><small class="circuit-time">Último teste: ${ago(c.last_check)} · intervalo ${c.interval}s</small>${c.error?`<p class="ssh-warning">${esc(c.error)} O erro não conta como perda de ping.</p>`:''}<div class="circuit-actions"><button type="button" class="button secondary" data-test-circuit="${c.id}" aria-label="Testar circuito ${esc(c.name)}">${icon('refresh')}Testar agora</button><button type="button" class="icon-button" data-edit-circuit="${c.id}" title="Editar circuito" aria-label="Editar circuito ${esc(c.name)}">${icon('edit')}</button><button type="button" class="icon-button" data-remove-circuit="${c.id}" title="Remover circuito" aria-label="Remover circuito ${esc(c.name)}">${icon('trash')}</button></div><details data-port-key="${d.id}:circuit:${c.id}"><summary>Ver saída do ping</summary><button type="button" class="button secondary output-copy" data-copy-output>${icon('copy')}Copiar saída</button><pre>${esc(c.output||'Aguardando a primeira consulta pelo Datacom.')}</pre></details></article>`).join('')}</div>`:'<p class="circuit-empty">Adicione o nome e o IP do circuito para testá-lo pela rede deste Datacom.</p>'}</section>`;
+ const circuits=d.circuits||[];if(!circuits.length)return '';
+ return `<section class="datacom-circuits"><div class="datacom-section-heading"><div><h4>Circuitos <span class="count-chip">${circuits.length}</span></h4><p>Ping a partir de ${esc(d.name)} via SSH.</p></div><button type="button" class="button secondary" data-configure-circuits="${d.id}">${icon('edit')}Configurar IPs</button></div><div class="circuit-cards">${circuits.map(c=>`<article class="circuit-card"><div class="circuit-card-header"><h5>${esc(c.name)}</h5>${badge(c.state)}</div><code class="circuit-target">${esc(c.host)}</code><div class="circuit-values"><span>Latência média<strong>${number(c.latency,2)} <small>ms</small></strong></span><span>Perdas consecutivas<strong>${c.failures} <small>/ 21</small></strong></span></div><p class="circuit-batch">${c.transmitted!=null?`${c.received} de ${c.transmitted} respostas no último teste`:'Aguardando resultado válido'}</p><small class="circuit-time">Último teste: ${ago(c.last_check)} · intervalo ${c.interval}s</small>${c.error?`<p class="ssh-warning">${esc(c.error)} O erro não conta como perda de ping.</p>`:''}<div class="circuit-actions"><button type="button" class="button secondary" data-test-circuit="${c.id}" aria-label="Testar circuito ${esc(c.name)}">${icon('refresh')}Testar agora</button><button type="button" class="icon-button" data-edit-circuit="${c.id}" title="Editar circuito" aria-label="Editar circuito ${esc(c.name)}">${icon('edit')}</button><button type="button" class="icon-button" data-remove-circuit="${c.id}" title="Remover circuito" aria-label="Remover circuito ${esc(c.name)}">${icon('trash')}</button></div><details data-port-key="${d.id}:circuit:${c.id}"><summary>Ver saída do ping</summary><button type="button" class="button secondary output-copy" data-copy-output>${icon('copy')}Copiar saída</button><pre>${esc(c.output||'Aguardando a primeira consulta pelo Datacom.')}</pre></details></article>`).join('')}</div></section>`;
 }
 function datacomHTML(d){
  const ports=d.ssh_error?[]:d.port_data;
@@ -157,28 +157,39 @@ function findCircuit(id){
  for(const device of state.data.devices){const circuit=(device.circuits||[]).find(c=>c.id===id);if(circuit)return{device,circuit};}
  return null;
 }
-function openCircuitForm(deviceId,circuitId=null){
- if(state.demo){toast('Saia da demonstração para cadastrar circuitos da sua rede.');return;}
- const device=state.data.devices.find(d=>d.id===deviceId&&d.kind==='datacom');if(!device)return;
- const circuit=(device.circuits||[]).find(c=>c.id===circuitId);
- state.circuitEditing={deviceId,circuitId};$('#circuit-form').reset();
- $('#circuit-dialog-title').textContent=circuit?'Editar circuito':'Adicionar circuito';
- $('#circuit-dialog-context').textContent=`Origem do ping: ${device.name} · ${device.host}`;
- for(const field of ['name','host','interval'])$(`#circuit-form [name="${field}"]`).value=circuit?.[field]??(field==='interval'?30:'');
- $('#circuit-form-error').hidden=true;$('#circuit-dialog').showModal();
+function updateCircuitDraftCount(){
+ $('#device-circuit-count').textContent=$('#device-circuit-rows').children.length;
 }
-document.querySelectorAll('.close-circuit').forEach(e=>e.addEventListener('click',()=>$('#circuit-dialog').close()));
-$('#circuit-form').addEventListener('submit',async event=>{
- event.preventDefault();const target=state.circuitEditing;if(!target)return;
- const data=Object.fromEntries(new FormData(event.target));data.interval=Number(data.interval);
- $('#save-circuit').disabled=true;$('#circuit-form-error').hidden=true;
- try{await api(target.circuitId?`/api/circuits/${target.circuitId}`:`/api/devices/${target.deviceId}/circuits`,{method:target.circuitId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});$('#circuit-dialog').close();state.circuitEditing=null;await load();toast('Circuito salvo. O ping será executado pelo Datacom.');}
- catch(error){$('#circuit-form-error').textContent=error.message;$('#circuit-form-error').hidden=false;}
- finally{$('#save-circuit').disabled=false;}
+function appendCircuitDraft(circuit={}){
+ const row=document.createElement('div');row.className='device-circuit-row';row.dataset.circuitId=circuit.id??'';
+ row.innerHTML=`<div class="form-grid"><label class="field">IP do circuito<input data-circuit-field="host" required placeholder="Ex.: 10.91.0.2" autocomplete="off" value="${esc(circuit.host||'')}"></label><label class="field">Nome (opcional)<input data-circuit-field="name" maxlength="80" placeholder="Ex.: Circuito Anori" value="${esc(circuit.name||'')}"></label></div><div class="device-circuit-row-footer"><label class="field">Intervalo dos testes (segundos)<input data-circuit-field="interval" type="number" min="10" max="300" required value="${circuit.interval??30}"></label><button type="button" class="button secondary remove-device-circuit" aria-label="Remover IP desta configuração">${icon('trash')}Remover IP</button></div>`;
+ row.querySelectorAll('input').forEach(input=>input.disabled=$('[name="kind"]:checked').value!=='datacom');
+ $('#device-circuit-rows').append(row);updateCircuitDraftCount();return row;
+}
+function renderCircuitDrafts(circuits=[]){
+ $('#device-circuit-rows').replaceChildren();circuits.forEach(appendCircuitDraft);updateCircuitDraftCount();$('#device-circuit-config').open=circuits.length>0;
+}
+function readCircuitDrafts(){
+ return [...$('#device-circuit-rows').children].map(row=>{
+  const host=row.querySelector('[data-circuit-field="host"]').value.trim();
+  const name=row.querySelector('[data-circuit-field="name"]').value.trim()||`Circuito ${host}`;
+  const interval=Number(row.querySelector('[data-circuit-field="interval"]').value);
+  return {...(row.dataset.circuitId?{id:Number(row.dataset.circuitId)}:{}),host,name,interval};
+ });
+}
+function configureCircuitIps(deviceId,circuitId=null){
+ openEdit(deviceId);if(!$('#device-dialog').open||state.editing?.id!==deviceId)return;
+ $('#device-circuit-config').open=true;
+ requestAnimationFrame(()=>{const row=circuitId?$(`#device-circuit-rows [data-circuit-id="${circuitId}"]`):null;const target=row?.querySelector('[data-circuit-field="host"]')||$('#device-circuit-config');target.scrollIntoView({block:'center'});if(row)target.focus({preventScroll:true});});
+}
+$('#add-device-circuit').addEventListener('click',()=>{
+ if($('#device-circuit-rows').children.length>=20){toast('Limite de 20 IPs por Datacom.');return;}
+ const row=appendCircuitDraft();row.querySelector('[data-circuit-field="host"]').focus();
 });
+$('#device-circuit-rows').addEventListener('click',event=>{const remove=event.target.closest('.remove-device-circuit');if(remove){remove.closest('.device-circuit-row').remove();updateCircuitDraftCount();}});
 document.addEventListener('click',async event=>{
- const add=event.target.closest('[data-add-circuit]');if(add)openCircuitForm(Number(add.dataset.addCircuit));
- const edit=event.target.closest('[data-edit-circuit]');if(edit){const target=findCircuit(Number(edit.dataset.editCircuit));if(target)openCircuitForm(target.device.id,target.circuit.id);}
+ const config=event.target.closest('[data-configure-circuits]');if(config)configureCircuitIps(Number(config.dataset.configureCircuits));
+ const edit=event.target.closest('[data-edit-circuit]');if(edit){const target=findCircuit(Number(edit.dataset.editCircuit));if(target)configureCircuitIps(target.device.id,target.circuit.id);}
  const test=event.target.closest('[data-test-circuit]');if(test){if(state.demo){toast('Os circuitos da demonstração são exemplos.');return;}test.disabled=true;try{await api(`/api/circuits/${Number(test.dataset.testCircuit)}/check`,{method:'POST'});toast('Teste solicitado ao Datacom. Aguarde alguns segundos pelo resultado.');}catch(error){toast(error.message);}finally{test.disabled=false;}}
  const remove=event.target.closest('[data-remove-circuit]');if(remove){if(state.demo){toast('Os circuitos da demonstração são exemplos.');return;}const target=findCircuit(Number(remove.dataset.removeCircuit));if(!target)return;state.removingCircuit=target.circuit.id;state.deleting=null;$('#confirm-dialog h2').textContent='Remover circuito?';$('#confirm-description').textContent=`Remover ${target.circuit.name} (${target.circuit.host}) de ${target.device.name}?`;$('#confirm-note').textContent='O monitoramento deste circuito será removido. Os eventos anteriores serão preservados.';$('#confirm-dialog').showModal();}
 });
@@ -257,10 +268,10 @@ function syncDeviceKind(){
  $('#device-dialog-title').textContent=state.editing?(ssh?'Editar Datacom':'Editar BBU'):(ssh?'Adicionar Datacom':'Adicionar BBU');
  $('#save-device').innerHTML=state.editing?`${icon('check')}Salvar alterações`:`${icon('plus')}Adicionar equipamento`;
  $('[name="name"]').placeholder=ssh?'Ex.: Datacom • Core principal':'Ex.: BBU • Torre central';
- syncInterfaceMode();
+ syncInterfaceMode();$('#device-circuit-rows').querySelectorAll('input').forEach(input=>input.disabled=!ssh);
 }
 function openAdd(){
- state.editing=null;$('#device-form').reset();
+ state.editing=null;$('#device-form').reset();renderCircuitDrafts();
  $(`[name="kind"][value="${state.page==='datacoms'?'datacom':'ping'}"]`).checked=true;
  syncDeviceKind();$('#form-error').hidden=true;$('#device-dialog').showModal();
 }
@@ -275,7 +286,7 @@ function openEdit(id){
  $(`[name="kind"][value="${device.kind}"]`).checked=true;
  $('[name="ports"]').value=device.ports.join(', ');$('[name="password"]').value='';
  const lists=mixedPortLists(device.ports);$('[name="ten_ports"]').value=lists.ten.join(', ');$('[name="giga_ports"]').value=lists.giga.join(', ');
- syncDeviceKind();$('#form-error').hidden=true;$('#device-dialog').showModal();
+ renderCircuitDrafts(device.circuits||[]);syncDeviceKind();$('#form-error').hidden=true;$('#device-dialog').showModal();
 }
 function renderDetail(){const d=state.data.devices.find(d=>d.id===state.selected);if(!d){$('#detail-dialog').close();state.selected=null;return;}
  const opened=[...$('#detail-content').querySelectorAll('details')].map(e=>e.open);
@@ -283,9 +294,11 @@ function renderDetail(){const d=state.data.devices.find(d=>d.id===state.selected
  $('#detail-content').querySelectorAll('details').forEach((e,i)=>e.open=Boolean(opened[i]));chart(state.detailSamples||[], $('#detail-chart'));
 }
 async function openDetail(id){state.selected=id;state.detailSamples=[];renderDetail();$('#detail-dialog').showModal();try{state.detailSamples=state.demo?state.data.samples.filter(s=>s.device_id===id):await api(`/api/devices/${id}/history`);if(state.selected===id)renderDetail();}catch(e){toast(e.message);}}
+$('#device-form').addEventListener('invalid',event=>{if(event.target.closest('#device-circuit-config'))$('#device-circuit-config').open=true;},true);
 $('#device-form').addEventListener('submit',async event=>{
  event.preventDefault();const form=new FormData(event.target);const d=Object.fromEntries(form);
  d.circuit_position=d.circuit_position===''?null:Number(d.circuit_position.trim().replace(',','.'));d.interval=Number(d.interval);d.ping_timeout=Number(d.ping_timeout);d.ssh_port=Number(d.ssh_port);d.ports=d.interface_type==='mixed'?[...normalizedPorts(d.ten_ports).map(port=>'ten:'+port),...normalizedPorts(d.giga_ports).map(port=>'giga:'+port)]:d.ports.split(',').map(p=>p.trim()).filter(Boolean);delete d.ten_ports;delete d.giga_ports;
+ if(d.kind==='datacom'){d.circuits=readCircuitDrafts();d.circuits_snapshot=Object.fromEntries((state.editing?.circuits||[]).map(c=>[c.id,c.config_version]));}
  const editingId=state.editing?.id;$('#save-device').disabled=true;$('#form-error').hidden=true;
  try{
   await api(editingId?`/api/devices/${editingId}`:'/api/devices',{method:editingId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
