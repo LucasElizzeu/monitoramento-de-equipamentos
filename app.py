@@ -23,6 +23,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from icmplib import ping
 from pydantic import BaseModel, Field, field_validator
+from remote_ping import RemotePingError, parse_remote_ping, read_remote_ping
 
 ROOT = Path(__file__).resolve().parent
 DATA = Path(os.environ.get('MONITOR_DATA_DIR', ROOT / '.data'))
@@ -57,6 +58,7 @@ def now():
 def connect():
     connection = sqlite3.connect(DB, timeout=15)
     connection.row_factory = sqlite3.Row
+    connection.execute('PRAGMA foreign_keys=ON')
     return connection
 
 
@@ -79,6 +81,15 @@ def init_db():
         CREATE TABLE IF NOT EXISTS alerts (
           id INTEGER PRIMARY KEY, device_id INTEGER NOT NULL, device_name TEXT NOT NULL,
           at TEXT NOT NULL, level TEXT NOT NULL, message TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS circuits (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          source_device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+          name TEXT NOT NULL, host TEXT NOT NULL, interval INTEGER NOT NULL DEFAULT 30,
+          state TEXT NOT NULL DEFAULT 'pending', failures INTEGER NOT NULL DEFAULT 0,
+          latency REAL, last_check TEXT, last_poll REAL NOT NULL DEFAULT 0,
+          output TEXT NOT NULL DEFAULT '', error TEXT,
+          transmitted INTEGER, received INTEGER, config_version INTEGER NOT NULL DEFAULT 0);
+        CREATE UNIQUE INDEX IF NOT EXISTS circuit_target ON circuits(source_device_id, host);
         ''')
         columns = {row['name'] for row in db.execute('PRAGMA table_info(devices)')}
         if 'config_version' not in columns:
@@ -219,13 +230,29 @@ class PortAliasInput(BaseModel):
         return value
 
 
+class CircuitInput(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    host: str
+    interval: int = Field(default=30, ge=10, le=300)
+
+    @field_validator('name')
+    @classmethod
+    def clean_name(cls, value):
+        return DeviceInput.clean_name(value)
+
+    @field_validator('host')
+    @classmethod
+    def valid_host(cls, value):
+        return DeviceInput.valid_host(value)
+
+
 def port_alias_key(port, interface_type='auto'):
     number = re.search(r'(?<![\d/])\d+/\d+/\d+(?![\d/])', port)
     prefix_family = interface_family(port[:number.start()]) if number else ''
     return f"{prefix_family or interface_type}:{number.group() if number else port}"
 
 
-def public_device(row):
+def public_device(row, db=None):
     value = dict(row)
     value['has_password'] = bool(value.pop('password'))
     value['ping_backend'] = 'Windows ping.exe' if IS_WINDOWS else 'ICMP (icmplib)'
@@ -237,6 +264,14 @@ def public_device(row):
         port['custom_name'] = value['port_aliases'].get(key, '')
         port['display_name'] = port['custom_name'] or port.get('description', '')
     value['ssh_diagnostic'] = json.loads(value['ssh_diagnostic'] or '{}')
+    def read_circuits(connection):
+        return [dict(row) for row in connection.execute(
+            'SELECT * FROM circuits WHERE source_device_id=? ORDER BY id', (value['id'],))]
+    if db is None:
+        with connect() as connection:
+            value['circuits'] = read_circuits(connection)
+    else:
+        value['circuits'] = read_circuits(db)
     return value
 
 
@@ -716,6 +751,79 @@ def check_ssh(device):
                        (time.time(), json.dumps(ports), device['id']))
 
 
+def record_circuit(circuit, device, result=None, error=None, output='', started_at=None):
+    with LOCK, connect() as db:
+        current = db.execute('SELECT * FROM circuits WHERE id=?', (circuit['id'],)).fetchone()
+        parent = db.execute('SELECT * FROM devices WHERE id=?', (device['id'],)).fetchone()
+        if (not current or not parent or parent['kind'] != 'datacom'
+                or current['source_device_id'] != device['id']
+                or current['config_version'] != circuit['config_version']
+                or parent['config_version'] != device['config_version']):
+            return
+        at = now()
+        polled = started_at if started_at is not None else time.time()
+        if error:
+            if current['error'] != error:
+                alert(db, parent, 'warning', f"Circuito {current['name']} ({current['host']}): {error}")
+            db.execute("UPDATE circuits SET state='error',error=?,last_check=?,last_poll=?,output=?,latency=NULL,transmitted=NULL,received=NULL WHERE id=?",
+                       (error, at, polled, output[:16000], circuit['id']))
+            return
+        failures = current['failures']
+        for success in result['probes']:
+            if success:
+                if failures > 20:
+                    alert(db, parent, 'success', f"Circuito {current['name']} ({current['host']}) voltou a responder pelo Datacom.")
+                failures = 0
+            else:
+                failures += 1
+                if failures == 21:
+                    alert(db, parent, 'critical', f"Circuito {current['name']} ({current['host']}): sem ping pelo Datacom, após 21 perdas consecutivas.")
+        status = 'offline' if failures > 20 else 'unstable' if failures else 'online'
+        db.execute('UPDATE circuits SET state=?,failures=?,latency=?,last_check=?,last_poll=?,output=?,error=NULL,transmitted=?,received=? WHERE id=?',
+                   (status, failures, result['latency'], at, polled, output[:16000], result['transmitted'], result['received'], circuit['id']))
+        db.execute('DELETE FROM alerts WHERE id NOT IN (SELECT id FROM alerts ORDER BY id DESC LIMIT 1000)')
+
+
+def check_circuit(circuit, device):
+    with LOCK, connect() as db:
+        current = db.execute('SELECT * FROM circuits WHERE id=?', (circuit['id'],)).fetchone()
+        source = db.execute('SELECT * FROM devices WHERE id=?', (device['id'],)).fetchone()
+        if (not current or not source or source['kind'] != 'datacom'
+                or current['source_device_id'] != device['id']
+                or current['config_version'] != circuit['config_version']
+                or source['config_version'] != device['config_version']):
+            return
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(VerifyFingerprint(device['fingerprint']))
+    started_at, output = time.time(), ''
+    try:
+        client.connect(device['host'], port=device['ssh_port'], username=device['username'],
+                       password=CIPHER.decrypt(device['password'].encode()).decode(), timeout=6,
+                       auth_timeout=6, banner_timeout=6, look_for_keys=False, allow_agent=False)
+        output = read_remote_ping(client, circuit['host'], cancelled=STOP.is_set)
+        result = parse_remote_ping(circuit['host'], output)
+    except RemotePingError as exc:
+        if not STOP.is_set():
+            record_circuit(circuit, device, error=str(exc), output=exc.output, started_at=started_at)
+    except paramiko.AuthenticationException:
+        record_circuit(circuit, device, error='Autenticação SSH recusada no Datacom de origem.', started_at=started_at)
+    except Exception:
+        record_circuit(circuit, device, error='Falha na consulta SSH. Verifique o acesso e a chave do Datacom de origem.', started_at=started_at)
+    else:
+        record_circuit(circuit, device, result=result, output=output, started_at=started_at)
+    finally:
+        client.close()
+
+
+def run_circuit_check(circuit, device):
+    try:
+        if not STOP.is_set():
+            check_circuit(circuit, device)
+    finally:
+        with LOCK:
+            INFLIGHT.discard((circuit['id'], 'circuit'))
+
+
 def run_check(device, kind):
     try:
         (check_ping if kind == 'ping' else check_ssh)(device)
@@ -725,10 +833,12 @@ def run_check(device, kind):
 
 
 def monitor():
-    with ThreadPoolExecutor(max_workers=12) as pool:
+    # Remote CLI pings can take several seconds; keep them off the local ping pool.
+    with ThreadPoolExecutor(max_workers=12) as pool, ThreadPoolExecutor(max_workers=4) as remote_pool:
         while not STOP.is_set():
             with LOCK, connect() as db:
                 devices = db.execute('SELECT * FROM devices').fetchall()
+                by_id = {row['id']: dict(row) for row in devices}
                 for row in devices:
                     device = dict(row)
                     for kind, due in [('ping', time.time() - device['last_ping'] >= device['interval']),
@@ -737,6 +847,13 @@ def monitor():
                         if due and key not in INFLIGHT:
                             INFLIGHT.add(key)
                             pool.submit(run_check, device, kind)
+                for row in db.execute('SELECT * FROM circuits'):
+                    circuit = dict(row)
+                    device = by_id.get(circuit['source_device_id'])
+                    key = (circuit['id'], 'circuit')
+                    if device and device['kind'] == 'datacom' and time.time() - circuit['last_poll'] >= circuit['interval'] and key not in INFLIGHT:
+                        INFLIGHT.add(key)
+                        remote_pool.submit(run_circuit_check, circuit, device)
             STOP.wait(0.1)
 
 
@@ -752,7 +869,7 @@ async def lifespan(app):
     thread.join(timeout=15)
 
 
-app = FastAPI(title='Nexo • Monitoramento de rede', lifespan=lifespan)
+app = FastAPI(title='VELOSONET MONITORAMENTO', lifespan=lifespan)
 app.mount('/static', StaticFiles(directory=ROOT / 'static'), name='static')
 
 
@@ -789,7 +906,7 @@ def dashboard(demo: bool = False):
     if demo:
         return demo_dashboard()
     with LOCK, connect() as db:
-        devices = [public_device(row) for row in db.execute('SELECT * FROM devices ORDER BY id')]
+        devices = [public_device(row, db) for row in db.execute('SELECT * FROM devices ORDER BY id')]
         by_id = {device['id']: device for device in devices}
         events = [public_alert(row, by_id) for row in db.execute('SELECT * FROM alerts ORDER BY id DESC LIMIT 60')]
         samples = [dict(row) for row in db.execute('SELECT * FROM samples ORDER BY id DESC LIMIT 720')][::-1]
@@ -830,7 +947,7 @@ def create_device(device: DeviceInput):
             raise HTTPException(422, 'Limite desta versão: 100 equipamentos.')
         columns = ','.join(values)
         cursor = db.execute(f"INSERT INTO devices({columns}) VALUES({','.join('?' for _ in values)})", tuple(values.values()))
-        result = public_device(db.execute('SELECT * FROM devices WHERE id=?', (cursor.lastrowid,)).fetchone())
+        result = public_device(db.execute('SELECT * FROM devices WHERE id=?', (cursor.lastrowid,)).fetchone(), db)
     return result
 
 
@@ -840,6 +957,8 @@ def update_device(device_id: int, device: DeviceInput):
         previous = db.execute('SELECT * FROM devices WHERE id=?', (device_id,)).fetchone()
         if not previous:
             raise HTTPException(404, 'Equipamento não encontrado.')
+        if device.kind != 'datacom' and db.execute('SELECT 1 FROM circuits WHERE source_device_id=?', (device_id,)).fetchone():
+            raise HTTPException(422, 'Remova os circuitos vinculados antes de converter o Datacom em BBU.')
         values = device_values(device, previous)
         if 'circuit_position' not in device.model_fields_set:
             values['circuit_position'] = previous['circuit_position']
@@ -856,10 +975,63 @@ def update_device(device_id: int, device: DeviceInput):
             values.update(state='pending', failures=0, latency=None, last_check=None, ping_detail=None)
         if changed_target or changed_ssh:
             values.update(port_data='[]', ssh_error=None, ssh_diagnostic='{}')
+        changed_source = any(values[key] != previous[key] for key in ('host', 'kind', 'ssh_port', 'username', 'password', 'fingerprint'))
+        if changed_source:
+            db.execute("UPDATE circuits SET state='pending',failures=0,latency=NULL,last_check=NULL,last_poll=0,output='',error=NULL,transmitted=NULL,received=NULL,config_version=config_version+1 WHERE source_device_id=?", (device_id,))
         values.update(config_version=previous['config_version'] + 1, last_ping=0, last_ssh=0)
         assignments = ','.join(f'{column}=?' for column in values)
         db.execute(f'UPDATE devices SET {assignments} WHERE id=?', (*values.values(), device_id))
-        return public_device(db.execute('SELECT * FROM devices WHERE id=?', (device_id,)).fetchone())
+        return public_device(db.execute('SELECT * FROM devices WHERE id=?', (device_id,)).fetchone(), db)
+
+
+@app.post('/api/devices/{device_id}/circuits', status_code=201)
+def create_circuit(device_id: int, entry: CircuitInput):
+    with LOCK, connect() as db:
+        parent = db.execute('SELECT * FROM devices WHERE id=?', (device_id,)).fetchone()
+        if not parent:
+            raise HTTPException(404, 'Datacom não encontrado.')
+        if parent['kind'] != 'datacom':
+            raise HTTPException(422, 'Selecione um Datacom como origem do ping.')
+        if db.execute('SELECT id FROM circuits WHERE source_device_id=? AND host=?', (device_id, entry.host)).fetchone():
+            raise HTTPException(409, 'Este IP já está monitorado por este Datacom.')
+        if db.execute('SELECT count(*) FROM circuits').fetchone()[0] >= 100 or db.execute('SELECT count(*) FROM circuits WHERE source_device_id=?', (device_id,)).fetchone()[0] >= 20:
+            raise HTTPException(422, 'Limite de 20 circuitos por Datacom e 100 circuitos no painel.')
+        cursor = db.execute('INSERT INTO circuits(source_device_id,name,host,interval) VALUES(?,?,?,?)',
+                            (device_id, entry.name, entry.host, entry.interval))
+        return dict(db.execute('SELECT * FROM circuits WHERE id=?', (cursor.lastrowid,)).fetchone())
+
+
+@app.put('/api/circuits/{circuit_id}')
+def update_circuit(circuit_id: int, entry: CircuitInput):
+    with LOCK, connect() as db:
+        current = db.execute('SELECT * FROM circuits WHERE id=?', (circuit_id,)).fetchone()
+        if not current:
+            raise HTTPException(404, 'Circuito não encontrado.')
+        if db.execute('SELECT id FROM circuits WHERE source_device_id=? AND host=? AND id<>?',
+                      (current['source_device_id'], entry.host, circuit_id)).fetchone():
+            raise HTTPException(409, 'Este IP já está monitorado por este Datacom.')
+        db.execute('UPDATE circuits SET name=?,host=?,interval=?,last_poll=0,config_version=config_version+1 WHERE id=?',
+                   (entry.name, entry.host, entry.interval, circuit_id))
+        if current['host'] != entry.host:
+            db.execute("UPDATE circuits SET state='pending',failures=0,latency=NULL,last_check=NULL,output='',error=NULL,transmitted=NULL,received=NULL WHERE id=?", (circuit_id,))
+        return dict(db.execute('SELECT * FROM circuits WHERE id=?', (circuit_id,)).fetchone())
+
+
+@app.delete('/api/circuits/{circuit_id}', status_code=204)
+def delete_circuit(circuit_id: int):
+    with LOCK, connect() as db:
+        if not db.execute('SELECT id FROM circuits WHERE id=?', (circuit_id,)).fetchone():
+            raise HTTPException(404, 'Circuito não encontrado.')
+        db.execute('DELETE FROM circuits WHERE id=?', (circuit_id,))
+
+
+@app.post('/api/circuits/{circuit_id}/check', status_code=202)
+def request_circuit_check(circuit_id: int):
+    with LOCK, connect() as db:
+        if not db.execute('SELECT id FROM circuits WHERE id=?', (circuit_id,)).fetchone():
+            raise HTTPException(404, 'Circuito não encontrado.')
+        db.execute('UPDATE circuits SET last_poll=0 WHERE id=?', (circuit_id,))
+    return {'status': 'scheduled'}
 
 
 @app.patch('/api/devices/{device_id}/port-name')
@@ -884,7 +1056,7 @@ def update_port_alias(device_id: int, entry: PortAliasInput):
         else:
             aliases.pop(key, None)
         db.execute('UPDATE devices SET port_aliases=? WHERE id=?', (json.dumps(aliases), device_id))
-        return public_device(db.execute('SELECT * FROM devices WHERE id=?', (device_id,)).fetchone())
+        return public_device(db.execute('SELECT * FROM devices WHERE id=?', (device_id,)).fetchone(), db)
 
 
 @app.delete('/api/devices/{device_id}', status_code=204)
@@ -916,6 +1088,10 @@ def demo_dashboard():
             utilization_enabled=True, utilization_output='Banda simulada para demonstração.',
             checked_at=now(), status_output='Exemplo de saída simulada', optics_output='Dados de demonstração') for p in range(1, 5)]
         devices.append(dict(id=i, name=name, host=host, kind=kind, state=state, failures=24 if state == 'offline' else 7 if state == 'unstable' else 0, latency=latency, last_check=now(), interval=5, ports=[p['name'] for p in ports], port_data=ports, ssh_error=None))
+        devices[-1]['circuits'] = [] if kind == 'ping' else [dict(
+            id=i, source_device_id=i, name='Circuito de demonstração', host=f'10.91.{i-1}.2',
+            interval=30, state='online', failures=0, latency=3.204, last_check=now(),
+            transmitted=5, received=5, error=None, output='Exemplo de ping simulado: 5 respostas, 0% de perda.')]
     samples = [dict(device_id=1, at=datetime.fromtimestamp(time.time()-(59-i)*5, timezone.utc).isoformat(), latency=round(3 + math.sin(i*.55)*.7 + math.cos(i*.17)*.45, 2), success=1) for i in range(60)]
     events = [dict(id=3, device_id=5, device_name=labels[4][0], at=now(), level='critical', message='Sem ping: 24 perdas consecutivas.'),
               dict(id=2, device_id=2, device_name=labels[1][0], at=now(), level='critical', message='Porta ge1/1/3 caiu (link down).'),

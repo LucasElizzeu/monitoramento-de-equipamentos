@@ -39,6 +39,31 @@ Os eventos de queda e recuperação, tanto na **Visão geral** quanto na aba **E
 
 Os nomes são vinculados ao Datacom, ao tipo de interface e ao número da porta; Gigabit `1/1/1` e Ten `1/1/1` podem ter nomes diferentes. Novas consultas SSH preservam os nomes personalizados. Deixe o campo vazio para voltar à descrição original. O nome do Datacom inteiro continua editável no cadastro do equipamento.
 
+## Circuitos: ping a partir do Datacom
+
+Na aba **Datacoms**, cada equipamento tem a seção **Circuitos**:
+
+1. No Datacom de origem, clique em **Adicionar circuito**.
+2. Informe o nome do circuito e o IP de destino, por exemplo **10.91.0.2**.
+3. Escolha o intervalo entre testes: **30 segundos por padrão**, de 10 a 300 segundos.
+4. Salve. A consulta começa automaticamente; **Testar agora** solicita uma nova leitura.
+
+O servidor conecta por SSH ao Datacom escolhido, verifica a impressão digital cadastrada e executa **`ping IP`**, usando as mesmas credenciais do equipamento. O ping de disponibilidade do próprio Datacom, na lista de equipamentos, continua saindo do computador do programa. Os cartões de circuito testam o destino a partir da rede do Datacom. O mesmo IP pode ser monitorado por Datacoms diferentes; dentro de um Datacom, o IP não pode ser duplicado.
+
+Cada circuito mostra estado, latência média, perdas consecutivas, quantidade de respostas do último teste e horário. Os botões permitem editar, remover e solicitar um novo teste. **Ver saída do ping → Copiar saída** mostra o resultado original; a atualização visual pausa durante a leitura. A seção também está disponível em **Ver detalhes** do Datacom.
+
+A leitura reconhece a saída fornecida para `ping 10.91.0.2`: cinco respostas, **0% de perda** e média **3,204 ms**. No firmware informado, o comando termina após cinco pacotes. As perdas são contadas **por pacote**, usando `icmp_seq`, e uma resposta zera a sequência de perdas. **Mais de 20 perdas consecutivas** geram um evento com nome do circuito, IP e Datacom de origem. Por exemplo, quatro testes sem nenhuma resposta somam 20 perdas; ao receber o resultado do quinto, o contador chega a 25 e o evento registra a passagem pela 21ª perda. A recuperação também gera evento. Falha de autenticação, chave inválida, consulta interrompida ou saída não reconhecida aparecem como **Erro de coleta**, sem aumentar perdas.
+
+O próximo teste aguarda o anterior terminar. Os pings remotos têm uma fila de execução separada dos pings locais das BBU's. Cada execução do comando é limitada a 45 segundos e 16 KB de saída. Esta versão aceita a sintaxe simples confirmada, sem VRF ou IP de origem personalizados. Há limite de 20 circuitos por Datacom e 100 circuitos no painel. Apenas IPs são aceitos como destino; o comando é construído pelo programa, sem comandos livres.
+
+Os circuitos ficam no mesmo SQLite, na pasta `.data`. A tabela é criada automaticamente na atualização, preservando equipamentos, senhas e nomes existentes. Editar nome ou intervalo mantém a última leitura. Trocar o destino ou os dados de acesso da origem limpa as leituras antigas; resultados de consultas anteriores à edição são descartados. Remover um Datacom remove os circuitos associados e preserva os eventos. Para converter um Datacom em BBU, primeiro remova seus circuitos.
+
+**Validação:** parser e fluxo completo foram testados com a saída enviada e um cliente SSH simulado. Não houve acesso à rede privada do usuário para validar o comando em equipamento físico.
+
+## Organização da interface
+
+O tema azul-marinho e a marca **VELOSONET MONITORAMENTO** foram mantidos. As informações de equipamentos, eventos, sinais e consumo usam letras maiores. Em telas menores, a lista de equipamentos vira cartões com status, IP, latência, perdas e última checagem visíveis juntos, além dos botões **Editar**, **Detalhes** e **Remover**. Nos Datacoms, os circuitos e as portas têm seções próprias; o cabeçalho resume portas ativas e inativas. Os nomes das portas ganham destaque, com sinal óptico e consumo separados.
+
 ## Ping
 
 - Cadastre nome, IP IPv4/IPv6 e intervalo de 1 a 300 segundos (1 segundo por padrão). Equipamentos existentes mantêm seu intervalo até serem editados.
@@ -141,6 +166,7 @@ Se a leitura falhar, abra **Ver diagnóstico da consulta SSH**, abaixo do aviso.
 - Esta versão é de uso **local**, sem login/múltiplos usuários, notificações por e-mail/WhatsApp ou gestão de permissões. Os alertas aparecem no painel e no histórico.
 - Mantenha o bind em `127.0.0.1`. Antes de expor para uma equipe, acrescente autenticação, HTTPS e regras de acesso. Não publique a porta diretamente na internet.
 - Limite desta versão: 100 equipamentos. Ainda não foi feito teste de carga com esse volume.
+- Circuitos remotos: até 100 no painel, com máximo de 20 por Datacom.
 
 ## Validação
 
