@@ -26,10 +26,19 @@ Imagens das propostas: [1 · Equilibrado](docs/visual-equilibrado.png), [2 · Co
 
 - **BBU's:** equipamentos cadastrados como ping, com disponibilidade, latência e perdas consecutivas.
 - **Datacoms:** equipamentos SSH, com disponibilidade, portas, descrições e sinais RX/TX.
+- **Rádios SIAE:** cadastro separado, ping local e cartões preparados para o consumo dos TRX A + B.
 - **Visão geral:** resumo conjunto da rede.
 - **Eventos:** histórico conjunto de quedas, recuperações e erros de coleta.
 
 Clique no **IP de uma BBU** para abrir seu site em uma nova aba, no endereço `http://IP/`. O atalho aparece na aba **BBU's** e na **Visão geral**, inclusive no celular; o monitoramento continua aberto na aba original. O endereço precisa disponibilizar uma interface web acessível pela sua rede.
+
+## Rádios SIAE — etapa inicial
+
+Na aba **Rádios SIAE**, use **Adicionar rádio SIAE**, informe nome e IP e escolha o intervalo e o tempo máximo do ping. O ping sai do computador que executa o programa, com a mesma regra de alerta na 21ª perda consecutiva. Cadastro, edição, remoção, histórico e listas de status estão disponíveis. O IP também abre a interface web do rádio em outra aba.
+
+**A coleta automática de consumo ainda não está habilitada.** O modelo informado é **ALFOplus2 — SIAE Microelettronica**, com acesso por IP e login. Os campos **ETH Capacity** de TX/RX dos TRX A/B representam capacidade disponível conforme a modulação; eles não são usados como consumo. O indicador desejado é o **tráfego real**. Falta identificar a página/consulta que fornece essas taxas ou contadores de tráfego, suas unidades e a autenticação necessária. Na rede real, os cartões exibem **—** e **Consumo aguardando configuração**, independentemente de o ping estar online. Esta etapa não acessa a página autenticada nem consulta os TRX do equipamento.
+
+Os cartões estão preparados para mostrar **TRX A**, **TRX B** e **consumo total = A + B**, com as duas taxas normalizadas em bps antes da soma. Um TRX sem leitura mantém o total indisponível. O modo demonstração usa exemplos explícitos de **120 Mbps + 80 Mbps = 200 Mbps**; esses números não são leituras reais.
 
 Os equipamentos existentes aparecem na aba correspondente ao tipo já cadastrado, sem migração do banco ou novo cadastro. Cada aba possui sua lista e seus contadores; o botão de adicionar já seleciona o tipo correspondente. A regra de alerta permanece na 21ª perda consecutiva.
 

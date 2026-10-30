@@ -168,7 +168,7 @@ class DeviceInput(BaseModel):
     @field_validator('kind')
     @classmethod
     def valid_kind(cls, value):
-        if value not in ('ping', 'datacom'):
+        if value not in ('ping', 'datacom', 'siae'):
             raise ValueError('Tipo inválido.')
         return value
 
@@ -275,6 +275,18 @@ def port_alias_key(port, interface_type='auto'):
     return f"{prefix_family or interface_type}:{number.group() if number else port}"
 
 
+def siae_consumption(trx_a_bps=None, trx_b_bps=None):
+    """Combine rates in bits/s; a missing TRX must never become a zero or a total."""
+    for value in (trx_a_bps, trx_b_bps):
+        if value is not None and (isinstance(value, bool) or not isinstance(value, (int, float))
+                                  or not math.isfinite(value) or value < 0):
+            raise ValueError('Consumo dos TRX deve ser uma taxa finita e não negativa em bps.')
+    total = trx_a_bps + trx_b_bps if trx_a_bps is not None and trx_b_bps is not None else None
+    if total is not None and not math.isfinite(total):
+        raise ValueError('Consumo total fora do intervalo suportado.')
+    return dict(trx_a_bps=trx_a_bps, trx_b_bps=trx_b_bps, total_bps=total)
+
+
 def public_device(row, db=None):
     value = dict(row)
     value['has_password'] = bool(value.pop('password'))
@@ -287,6 +299,9 @@ def public_device(row, db=None):
         port['custom_name'] = value['port_aliases'].get(key, '')
         port['display_name'] = port['custom_name'] or port.get('description', '')
     value['ssh_diagnostic'] = json.loads(value['ssh_diagnostic'] or '{}')
+    if value['kind'] == 'siae':
+        # Web login and the TRX source still need to be identified for this model.
+        value['siae_consumption'] = dict(siae_consumption(), status='unconfigured')
     def read_circuits(connection):
         return [dict(row) for row in connection.execute(
             'SELECT * FROM circuits WHERE source_device_id=? ORDER BY id', (value['id'],))]
@@ -1027,7 +1042,7 @@ def update_device(device_id: int, device: DeviceInput):
         if device.circuits is not None:
             check_circuit_snapshot(db, device_id, device.circuits_snapshot)
         if device.kind != 'datacom' and db.execute('SELECT 1 FROM circuits WHERE source_device_id=?', (device_id,)).fetchone():
-            raise HTTPException(422, 'Remova os circuitos vinculados antes de converter o Datacom em BBU.')
+            raise HTTPException(422, 'Remova os circuitos vinculados antes de alterar o tipo do Datacom.')
         values = device_values(device, previous)
         if 'circuit_position' not in device.model_fields_set:
             values['circuit_position'] = previous['circuit_position']
@@ -1151,20 +1166,24 @@ def demo_dashboard():
               ('Servidor • ERP', '10.0.0.10', 'ping', 'online', 1.2),
               ('Roteador • Filial centro', '10.0.2.1', 'ping', 'unstable', None),
               ('Switch • Almoxarifado', '10.0.3.2', 'ping', 'offline', None),
-              ('Datacom • Distribuição sul', '10.0.4.1', 'datacom', 'online', 4.1)]
+              ('Datacom • Distribuição sul', '10.0.4.1', 'datacom', 'online', 4.1),
+              ('SIAE • Enlace principal', '192.0.2.70', 'siae', 'online', 2.8),
+              ('SIAE • Enlace secundário', '192.0.2.71', 'siae', 'unstable', None)]
     for i, (name, host, kind, state, latency) in enumerate(labels, 1):
-        ports = [] if kind == 'ping' else [dict(name=f'ge1/1/{p}', description=f'Enlace de demonstração {p}', state='down' if i == 2 and p == 3 else 'up', rx=None if i == 2 and p == 3 else round(-8.3-p*1.2, 2), tx=-2.1,
+        ports = [] if kind != 'datacom' else [dict(name=f'ge1/1/{p}', description=f'Enlace de demonstração {p}', state='down' if i == 2 and p == 3 else 'up', rx=None if i == 2 and p == 3 else round(-8.3-p*1.2, 2), tx=-2.1,
             rx_bps=0 if i == 2 and p == 3 else p*120e6, tx_bps=0 if i == 2 and p == 3 else p*30e6,
             l2_rx_bps=0 if i == 2 and p == 3 else p*115e6, l2_tx_bps=0 if i == 2 and p == 3 else p*28e6,
             utilization_enabled=True, utilization_output='Banda simulada para demonstração.',
             checked_at=now(), status_output='Exemplo de saída simulada', optics_output='Dados de demonstração') for p in range(1, 5)]
         devices.append(dict(id=i, name=name, host=host, kind=kind, state=state, failures=24 if state == 'offline' else 7 if state == 'unstable' else 0, latency=latency, last_check=now(), interval=5, ports=[p['name'] for p in ports], port_data=ports, ssh_error=None))
-        devices[-1]['circuits'] = [] if kind == 'ping' or i != 1 else [dict(
+        devices[-1]['circuits'] = [] if kind != 'datacom' or i != 1 else [dict(
             id=i, source_device_id=i, name='Circuito de demonstração', host=f'10.91.{i-1}.2',
             interval=30, state='online', failures=0, latency=3.204, last_check=now(),
             transmitted=5, received=5, error=None, output='Exemplo de ping simulado: 5 respostas, 0% de perda.')]
         if devices[-1]['circuits']:
             devices[-1]['circuits'][0]['port_identity'] = 'gigabit-ethernet:1/1/1'
+        if kind == 'siae':
+            devices[-1]['siae_consumption'] = dict(siae_consumption(120e6, 80e6), status='demo')
     samples = [dict(device_id=1, at=datetime.fromtimestamp(time.time()-(59-i)*5, timezone.utc).isoformat(), latency=round(3 + math.sin(i*.55)*.7 + math.cos(i*.17)*.45, 2), success=1) for i in range(60)]
     events = [dict(id=3, device_id=5, device_name=labels[4][0], at=now(), level='critical', message='Sem ping: 24 perdas consecutivas.'),
               dict(id=2, device_id=2, device_name=labels[1][0], at=now(), level='critical', message='Porta ge1/1/3 caiu (link down).'),

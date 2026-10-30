@@ -46,8 +46,10 @@ function orderedDatacoms(devices=state.data.devices){
 }
 function pageDevices(page=state.page){
  if(page==='datacoms')return orderedDatacoms();
+ if(page==='siae')return state.data.devices.filter(d=>d.kind==='siae');
  return page==='bbus'?state.data.devices.filter(d=>d.kind==='ping'):state.data.devices;
 }
+function deviceKindLabel(device){return device.kind==='datacom'?'Datacom':device.kind==='siae'?'Rádio SIAE':'BBU';}
 function collectedPorts(devices){
  return orderedDatacoms(devices).filter(d=>!d.ssh_error).flatMap(device=>(device.port_data||[]).map(port=>({device,port})));
 }
@@ -56,16 +58,18 @@ function metricEntries(key,devices){
  return devices.filter(d=>key==='all'||d.state===key).map(device=>({device}));
 }
 function renderMetrics(){const d=pageDevices();const online=metricEntries('online',d).length;const offline=metricEntries('offline',d).length;const downPorts=metricEntries('down-ports',d).length;
- const cards=[[state.page==='bbus'?"BBU's monitoradas":state.page==='datacoms'?'Datacoms monitorados':'Equipamentos monitorados',d.length,'server','',`${d.filter(x=>x.kind==='datacom').length} Datacoms`,`${d.filter(x=>x.kind==='ping').length} BBU's`],['Equipamentos online',online,'wifi','green',d.length?`${Math.round(online/d.length*100)}% da rede`:'Aguardando cadastro','Respondendo ao ping'],['Equipamentos sem ping',offline,'warning','red','Mais de 20 perdas','consecutivas'],['Portas inativas',downPorts,'ports','amber',`${collectedPorts(d).length} portas consultadas`,'via SSH']];
- if(state.page==='bbus'){
+ const cards=[[state.page==='bbus'?"BBU's monitoradas":state.page==='datacoms'?'Datacoms monitorados':'Equipamentos monitorados',d.length,'server','',`${d.filter(x=>x.kind==='datacom').length} Datacoms`,`${d.filter(x=>x.kind==='ping').length} BBU's · ${d.filter(x=>x.kind==='siae').length} SIAE`],['Equipamentos online',online,'wifi','green',d.length?`${Math.round(online/d.length*100)}% da rede`:'Aguardando cadastro','Respondendo ao ping'],['Equipamentos sem ping',offline,'warning','red','Mais de 20 perdas','consecutivas'],['Portas inativas',downPorts,'ports','amber',`${collectedPorts(d).length} portas consultadas`,'via SSH']];
+ if(['bbus','siae'].includes(state.page)){
+  const subject=state.page==='siae'?'Rádios SIAE':"BBU's";
+  cards[0][0]=state.page==='siae'?'Rádios SIAE monitorados':"BBU's monitoradas";
   cards[0].splice(4,2,'Monitoramento por ping','ICMP');
-  cards[1][0]="BBU's online";cards[2][0]="BBU's sem ping";
-  cards[3]=["BBU's instáveis",d.filter(x=>x.state==='unstable').length,'activity','amber','De 1 a 20 perdas','consecutivas'];
+  cards[1][0]=`${subject} online`;cards[2][0]=`${subject} sem ping`;
+  cards[3]=[`${subject} instáveis`,d.filter(x=>x.state==='unstable').length,'activity','amber','De 1 a 20 perdas','consecutivas'];
  }else if(state.page==='datacoms'){
   cards[0].splice(4,2,'Monitoramento SSH','ping e portas');
   cards[1][0]='Datacoms online';cards[2][0]='Datacoms sem ping';
  }
- const keys=['all','online','offline',state.page==='bbus'?'unstable':'down-ports'];
+ const keys=['all','online','offline',['bbus','siae'].includes(state.page)?'unstable':'down-ports'];
  state.metricCards=Object.fromEntries(keys.map((key,index)=>[key,{title:cards[index][0],page:state.page,entries:metricEntries(key,d),at:state.data.updated_at,demo:state.demo,sshErrors:key==='down-ports'&&d.some(x=>x.kind==='datacom'&&x.ssh_error)}]));
  const focused=document.activeElement?.dataset.metric;
  $('#metrics').innerHTML=cards.map(([title,value,i,color,a,b],index)=>`<article class="metric-card ${color}"><div class="metric-title">${title}<button type="button" class="metric-icon metric-details" data-metric="${keys[index]}" title="Listar ${title.toLowerCase()}" aria-label="Listar ${title.toLowerCase()}" aria-haspopup="dialog" aria-controls="metric-dialog">${icon('attention')}</button></div><div class="metric-value">${value.toString().padStart(2,'0')}</div><div class="metric-bottom"><strong>${a}</strong><span>· ${b}</span></div></article>`).join('');
@@ -73,7 +77,7 @@ function renderMetrics(){const d=pageDevices();const online=metricEntries('onlin
  const errors=d.filter(x=>x.state==='error'||x.ssh_error||(x.circuits||[]).some(c=>c.state==='error')).length;const unstable=d.filter(x=>x.state==='unstable'||(x.circuits||[]).some(c=>c.state==='unstable')).length;const remoteOffline=d.some(x=>(x.circuits||[]).some(c=>c.state==='offline'));
  $('#network-status').textContent=!d.length?'Sua rede começa aqui':errors?'Há erros de coleta':offline||downPorts||remoteOffline?'Sua rede precisa de atenção':unstable?'Há equipamentos com perda de ping':'Sua rede está operando normalmente';
  $('#network-subtitle').textContent=!d.length?'Cadastre um equipamento para começar':`${d.length} equipamentos acompanhados`;
- $('#bbu-count').textContent=state.data.devices.filter(x=>x.kind==='ping').length;$('#datacom-count').textContent=state.data.devices.filter(x=>x.kind==='datacom').length;$('#alert-dot').hidden=!state.data.alerts.some(a=>a.level==='critical');
+ $('#bbu-count').textContent=state.data.devices.filter(x=>x.kind==='ping').length;$('#datacom-count').textContent=state.data.devices.filter(x=>x.kind==='datacom').length;$('#siae-count').textContent=state.data.devices.filter(x=>x.kind==='siae').length;$('#alert-dot').hidden=!state.data.alerts.some(a=>a.level==='critical');
 }
 function renderMetricList(){
  const view=state.metricView;if(!view)return;
@@ -81,10 +85,10 @@ function renderMetricList(){
  $('#metric-dialog-title').textContent=view.title;
  $('#metric-dialog-description').textContent=`${pages[view.page][0]} · ${count} ${ports?(count===1?'porta':'portas'):(count===1?'equipamento':'equipamentos')} · ${view.demo?'Demonstração':'Leitura'} às ${formatTime(view.at)}`;
  $('#metric-dialog-note').hidden=!view.sshErrors;
- const emptyMessages={all:'Nenhum equipamento cadastrado nesta aba.',online:'Nenhum equipamento online nesta aba.',offline:'Nenhum equipamento sem ping nesta aba.',unstable:"Nenhuma BBU instável nesta aba.",'down-ports':'Nenhuma porta inativa nas leituras disponíveis.'};
+ const emptyMessages={all:'Nenhum equipamento cadastrado nesta aba.',online:'Nenhum equipamento online nesta aba.',offline:'Nenhum equipamento sem ping nesta aba.',unstable:view.page==='siae'?'Nenhum rádio SIAE instável nesta aba.':"Nenhuma BBU instável nesta aba.",'down-ports':'Nenhuma porta inativa nas leituras disponíveis.'};
  $('#metric-dialog-results').innerHTML=count?`<ul class="metric-results">${view.entries.map(({device:d,port:p})=>{
   const name=p?(p.custom_name||p.display_name||p.description||`Porta ${p.name}`):d.name;
-  const family=p?(interfaceLabels[p.interface_type||d.interface_type]||'Interface'):(d.kind==='datacom'?'Datacom':"BBU · Ping");
+  const family=p?(interfaceLabels[p.interface_type||d.interface_type]||'Interface'):`${deviceKindLabel(d)} · ${d.kind==='datacom'?'SSH':'Ping'}`;
   const context=p?`${family} · Porta ${p.name}`:family;
   return `<li class="metric-result"><div class="metric-result-main"><strong class="metric-result-name">${esc(name)}</strong><p>${esc(p?`${d.name} · ${d.host}`:d.host)}</p><small>${esc(context)}${d.circuit_position!=null?` · Posição ${esc(d.circuit_position)}`:''}</small>${p?`<small>Leitura ${ago(p.checked_at)}</small>`:`<small>${d.failures} perdas consecutivas · ${ago(d.last_check)}</small>`}</div><div class="metric-result-actions">${badge(p?p.state:d.state)}<button type="button" class="button secondary" data-metric-device="${d.id}" aria-label="Ver equipamento ${esc(d.name)}">Ver equipamento ${icon('arrow')}</button></div></li>`;
  }).join('')}</ul>`:`<p class="metric-empty">${emptyMessages[view.key]}</p>`;
@@ -127,17 +131,17 @@ function chart(samples, target){
 function eventHTML(event){const i=event.level==='success'?'check':'warning';return `<div class="event-item"><span class="event-icon ${esc(event.level)}">${icon(i)}</span><div class="event-body"><strong>${esc(event.message)}</strong><p>${esc(event.device_name)}</p></div><span class="event-time" title="${esc(new Date(event.at).toLocaleString('pt-BR'))}">${ago(event.at)}</span></div>`;}
 function empty(title,description,action=false){return `<div class="empty-state">${icon('activity')}<h3>${title}</h3><p>${description}</p>${action?'<button class="button primary" data-action="add">Adicionar equipamento</button>':''}</div>`;}
 function deviceAddressHTML(device){
- if(device.kind!=='ping')return esc(device.host);
+ if(!['ping','siae'].includes(device.kind))return esc(device.host);
  const host=device.host.includes(':')?`[${device.host}]`:device.host;
- return `<a class="device-web-link" href="http://${esc(host)}/" target="_blank" rel="noopener noreferrer" title="Abrir site da BBU em nova aba" aria-label="Abrir site de ${esc(device.name)} (${esc(device.host)}) em nova aba"><span>${esc(device.host)}</span>${icon('arrow')}</a>`;
+ return `<a class="device-web-link" href="http://${esc(host)}/" target="_blank" rel="noopener noreferrer" title="Abrir site de ${esc(deviceKindLabel(device))} em nova aba" aria-label="Abrir site de ${esc(device.name)} (${esc(device.host)}) em nova aba"><span>${esc(device.host)}</span>${icon('arrow')}</a>`;
 }
 function renderDevices(){
  const q=$('#search').value.toLowerCase(),filter=$('#state-filter').value,all=pageDevices();
  const devices=all.filter(d=>(d.name.toLowerCase().includes(q)||d.host.includes(q))&&(filter==='all'||d.state===filter));
- $('#table-title').textContent=state.page==='bbus'?"BBU's":state.page==='datacoms'?'Datacoms':'Equipamentos';
- $('#table-description').textContent=state.page==='bbus'?"Disponibilidade e latência das suas BBU's.":state.page==='datacoms'?'Disponibilidade dos Datacoms. Consulte circuitos e portas abaixo.':'Acompanhe a disponibilidade de cada ponto da rede.';
+ $('#table-title').textContent=state.page==='bbus'?"BBU's":state.page==='datacoms'?'Datacoms':state.page==='siae'?'Rádios SIAE':'Equipamentos';
+ $('#table-description').textContent=state.page==='bbus'?"Disponibilidade e latência das suas BBU's.":state.page==='datacoms'?'Disponibilidade dos Datacoms. Consulte circuitos e portas abaixo.':state.page==='siae'?'Disponibilidade dos rádios. Consulte o consumo dos TRX abaixo.':'Acompanhe a disponibilidade de cada ponto da rede.';
  $('#table-count').textContent=all.length;$('#table-summary').textContent=`Exibindo ${devices.length} de ${all.length} equipamentos`;
- $('#device-rows').innerHTML=devices.length?devices.map(d=>`<tr class="device-row"><td class="device-name-cell"><div class="device-cell"><span class="device-icon">${icon(d.kind==='datacom'?'ports':'server')}</span><div><strong>${esc(d.name)}</strong><small>${d.kind==='datacom'?`DATACOM · SSH${d.circuit_position!=null?' · POSIÇÃO '+d.circuit_position:''}`:"BBU · PING ICMP"}</small></div></div><span class="mobile-device-status">${badge(d.state)}</span></td><td class="ip" data-label="Endereço IP">${deviceAddressHTML(d)}</td><td class="device-state-cell">${badge(d.state)}</td><td class="latency" data-label="Latência">${d.latency!=null?`<span class="tiny-bars">▂▄▆</span>${number(d.latency)} <small>ms</small>`:'—'}</td><td data-label="Perdas consecutivas"><span class="loss-value ${d.failures>20?'critical':''}"><span class="loss-track"><i style="width:${Math.min(d.failures/21*100,100)}%"></i></span>${d.failures}<span class="muted">/ 21</span></span></td><td data-label="Última checagem">${ago(d.last_check)}</td><td class="device-actions-cell"><div class="device-actions"><button class="icon-button" data-edit="${d.id}" title="Editar equipamento" aria-label="Editar ${esc(d.name)}">${icon('edit')}<span class="action-label">Editar</span></button><button class="icon-button" data-detail="${d.id}" title="Ver detalhes" aria-label="Ver detalhes de ${esc(d.name)}">${icon('arrow')}<span class="action-label">Detalhes</span></button><button class="icon-button" data-remove="${d.id}" title="Remover equipamento" aria-label="Remover ${esc(d.name)}">${icon('trash')}<span class="action-label">Remover</span></button></div></td></tr>`).join(''):`<tr><td colspan="7">${empty(all.length?'Nenhum resultado encontrado':state.page==='bbus'?"Cadastre sua primeira BBU":state.page==='datacoms'?'Conecte seu primeiro Datacom':'Sua rede, em um só lugar',all.length?'Tente outro nome, IP ou filtro.':'Adicione um equipamento ou explore a demonstração para conhecer o painel.',!all.length)}</td></tr>`;
+ $('#device-rows').innerHTML=devices.length?devices.map(d=>`<tr class="device-row"><td class="device-name-cell"><div class="device-cell"><span class="device-icon">${icon(d.kind==='datacom'?'ports':d.kind==='siae'?'wifi':'server')}</span><div><strong>${esc(d.name)}</strong><small>${d.kind==='datacom'?`DATACOM · SSH${d.circuit_position!=null?' · POSIÇÃO '+d.circuit_position:''}`:d.kind==='siae'?"SIAE · PING ICMP":"BBU · PING ICMP"}</small></div></div><span class="mobile-device-status">${badge(d.state)}</span></td><td class="ip" data-label="Endereço IP">${deviceAddressHTML(d)}</td><td class="device-state-cell">${badge(d.state)}</td><td class="latency" data-label="Latência">${d.latency!=null?`<span class="tiny-bars">▂▄▆</span>${number(d.latency)} <small>ms</small>`:'—'}</td><td data-label="Perdas consecutivas"><span class="loss-value ${d.failures>20?'critical':''}"><span class="loss-track"><i style="width:${Math.min(d.failures/21*100,100)}%"></i></span>${d.failures}<span class="muted">/ 21</span></span></td><td data-label="Última checagem">${ago(d.last_check)}</td><td class="device-actions-cell"><div class="device-actions"><button class="icon-button" data-edit="${d.id}" title="Editar equipamento" aria-label="Editar ${esc(d.name)}">${icon('edit')}<span class="action-label">Editar</span></button><button class="icon-button" data-detail="${d.id}" title="Ver detalhes" aria-label="Ver detalhes de ${esc(d.name)}">${icon('arrow')}<span class="action-label">Detalhes</span></button><button class="icon-button" data-remove="${d.id}" title="Remover equipamento" aria-label="Remover ${esc(d.name)}">${icon('trash')}<span class="action-label">Remover</span></button></div></td></tr>`).join(''):`<tr><td colspan="7">${empty(all.length?'Nenhum resultado encontrado':state.page==='bbus'?"Cadastre sua primeira BBU":state.page==='datacoms'?'Conecte seu primeiro Datacom':state.page==='siae'?'Cadastre seu primeiro rádio SIAE':'Sua rede, em um só lugar',all.length?'Tente outro nome, IP ou filtro.':'Adicione um equipamento ou explore a demonstração para conhecer o painel.',!all.length)}</td></tr>`;
 }
 function sshDiagnosticHTML(d){
  const diagnostic=d.ssh_diagnostic||{};
@@ -151,6 +155,16 @@ function bandwidth(value){
  if(value==null)return '—';
  const [scale,unit]=value>=1e9?[1e9,'Gbps']:value>=1e6?[1e6,'Mbps']:value>=1e3?[1e3,'Kbps']:[1,'bps'];
  return `${number(value/scale,2)} <small>${unit}</small>`;
+}
+function siaeCardHTML(device){
+ const consumption=device.siae_consumption||{};
+ const note=consumption.status==='demo'?'Dados simulados · TRX A + TRX B':consumption.total_bps==null?'Consumo aguardando configuração.':'Consumo total = TRX A + TRX B';
+ return `<article class="port-card siae-card" data-siae="${device.id}"><div class="port-card-header"><h3>${esc(device.name)}</h3>${badge(device.state)}</div><p class="siae-address ip">${deviceAddressHTML(device)}</p><div class="port-ping-values siae-ping"><span>Latência<strong>${number(device.latency,2)} <small>ms</small></strong></span><span>Perdas<strong>${device.failures} <small>/ 21</small></strong></span></div><small>Ping ${ago(device.last_check)}</small><div class="port-traffic"><div class="traffic-heading">Consumo total</div><div class="traffic-values"><strong>${bandwidth(consumption.total_bps)}</strong></div></div><div class="siae-trx"><span>TRX A<strong>${bandwidth(consumption.trx_a_bps)}</strong></span><span>TRX B<strong>${bandwidth(consumption.trx_b_bps)}</strong></span></div><p class="siae-note ${consumption.total_bps==null?'pending':''}">${esc(note)}</p></article>`;
+}
+function renderSiae(){
+ const radios=pageDevices('siae'),q=$('#search').value.toLowerCase(),filter=$('#state-filter').value;
+ const visible=radios.filter(d=>(d.name.toLowerCase().includes(q)||d.host.includes(q))&&(filter==='all'||d.state===filter));
+ $('#siae-content').innerHTML=visible.length?visible.map(siaeCardHTML).join(''):empty(radios.length?'Nenhum rádio neste filtro':'Cadastre seu primeiro rádio SIAE',radios.length?'Tente outro nome, IP ou status.':'Adicione um rádio para acompanhar seu ping. A coleta dos TRX aguarda a configuração do modelo.',!radios.length);
 }
 function utilizationHTML(p){
  if(p.utilization_enabled===false)return '';
@@ -253,7 +267,7 @@ function render(){
  $('#reading-banner').hidden=!paused;
  if(paused)return;
  const {devices,alerts,samples}=state.data;$('#demo-banner').hidden=!state.demo;$('#demo-label').textContent=state.demo?'Sair da demonstração':'Ver demonstração';$('#last-update').textContent=`${state.demo?'Simulação':'Atualizado'} às ${formatTime(state.data.updated_at)}`;
- renderMetrics();renderDevices();const average=chart(samples,$('#latency-chart'));$('#chart-average').innerHTML=`${number(average)} <small>ms</small>`;
+ renderMetrics();renderDevices();renderSiae();const average=chart(samples,$('#latency-chart'));$('#chart-average').innerHTML=`${number(average)} <small>ms</small>`;
  $('#recent-events').innerHTML=alerts.length?alerts.slice(0,3).map(eventHTML).join(''):empty('Nenhum evento por aqui','Quedas e recuperações aparecerão neste espaço.');
  $('#alerts-content').innerHTML=alerts.length?alerts.map(eventHTML).join(''):empty('Sua linha do tempo começa aqui','Eventos serão registrados automaticamente quando houver uma mudança na rede.');
  const openPorts=new Set([...$('#ports-content').querySelectorAll('details[open]')].map(e=>e.dataset.portKey));
@@ -261,7 +275,7 @@ function render(){
  $('#ports-content').querySelectorAll('details').forEach(e=>e.open=openPorts.has(e.dataset.portKey));
  if(state.selected&&$('#detail-dialog').open){if(state.demo){state.detailSamples=samples.filter(s=>s.device_id===state.selected);renderDetail();}else{const selected=state.selected;api(`/api/devices/${selected}/history`).then(history=>{if(state.selected===selected){state.detailSamples=history;renderDetail();}}).catch(()=>{});}}
 }
-const pages={overview:['Visão geral','Tudo conectado. Tudo sob controle.'],bbus:["BBU's","Monitore o ping, a latência e as perdas das suas BBU's."],datacoms:['Datacoms','Disponibilidade, portas e sinais ópticos dos seus Datacoms.'],alerts:['Eventos','Cada mudança na rede, registrada em um só lugar.']};
+const pages={overview:['Visão geral','Tudo conectado. Tudo sob controle.'],bbus:["BBU's","Monitore o ping, a latência e as perdas das suas BBU's."],datacoms:['Datacoms','Disponibilidade, portas e sinais ópticos dos seus Datacoms.'],siae:['Rádios SIAE','Disponibilidade por ping e consumo total dos TRX A + B.'],alerts:['Eventos','Cada mudança na rede, registrada em um só lugar.']};
 function navigate(page){
  window.getSelection()?.removeAllRanges();state.page=page;
  document.querySelectorAll('[data-page]').forEach(e=>{
@@ -269,10 +283,10 @@ function navigate(page){
   if(e.dataset.page===page)e.setAttribute('aria-current','page');else e.removeAttribute('aria-current');
  });
  $('#page-title').textContent=pages[page][0];$('#breadcrumb').textContent=pages[page][0];$('#page-description').textContent=pages[page][1];
- $('#add-device-label').textContent=page==='bbus'?'Adicionar BBU':page==='datacoms'?'Adicionar Datacom':'Adicionar equipamento';
+ $('#add-device-label').textContent=page==='bbus'?'Adicionar BBU':page==='datacoms'?'Adicionar Datacom':page==='siae'?'Adicionar rádio SIAE':'Adicionar equipamento';
  $('#overview-charts').hidden=page!=='overview';
- $('#devices-section').hidden=!['overview','bbus','datacoms'].includes(page);
- $('#ports-section').hidden=page!=='datacoms';$('#alerts-section').hidden=page!=='alerts';
+ $('#devices-section').hidden=!['overview','bbus','datacoms','siae'].includes(page);
+ $('#ports-section').hidden=page!=='datacoms';$('#siae-section').hidden=page!=='siae';$('#alerts-section').hidden=page!=='alerts';
  $('#search').value='';$('#state-filter').value='all';
  render();
 }
@@ -307,22 +321,23 @@ function syncInterfaceMode(carry=false){
  $('#single-port-field').hidden=mode==='mixed';$('#mixed-port-fields').hidden=mode!=='mixed';selector.dataset.previousMode=mode;refreshCircuitPortOptions();
 }
 function syncDeviceKind(){
- const ssh=$('[name="kind"]:checked').value==='datacom';
+ const kind=$('[name="kind"]:checked').value,ssh=kind==='datacom';
+ $('#siae-setup-note').hidden=kind!=='siae';
  $('#ssh-fields').hidden=!ssh;
  for(const name of ['username','fingerprint'])$(`[name="${name}"]`).required=ssh;
  const keepPassword=state.editing?.kind==='datacom'&&state.editing.has_password;
  $('[name="password"]').required=ssh&&!keepPassword;
  $('[name="password"]').placeholder=keepPassword?'Deixe vazio para manter a senha atual':'';
  $('#password-help').textContent=keepPassword?'Deixe vazio para manter a senha atual. Preencha apenas para trocar.':'Armazenada de forma criptografada no servidor.';
- $('#device-dialog-title').textContent=state.editing?(ssh?'Editar Datacom':'Editar BBU'):(ssh?'Adicionar Datacom':'Adicionar BBU');
+ $('#device-dialog-title').textContent=`${state.editing?'Editar':'Adicionar'} ${kind==='datacom'?'Datacom':kind==='siae'?'rádio SIAE':'BBU'}`;
  $('#save-device').innerHTML=state.editing?`${icon('check')}Salvar alterações`:`${icon('plus')}Adicionar equipamento`;
- $('[name="name"]').placeholder=ssh?'Ex.: Datacom • Core principal':'Ex.: BBU • Torre central';
+ $('[name="name"]').placeholder=ssh?'Ex.: Datacom • Core principal':kind==='siae'?'Ex.: SIAE • Enlace Coari':'Ex.: BBU • Torre central';
  syncInterfaceMode();$('#device-circuit-rows').querySelectorAll('input,select').forEach(input=>input.disabled=!ssh);
 }
 function openAdd(){
  if(designPreview){toast('Esta prévia usa dados de demonstração. Volte ao monitoramento para adicionar equipamentos.');return;}
  state.editing=null;$('#device-form').reset();renderCircuitDrafts();
- $(`[name="kind"][value="${state.page==='datacoms'?'datacom':'ping'}"]`).checked=true;
+ $(`[name="kind"][value="${state.page==='datacoms'?'datacom':state.page==='siae'?'siae':'ping'}"]`).checked=true;
  syncDeviceKind();$('#form-error').hidden=true;$('#device-dialog').showModal();
 }
 function openEdit(id){
@@ -340,7 +355,7 @@ function openEdit(id){
 }
 function renderDetail(){const d=state.data.devices.find(d=>d.id===state.selected);if(!d){$('#detail-dialog').close();state.selected=null;return;}
  const opened=[...$('#detail-content').querySelectorAll('details')].map(e=>e.open);
- $('#detail-content').innerHTML=`<div class="dialog-heading"><div><div class="eyebrow">${d.kind==='datacom'?'DATACOM · SSH + ICMP':'MONITORAMENTO ICMP'}</div><h2>${esc(d.name)}</h2></div><button class="icon-button" data-close-detail aria-label="Fechar">${icon('close')}</button></div><p class="dialog-description">${esc(d.host)} · Intervalo ${d.interval}s ${state.demo?'· Demonstração':''}</p><div class="detail-summary"><div class="detail-stat">Disponibilidade<strong>${badge(d.state)}</strong></div><div class="detail-stat">Latência<strong>${number(d.latency)} <small>ms</small></strong></div><div class="detail-stat">Perdas consecutivas<strong>${d.failures} <small>/ 21</small></strong></div></div>${d.state==='error'?'<p class="ssh-warning">O coletor não conseguiu executar o ping. Veja o diagnóstico abaixo. Este erro não é contado como perda.</p>':''}<h2>Última tentativa de ping</h2><p class="dialog-description">${esc(d.ping_backend||'ICMP')} · espera máxima ${number(d.ping_timeout??4)}s</p><pre class="ping-diagnostic">${esc(d.ping_detail||'Aguardando a primeira tentativa.')}</pre><h2>Histórico de ping</h2><div class="chart-container detail-chart" id="detail-chart"></div>${d.kind==='datacom'?`<div class="section-divider">PORTAS, SINAIS E PINGS</div>${portsHTML(d)}`:''}`;
+ $('#detail-content').innerHTML=`<div class="dialog-heading"><div><div class="eyebrow">${d.kind==='datacom'?'DATACOM · SSH + ICMP':d.kind==='siae'?'RÁDIO SIAE · ICMP':'MONITORAMENTO ICMP'}</div><h2>${esc(d.name)}</h2></div><button class="icon-button" data-close-detail aria-label="Fechar">${icon('close')}</button></div><p class="dialog-description">${esc(d.host)} · Intervalo ${d.interval}s ${state.demo?'· Demonstração':''}</p><div class="detail-summary"><div class="detail-stat">Disponibilidade<strong>${badge(d.state)}</strong></div><div class="detail-stat">Latência<strong>${number(d.latency)} <small>ms</small></strong></div><div class="detail-stat">Perdas consecutivas<strong>${d.failures} <small>/ 21</small></strong></div></div>${d.state==='error'?'<p class="ssh-warning">O coletor não conseguiu executar o ping. Veja o diagnóstico abaixo. Este erro não é contado como perda.</p>':''}<h2>Última tentativa de ping</h2><p class="dialog-description">${esc(d.ping_backend||'ICMP')} · espera máxima ${number(d.ping_timeout??4)}s</p><pre class="ping-diagnostic">${esc(d.ping_detail||'Aguardando a primeira tentativa.')}</pre><h2>Histórico de ping</h2><div class="chart-container detail-chart" id="detail-chart"></div>${d.kind==='datacom'?`<div class="section-divider">PORTAS, SINAIS E PINGS</div>${portsHTML(d)}`:d.kind==='siae'?`<div class="section-divider">CONSUMO DO RÁDIO</div>${siaeCardHTML(d)}`:''}`;
  $('#detail-content').querySelectorAll('details').forEach((e,i)=>e.open=Boolean(opened[i]));chart(state.detailSamples||[], $('#detail-chart'));
 }
 async function openDetail(id){state.selected=id;state.detailSamples=[];renderDetail();$('#detail-dialog').showModal();try{state.detailSamples=state.demo?state.data.samples.filter(s=>s.device_id===id):await api(`/api/devices/${id}/history`);if(state.selected===id)renderDetail();}catch(e){toast(e.message);}}
@@ -354,7 +369,7 @@ $('#device-form').addEventListener('submit',async event=>{
  try{
   await api(editingId?`/api/devices/${editingId}`:'/api/devices',{method:editingId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
   $('#device-dialog').close();state.editing=null;state.demo=false;localStorage.setItem('nexo-demo','false');
-  navigate(d.kind==='datacom'?'datacoms':'bbus');toast(editingId?'Alterações salvas. O monitoramento será atualizado.':'Equipamento adicionado à sua rede.');await load();
+  navigate(d.kind==='datacom'?'datacoms':d.kind==='siae'?'siae':'bbus');toast(editingId?'Alterações salvas. O monitoramento será atualizado.':'Equipamento adicionado à sua rede.');await load();
  }catch(e){$('#form-error').textContent=e.message;$('#form-error').hidden=false;}finally{$('#save-device').disabled=false;}
 });
  $('[name="interface_type"]').addEventListener('change',()=>syncInterfaceMode(true));
@@ -364,7 +379,7 @@ $('#all-events').addEventListener('click',()=>navigate('alerts'));
 $('#add-device').addEventListener('click',openAdd);
 $('#refresh').addEventListener('click',()=>load());
 $('#demo-toggle').addEventListener('click',()=>toggleDemo(!state.demo));$('#exit-demo').addEventListener('click',()=>toggleDemo(false));
-$('#search').addEventListener('input',renderDevices);$('#state-filter').addEventListener('change',renderDevices);
+$('#search').addEventListener('input',()=>{renderDevices();renderSiae();});$('#state-filter').addEventListener('change',()=>{renderDevices();renderSiae();});
 document.querySelectorAll('.close-dialog').forEach(e=>e.addEventListener('click',()=>$('#device-dialog').close()));
 document.querySelectorAll('.close-confirm').forEach(e=>e.addEventListener('click',()=>$('#confirm-dialog').close()));
 document.addEventListener('click',event=>{const alias=event.target.closest('[data-port-alias]');if(alias)openPortName(Number(alias.dataset.portAlias),alias.dataset.port,alias.dataset.family);const copy=event.target.closest('[data-copy-output]');if(copy)copyOutput(copy);const edit=event.target.closest('[data-edit]'),detail=event.target.closest('[data-detail]'),remove=event.target.closest('[data-remove]');if(edit)openEdit(Number(edit.dataset.edit));if(detail)openDetail(Number(detail.dataset.detail));if(event.target.closest('[data-close-detail]')){$('#detail-dialog').close();state.selected=null;}if(event.target.closest('[data-action="add"]'))openAdd();if(remove){if(state.demo){toast('Os equipamentos de demonstração são exemplos. Saia do modo demonstração para gerenciar sua rede.');return;}state.deleting=Number(remove.dataset.remove);state.removingCircuit=null;$('#confirm-dialog h2').textContent='Remover equipamento?';$('#confirm-note').textContent='O monitoramento e as amostras de ping serão removidos. O histórico de eventos será preservado.';const d=state.data.devices.find(d=>d.id===state.deleting);$('#confirm-description').textContent=`Deseja remover “${d.name}” (${d.host})?`;$('#confirm-dialog').showModal();}});
