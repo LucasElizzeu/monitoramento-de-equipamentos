@@ -19,6 +19,8 @@ from pathlib import Path
 import paramiko
 from cryptography.fernet import Fernet, InvalidToken
 from fastapi import FastAPI, HTTPException
+from fastapi.exceptions import RequestValidationError
+from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from icmplib import ping
@@ -28,6 +30,8 @@ from siae import SiaeError, SiaeSessionError, login as siae_login, read_counters
 import traffic_history
 import availability
 import backups
+import notifications
+import whatsapp_meta
 
 ROOT = Path(__file__).resolve().parent
 DATA = Path(os.environ.get('MONITOR_DATA_DIR', ROOT / '.data'))
@@ -47,6 +51,7 @@ STOP = threading.Event()
 INFLIGHT = set()
 SIAE_BASELINES = {}
 BACKUP_ERROR = None
+NOTIFICATION_ERROR = None
 IS_WINDOWS = sys.platform == 'win32'
 INTERFACE_LABELS = {
     'auto': 'Automático',
@@ -100,6 +105,7 @@ def init_db():
         ''')
         traffic_history.init_schema(db)
         availability.init_schema(db)
+        notifications.init_schema(db)
         columns = {row['name'] for row in db.execute('PRAGMA table_info(devices)')}
         for name, definition in (
                 ('siae_enabled', 'INTEGER NOT NULL DEFAULT 0'),
@@ -139,6 +145,22 @@ def init_db():
                    "last_ssh=0, config_version=config_version+1 "
                    "WHERE kind='datacom' AND lower(trim(optics_command))='show interface tranceivers'")
     os.chmod(DB, 0o600)
+
+
+class NotificationInput(BaseModel):
+    enabled: bool = False
+    token: str = Field(default='', max_length=4096)
+    phone_number_id: str = Field(default='', max_length=30)
+    recipient: str = Field(default='', max_length=40)
+    template_name: str = Field(default='velosonet_alerta', max_length=512)
+    language: str = Field(default='pt_BR', max_length=10)
+    api_version: str = Field(default='v23.0', max_length=10)
+    batch_seconds: int = Field(default=30, ge=15, le=300)
+    notify_ping: bool = True
+    notify_ports: bool = True
+    notify_circuits: bool = True
+    notify_collection: bool = False
+    revision: int | None = Field(default=None, ge=0)
 
 
 class DeviceInput(BaseModel):
@@ -421,9 +443,11 @@ def public_alert(row, devices):
     return value
 
 
-def alert(db, device, level, message):
-    db.execute('INSERT INTO alerts(device_id,device_name,at,level,message) VALUES(?,?,?,?,?)',
-               (device['id'], device['name'], now(), level, message))
+def alert(db, device, level, message, topic='collection'):
+    at = now()
+    cursor = db.execute('INSERT INTO alerts(device_id,device_name,at,level,message) VALUES(?,?,?,?,?)',
+                        (device['id'], device['name'], at, level, message))
+    notifications.enqueue(db, cursor.lastrowid, device, level, message, topic, at, time.time())
 
 
 def record_ping(device_id, success, latency=None, error=None, expected_version=None, started_at=None, detail=None):
@@ -445,9 +469,9 @@ def record_ping(device_id, success, latency=None, error=None, expected_version=N
         failures = 0 if success else device['failures'] + 1
         state = 'online' if success else ('offline' if failures > 20 else 'unstable')
         if state == 'offline' and device['failures'] <= 20:
-            alert(db, device, 'critical', f'Sem ping: {failures} perdas consecutivas.')
+            alert(db, device, 'critical', f'Sem ping: {failures} perdas consecutivas.', 'ping')
         if success and device['failures'] > 20:
-            alert(db, device, 'success', 'Ping restabelecido. Equipamento online.')
+            alert(db, device, 'success', 'Ping restabelecido. Equipamento online.', 'ping')
         at = now()
         db.execute('UPDATE devices SET state=?,failures=?,latency=?,last_check=?,last_ping=? WHERE id=?',
                    (state, failures, latency if success else None, at, ping_at, device_id))
@@ -865,9 +889,9 @@ def check_ssh(device):
                 display_name = aliases.get(port_alias_key(port['name'], port['interface_type'])) or port.get('description', '')
                 alias_label = f' ({display_name})' if display_name else ''
                 if port['state'] == 'down' and old != 'down':
-                    alert(db, current, 'critical', f"Porta {label}{port['name']}{alias_label} caiu (link down).")
+                    alert(db, current, 'critical', f"Porta {label}{port['name']}{alias_label} caiu (link down).", 'port')
                 elif port['state'] == 'up' and old == 'down':
-                    alert(db, current, 'success', f"Porta {label}{port['name']}{alias_label} restabelecida.")
+                    alert(db, current, 'success', f"Porta {label}{port['name']}{alias_label} restabelecida.", 'port')
             db.execute("UPDATE devices SET ssh_error=NULL,last_ssh=?,port_data=?,ssh_diagnostic='{}' WHERE id=?",
                        (time.time(), json.dumps(ports), device['id']))
 
@@ -893,12 +917,12 @@ def record_circuit(circuit, device, result=None, error=None, output='', started_
         for success in result['probes']:
             if success:
                 if failures > 20:
-                    alert(db, parent, 'success', f"Circuito {current['name']} ({current['host']}) voltou a responder pelo Datacom.")
+                    alert(db, parent, 'success', f"Circuito {current['name']} ({current['host']}) voltou a responder pelo Datacom.", 'circuit')
                 failures = 0
             else:
                 failures += 1
                 if failures == 21:
-                    alert(db, parent, 'critical', f"Circuito {current['name']} ({current['host']}): sem ping pelo Datacom, após 21 perdas consecutivas.")
+                    alert(db, parent, 'critical', f"Circuito {current['name']} ({current['host']}): sem ping pelo Datacom, após 21 perdas consecutivas.", 'circuit')
         status = 'offline' if failures > 20 else 'unstable' if failures else 'online'
         db.execute('UPDATE circuits SET state=?,failures=?,latency=?,last_check=?,last_poll=?,output=?,error=NULL,transmitted=?,received=? WHERE id=?',
                    (status, failures, result['latency'], at, polled, output[:16000], result['transmitted'], result['received'], circuit['id']))
@@ -1114,26 +1138,79 @@ def automatic_backups():
         STOP.wait(60)
 
 
+def send_pending_notifications():
+    with LOCK, connect() as db:
+        notifications.prune(db, time.time())
+        job = notifications.prepare(db, time.time())
+    if not job:
+        return
+    with LOCK, connect() as db:
+        current = notifications.settings(db)
+        if not current['enabled'] or current['revision'] != job['settings']['revision']:
+            notifications.finish(db, job, time.time(), error='Configuração alterada antes do envio.')
+            return
+    try:
+        token = CIPHER.decrypt(job['settings']['token'].encode()).decode()
+        provider_id = whatsapp_meta.send(job['settings']['config'], token, whatsapp_meta.summary(job['events']))
+    except (InvalidToken, ValueError):
+        error = whatsapp_meta.SendError('A chave local não abriu o token. Informe o token novamente na configuração.')
+    except whatsapp_meta.SendError as failure:
+        error = failure
+    except Exception:
+        error = whatsapp_meta.SendError('Falha inesperada no envio. Revise a configuração antes de retomar.')
+    else:
+        with LOCK, connect() as db:
+            notifications.finish(db, job, time.time(), provider_id=provider_id)
+        return
+    with LOCK, connect() as db:
+        notifications.finish(db, job, time.time(), str(error), error.retryable, error.retry_after)
+
+
+def notification_worker():
+    global NOTIFICATION_ERROR
+    while not STOP.is_set():
+        try:
+            send_pending_notifications()
+            NOTIFICATION_ERROR = None
+        except Exception:
+            NOTIFICATION_ERROR = 'A fila de notificações não pôde ser processada. Verifique o acesso ao banco de dados.'
+        STOP.wait(1)
+
+
 @asynccontextmanager
 async def lifespan(app):
     init_db()
     with connect() as db:
         # Old live observations cannot cover the time the program was stopped.
         db.execute('DELETE FROM availability_cursor')
+        notifications.recover(db)
     STOP.clear()
     thread = threading.Thread(target=monitor, daemon=True)
     backup_thread = threading.Thread(target=automatic_backups, daemon=True)
+    notification_thread = threading.Thread(target=notification_worker, daemon=True)
+    app.state.notification_thread = notification_thread
     app.state.monitor_thread = thread
     thread.start()
     backup_thread.start()
+    notification_thread.start()
     yield
     STOP.set()
     thread.join(timeout=15)
     backup_thread.join(timeout=15)
+    notification_thread.join(timeout=15)
 
 
 app = FastAPI(title='VELOSONET MONITORAMENTO', lifespan=lifespan)
 app.mount('/static', StaticFiles(directory=ROOT / 'static'), name='static')
+
+
+@app.exception_handler(RequestValidationError)
+async def safe_notification_validation(request, error):
+    if request.url.path.startswith('/api/notifications'):
+        # Pydantic normally echoes invalid input, which could include a token.
+        return JSONResponse(status_code=422, content={'detail': [
+            {key: item[key] for key in ('loc', 'msg', 'type')} for item in error.errors()]})
+    return await request_validation_exception_handler(request, error)
 
 
 @app.middleware('http')
@@ -1210,6 +1287,101 @@ def download_backup(name: str):
         raise HTTPException(404, 'Backup não encontrado.') from None
     return FileResponse(path, media_type='application/zip', filename=path.name,
                         headers={'Cache-Control': 'no-store'})
+
+
+@app.get('/api/notifications')
+def notification_settings():
+    with LOCK, connect() as db:
+        selected = notifications.settings(db)
+        defaults = NotificationInput().model_dump(exclude={'token', 'revision', 'enabled'})
+        config = selected['config']
+        defaults.update({key: value for key, value in config.items() if key in defaults})
+        for field, topic in (('notify_ping', 'ping'), ('notify_ports', 'port'),
+                             ('notify_circuits', 'circuit'), ('notify_collection', 'collection')):
+            defaults[field] = config.get('topics', {}).get(topic, defaults[field])
+        counts = {row['status']: row['total'] for row in db.execute(
+            'SELECT status,count(*) AS total FROM notification_outbox GROUP BY status')}
+        recent = [dict(row) for row in db.execute('SELECT id,created_at,event_at,device_name,level,message,status,attempts,error '
+                                                 'FROM notification_outbox ORDER BY id DESC LIMIT 20')]
+    thread = getattr(app.state, 'notification_thread', None)
+    return dict(config=defaults, enabled=bool(selected['enabled']), has_token=bool(selected['token']),
+                revision=selected['revision'], blocked=bool(selected['blocked']),
+                last_error=selected['last_error'] or NOTIFICATION_ERROR,
+                last_sent_at=selected['last_sent_at'], counts=counts, recent=recent,
+                worker_running=bool(thread and thread.is_alive() and not STOP.is_set()))
+
+
+@app.put('/api/notifications')
+def save_notification_settings(value: NotificationInput):
+    config = value.model_dump(exclude={'token', 'revision', 'enabled', 'notify_ping', 'notify_ports', 'notify_circuits', 'notify_collection'})
+    config = {key: field.strip() if isinstance(field, str) else field for key, field in config.items()}
+    recipient = config['recipient']
+    if recipient and not re.fullmatch(r'\+?[0-9 ()-]+', recipient):
+        raise HTTPException(422, 'Informe o destino com DDI, DDD e número.')
+    config['recipient'] = re.sub(r'\D', '', recipient)
+    for name, pattern, message in (
+            ('phone_number_id', r'\d{1,30}', 'Informe o ID numérico do número remetente fornecido pela Meta.'),
+            ('recipient', r'[1-9]\d{7,14}', 'Informe o destino com DDI, DDD e número, sem zero inicial.'),
+            ('template_name', r'[a-z0-9_]{1,512}', 'Use o nome aprovado do modelo, com letras minúsculas, números e sublinhado.'),
+            ('language', r'[a-z]{2}(?:_[A-Z]{2})?', 'Informe o idioma do modelo, por exemplo pt_BR.'),
+            ('api_version', r'v\d{1,3}\.0', 'Informe uma versão da Graph API, por exemplo v23.0.')):
+        if (config[name] or value.enabled) and not re.fullmatch(pattern, config[name]):
+            raise HTTPException(422, message)
+    token = value.token.strip()
+    if token and not re.fullmatch(r'[A-Za-z0-9_.|:-]{20,4096}', token):
+        raise HTTPException(422, 'Formato de token inválido. Copie o token de acesso fornecido pela Meta.')
+    config['topics'] = dict(ping=value.notify_ping, port=value.notify_ports,
+                            circuit=value.notify_circuits, collection=value.notify_collection)
+    with LOCK, connect() as db:
+        previous = notifications.settings(db)
+        if value.revision is not None and previous['revision'] != value.revision:
+            raise HTTPException(409, 'A configuração mudou em outra janela. Recarregue antes de salvar.')
+        saved_token = CIPHER.encrypt(token.encode()).decode() if token else previous['token']
+        if value.enabled:
+            if not saved_token or not all(config[key] for key in ('phone_number_id', 'recipient', 'template_name', 'language', 'api_version')):
+                raise HTTPException(422, 'Preencha token, ID do número, destino e modelo antes de ativar os alertas.')
+            if not any(config['topics'].values()):
+                raise HTTPException(422, 'Selecione pelo menos um tipo de evento para enviar.')
+            try:
+                CIPHER.decrypt(saved_token.encode())
+            except InvalidToken:
+                raise HTTPException(422, 'A chave local não abriu o token salvo. Informe o token novamente.') from None
+        db.execute('UPDATE notification_settings SET enabled=?,token=?,config=?,revision=revision+1,'
+                   'last_error=NULL,blocked=0,next_send_at=0 WHERE id=1',
+                   (int(value.enabled), saved_token, json.dumps(config)))
+        db.execute("UPDATE notification_outbox SET status='cancelled' WHERE status='pending'")
+    return notification_settings()
+
+
+@app.delete('/api/notifications', status_code=204)
+def remove_notification_settings():
+    with LOCK, connect() as db:
+        db.execute("UPDATE notification_settings SET enabled=0,token='',config='{}',revision=revision+1,"
+                   'last_error=NULL,blocked=0,next_send_at=0,last_sent_at=NULL WHERE id=1')
+        db.execute("UPDATE notification_outbox SET status='cancelled' WHERE status='pending'")
+
+
+@app.post('/api/notifications/test')
+def test_notification():
+    with LOCK, connect() as db:
+        selected = notifications.settings(db)
+    if not selected['token']:
+        raise HTTPException(422, 'Salve as credenciais antes de testar o envio.')
+    try:
+        token = CIPHER.decrypt(selected['token'].encode()).decode()
+        whatsapp_meta.send(selected['config'], token,
+            'Teste solicitado no painel VELOSONET. A configuração do WhatsApp recebeu uma solicitação de envio.')
+    except whatsapp_meta.SendError as error:
+        with LOCK, connect() as db:
+            db.execute('UPDATE notification_settings SET last_error=? WHERE id=1 AND revision=?',
+                       (str(error), selected['revision']))
+        raise HTTPException(502, str(error)) from None
+    except (InvalidToken, KeyError):
+        raise HTTPException(422, 'Configuração incompleta ou token inacessível. Salve os dados e informe o token novamente.') from None
+    with LOCK, connect() as db:
+        db.execute('UPDATE notification_settings SET last_error=NULL,blocked=0,last_sent_at=? WHERE id=1 AND revision=?',
+                   (time.time(), selected['revision']))
+    return dict(status='accepted', message='A Meta aceitou a mensagem de teste. Confira o WhatsApp do destinatário.')
 
 
 def traffic_catalog(db, at, include_zero=False):

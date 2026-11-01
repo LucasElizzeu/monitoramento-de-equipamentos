@@ -50,6 +50,9 @@ def check_database(path, key):
                 if column in columns:
                     for (value,) in db.execute(f'SELECT {column} FROM devices WHERE {column} IS NOT NULL AND {column}!=\'\''):
                         cipher.decrypt(value.encode())
+            if 'notification_settings' in tables:
+                for (value,) in db.execute("SELECT token FROM notification_settings WHERE token!=''"):
+                    cipher.decrypt(value.encode())
     except BackupError:
         raise
     except (sqlite3.Error, ValueError, TypeError, AttributeError, InvalidToken):
@@ -153,6 +156,15 @@ def restore(archive, destination):
                     if digest(temporary / name) != manifest['sha256'][name]:
                         raise BackupError('O conteúdo do backup não corresponde à verificação de integridade.')
             check_database(temporary / 'monitor.db', (temporary / 'credentials.key').read_bytes())
+            # Restoring a snapshot must never replay old queued notifications.
+            with closing(sqlite3.connect(temporary / 'monitor.db')) as db:
+                db.execute('PRAGMA journal_mode=DELETE')
+                tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+                if 'notification_settings' in tables:
+                    db.execute('UPDATE notification_settings SET enabled=0,revision=revision+1,last_error=NULL')
+                if 'notification_outbox' in tables:
+                    db.execute("UPDATE notification_outbox SET status='cancelled' WHERE status IN ('pending','sending')")
+                db.commit()
             # All validation precedes creating the destination. Existing data is untouched.
             destination.mkdir(mode=0o700)
             try:

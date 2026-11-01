@@ -1,0 +1,19 @@
+.notification-intro{padding:22px;display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:20px}
+.notification-intro p,.notification-help p,.notification-help li{font-size:12px;line-height:1.9;color:var(--muted)}
+.notification-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:20px;align-items:start}
+.notification-form,.notification-help,.notification-health{padding:22px}.notification-form fieldset{border:0;padding:0;margin:0;min-width:0}
+.notification-form legend{font-size:15px;font-weight:600;margin-bottom:20px}.notification-form .field{margin-top:20px}
+.notification-toggle,.notification-topics label{display:flex;align-items:center;gap:9px;font-size:12px;line-height:1.8;cursor:pointer}
+.notification-toggle input,.notification-topics input{width:17px;height:17px;flex-shrink:0;accent-color:var(--accent)}
+.notification-topics{display:grid;gap:12px;margin:24px 0}.notification-topics strong{font-size:12px;margin-bottom:5px}
+.notification-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}.notification-side{display:grid;gap:20px}
+.notification-help h3,.notification-health h3{font-size:14px;margin:0 0 18px}.notification-help ol{padding-left:20px}.notification-help li{padding-left:4px;margin-bottom:14px}
+.notification-help blockquote{border-left:3px solid var(--accent);padding:13px 15px;background:var(--inset);margin:18px 0;font-size:12px;line-height:1.9}
+.notification-help a{font-size:12px}.notification-health dl{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.notification-health dt{font-size:10px;color:var(--muted)}.notification-health dd{font-size:23px;margin:10px 0}
+.notification-history{margin-top:22px}.notification-history .panel-heading{padding-bottom:10px}
+.notification-event{display:flex;justify-content:space-between;gap:16px;padding:17px 22px;border-top:1px solid var(--line)}.notification-event>div{min-width:0}
+.notification-event strong{font-size:12px;overflow-wrap:anywhere}.notification-event p{font-size:11px;line-height:1.8;color:var(--muted);margin:6px 0;overflow-wrap:anywhere}.notification-event small{font-size:10px;color:var(--dim)}.notification-event .status-pill{align-self:start;white-space:nowrap}
+#remove-notification{border-radius:8px;background:var(--danger-bg);color:var(--red);font-size:11px}
+.notification-form fieldset:disabled{opacity:.5}#notification-enabled-status.active{color:var(--success);border-color:#65deb34a}#notification-enabled-status.blocked{color:var(--amber);border-color:#fcd58b4a}
+@media(max-width:1100px){.notification-grid{grid-template-columns:1fr}.notification-side{grid-template-columns:1fr 1fr}}
+@media(max-width:640px){.notification-intro{padding:18px 15px;align-items:flex-start;flex-direction:column}.notification-form,.notification-help,.notification-health{padding:18px 15px}.notification-side{grid-template-columns:1fr}.notification-event{padding:15px;gap:10px;flex-direction:column}.notification-actions .button{flex:1}.notification-event .status-pill{font-size:10px}}
