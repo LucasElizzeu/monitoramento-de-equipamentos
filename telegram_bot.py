@@ -1,5 +1,6 @@
 """Telegram Bot API over verified HTTPS; never expose token-bearing URLs."""
 import json
+import alert_labels
 import re
 import ssl
 from datetime import datetime, timezone
@@ -32,6 +33,7 @@ def summary(events):
     parts = ['VELOSONET · MONITORAMENTO']
     for event in events:
         kind = {'critical': 'QUEDA', 'success': 'RECUPERAÇÃO', 'warning': 'COLETA'}[event['level']]
+        kind += ' · ' + alert_labels.title(event['message'], event['level'], event.get('topic')).upper()
         stamp = datetime.fromisoformat(event['event_at']).astimezone(timezone.utc).strftime('%d/%m/%Y %H:%M UTC')
         name = ' '.join(event['device_name'].split())
         message = ' '.join(event['message'].split())[:650]
