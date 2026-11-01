@@ -191,6 +191,17 @@ class NotificationTests(unittest.TestCase):
         self.assertEqual(self.rows(),[])
         self.assertFalse(app.notification_settings()['enabled'])
 
+    def test_test_send_with_own_bot_id_returns_safe_actionable_error_without_network(self):
+        self.configure(enabled=False,chat_id=TOKEN.partition(':')[0])
+        with patch.object(telegram_bot,'build_opener') as builder:
+            with self.assertRaises(HTTPException) as result:
+                app.test_notification()
+            builder.assert_not_called()
+        self.assertEqual(result.exception.status_code,502)
+        self.assertIn('ID do próprio bot',result.exception.detail)
+        self.assertNotIn(TOKEN,result.exception.detail)
+        self.assertIn('ID do próprio bot',app.notification_settings()['last_error'])
+
     def test_backup_preserves_encrypted_token_but_restore_pauses_notifications(self):
         self.configure(); self.enqueue()
         archive=backups.create(self.data)

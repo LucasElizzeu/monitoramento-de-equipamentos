@@ -8,7 +8,7 @@ from urllib.error import HTTPError, URLError
 import telegram_bot
 
 CONFIG = dict(chat_id='123456789')
-TOKEN = '123456789:AA_fake_telegram_token_for_tests_12345'
+TOKEN = '987654321:AA_fake_telegram_token_for_tests_12345'
 
 
 class TelegramBotTests(unittest.TestCase):
@@ -49,7 +49,7 @@ class TelegramBotTests(unittest.TestCase):
 
     def test_errors_do_not_echo_api_description_or_token_url(self):
         for status,retryable,expected in [(401,False,'Token'),(404,False,'Token'),(403,False,'permissão'),
-                (400,False,'Conversa'),(409,False,'webhook'),(429,True,'Limite'),(500,True,'temporariamente')]:
+                (400,False,'HTTP 400'),(409,False,'webhook'),(429,True,'Limite'),(500,True,'temporariamente')]:
             with self.subTest(status=status):
                 body=json.dumps(dict(ok=False,description=f'https://api.telegram.org/bot{TOKEN}',parameters={'retry_after':90})).encode()
                 error=HTTPError(f'https://api.telegram.org/bot{TOKEN}',status,'Error',{},io.BytesIO(body))
@@ -122,3 +122,33 @@ class TelegramBotTests(unittest.TestCase):
         with patch.object(telegram_bot,'MAX_RESPONSE',10),patch.object(telegram_bot,'build_opener') as builder:
             builder.return_value.open.return_value=self.response(self.accepted())
             with self.assertRaises(telegram_bot.SendError): telegram_bot.send(CONFIG,TOKEN,'Teste')
+
+    def test_bot_id_is_not_accepted_as_destination_and_does_not_make_request(self):
+        with patch.object(telegram_bot,'build_opener') as builder:
+            with self.assertRaises(telegram_bot.SendError) as result:
+                telegram_bot.send(dict(chat_id=TOKEN.partition(':')[0]),TOKEN,'Teste')
+            builder.assert_not_called()
+        self.assertIn('ID do próprio bot',str(result.exception))
+        self.assertNotIn(TOKEN,str(result.exception))
+
+    def test_known_rejections_have_specific_safe_instructions(self):
+        cases=[(400,'Bad Request: chat not found','Chat ID'),
+               (403,"Forbidden: bot can't initiate conversation with a user",'/start'),
+               (403,"Forbidden: bot can't send messages to bots",'outro bot'),
+               (403,'Forbidden: bot was blocked by the user','Desbloqueie'),
+               (403,'Forbidden: bot was kicked from the group chat','Adicione'),
+               (403,'Forbidden: bot is not a member of the channel chat','Adicione'),
+               (400,'Bad Request: not enough rights to send text messages to the chat','permissão'),
+               (400,'Bad Request: chat_id is empty','destino está vazio'),
+               (400,'Bad Request: message is too long','tamanho do texto')]
+        for status,description,expected in cases:
+            with self.subTest(description=description):
+                payload=dict(description=description+' '+TOKEN)
+                error=HTTPError(f'https://api.telegram.org/bot{TOKEN}',status,'Error',{},io.BytesIO(json.dumps(payload).encode()))
+                with patch.object(telegram_bot,'build_opener') as builder:
+                    builder.return_value.open.side_effect=error
+                    with self.assertRaises(telegram_bot.SendError) as result:
+                        telegram_bot.send(CONFIG,TOKEN,'Teste')
+                self.assertIn(expected,str(result.exception))
+                self.assertNotIn(TOKEN,str(result.exception))
+                self.assertFalse(result.exception.retryable)

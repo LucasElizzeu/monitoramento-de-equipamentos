@@ -272,6 +272,12 @@ A aba **Notificações** envia quedas e recuperações para uma **conversa, grup
 
 O servidor precisa alcançar `https://api.telegram.org` na porta 443, mantendo a verificação TLS. O token fica criptografado no banco com a mesma chave das outras credenciais e nunca é retornado pela API. Deixe o campo vazio para manter um token já salvo. A Bot API exige o token no caminho da requisição HTTPS; erros exibidos pelo programa são tratados para não expor esse endereço nem o token, e redirecionamentos são recusados.
 
+### Se Enviar teste recusar a conversa
+
+O **Chat ID da conversa é diferente do ID do bot**. Não copie o número antes dos dois-pontos do token e não use o telefone como destino. Abra o bot correspondente ao token salvo, envie `/start`, volte ao painel, clique em **Buscar conversas**, selecione o destino e **salve antes de testar**. Para grupos, mantenha o sinal de menos do ID e confira se o bot é membro e pode escrever.
+
+O programa identifica separadamente ID do próprio bot, conversa não encontrada, bot bloqueado, falta de permissão e destino que ainda não iniciou conversa. Rejeições desconhecidas mostram o código HTTP sem afirmar que o Chat ID está errado. O conteúdo bruto de erros da API e o token não são exibidos.
+
 ### Eventos, agrupamento e tentativas
 
 - Ping: avisa a entrada na **21ª perda consecutiva** e a recuperação. Perdas adicionais na mesma sequência não geram novos eventos.

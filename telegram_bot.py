@@ -41,6 +41,8 @@ def summary(events):
 
 def api_error(status, payload):
     parameters = payload.get('parameters', {}) if isinstance(payload, dict) else {}
+    description = payload.get('description', '') if isinstance(payload, dict) else ''
+    description = description[:4096].lower() if isinstance(description, str) else ''
     if not isinstance(parameters, dict):
         parameters = {}
     if status == 429:
@@ -51,13 +53,31 @@ def api_error(status, payload):
         return SendError('O Telegram está temporariamente indisponível.', True)
     if status in (401, 404):
         return SendError('Token do bot recusado. Confira o token fornecido pelo BotFather.')
+    if "can't initiate conversation" in description:
+        return SendError('O destinatário ainda não iniciou conversa com este bot. Abra o bot correspondente ao token, envie /start e busque as conversas novamente.')
+    if "can't send messages to bots" in description:
+        return SendError('O destino é outro bot. Escolha sua conversa pessoal ou um grupo em Buscar conversas.')
+    if 'blocked by the user' in description:
+        return SendError('O destinatário bloqueou este bot. Desbloqueie o bot no Telegram e envie /start novamente.')
+    if 'kicked from' in description or 'not a member' in description:
+        return SendError('Este bot não faz parte do grupo ou canal. Adicione-o ao destino e busque as conversas novamente.')
+    if 'not enough rights' in description or 'have no rights' in description or 'chat_write_forbidden' in description:
+        return SendError('O bot não tem permissão para enviar mensagens no grupo ou canal. Confira as permissões do bot no destino.')
     if status == 403:
         return SendError('O bot foi bloqueado ou não tem permissão para enviar nesta conversa.')
     if status == 409:
         return SendError('O bot já usa outro coletor ou webhook. Use um bot dedicado ao monitoramento.')
     if parameters.get('migrate_to_chat_id'):
         return SendError('O grupo mudou de ID. Busque as conversas novamente e salve o novo Chat ID.')
-    return SendError('Conversa não encontrada ou pedido recusado. Envie /start ao bot e confira o Chat ID.')
+    if 'chat not found' in description:
+        return SendError('O Telegram não encontrou este Chat ID para o bot configurado. Abra o bot correspondente ao token, envie /start, selecione o destino em Buscar conversas e salve antes de testar.')
+    if 'chat_id is empty' in description:
+        return SendError('O destino está vazio. Selecione uma conversa e salve o Chat ID antes de testar.')
+    if 'message text is empty' in description or 'message is too long' in description:
+        return SendError('O Telegram recusou o tamanho do texto da mensagem. Atualize o programa e teste novamente.')
+    if 300 <= status < 400:
+        return SendError('A conexão foi redirecionada. O envio foi interrompido para proteger o token. Confira a conexão HTTPS com api.telegram.org.')
+    return SendError(f'O Telegram recusou a solicitação (HTTP {status}). O motivo não foi reconhecido; confira a conexão e a configuração do bot.')
 
 
 def request(token, method, payload):
@@ -99,6 +119,8 @@ def send(config, token, text):
     chat_id = config.get('chat_id', '')
     if not re.fullmatch(CHAT_PATTERN, chat_id):
         raise SendError('Informe o Chat ID numérico da conversa antes de enviar.')
+    if chat_id == token.partition(':')[0]:
+        raise SendError('Este Chat ID é o ID do próprio bot. Use o ID da sua conversa ou grupo: envie /start ao bot, clique em Buscar conversas, escolha o destino e salve.')
     result = request(token, 'sendMessage', dict(chat_id=chat_id, text=text_limit(text),
                                                link_preview_options={'is_disabled': True}))
     if (not isinstance(result, dict) or type(result.get('message_id')) is not int or result['message_id'] <= 0
