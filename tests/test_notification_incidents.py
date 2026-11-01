@@ -47,11 +47,12 @@ class NotificationIncidentTests(unittest.TestCase):
         with patch.object(app, 'now', return_value=START):
             for _ in range(21): app.record_ping(self.device['id'], False)
         message = telegram_bot.summary(self.rows())
-        self.assertEqual(message, 'LTE UARINI\nCausa: Sem resposta ao ping (21 perdas consecutivas).\nIniciado: 01/11/2026 às 10:14:00')
+        self.assertEqual(message, '🔴 LTE UARINI\nCausa: Sem resposta ao ping (21 perdas consecutivas).\nIniciado: 01/11/2026 às 10:14:00')
         with patch.object(app, 'now', return_value=END):
             app.record_ping(self.device['id'], True, 2)
         resolved = telegram_bot.summary([self.rows()[-1]])
-        self.assertEqual(resolved, message + '\nResolvido: 01/11/2026 às 10:20:00')
+        self.assertEqual(resolved, '🟢 LTE UARINI\nCausa: Sem resposta ao ping (21 perdas consecutivas).\nResolvido: 01/11/2026 às 10:20:00\nTempo fora: 6 min')
+        self.assertNotIn('Iniciado:', resolved)
         self.assertEqual(self.active(), [])
 
     def test_initial_time_survives_restart_pruning_and_repeated_failures(self):
@@ -88,7 +89,8 @@ class NotificationIncidentTests(unittest.TestCase):
         self.emit('Leitura de banda SIAE restabelecida.', 'success', 'collection', 'siae-band', END)
         result = telegram_bot.summary([self.rows()[-1]])
         self.assertIn('Causa: Falha ao ler banda SIAE: O rádio não respondeu.', result)
-        self.assertIn('Iniciado: 01/11/2026 às 10:14:00', result)
+        self.assertIn('Tempo fora: 6 min', result)
+        self.assertNotIn('Iniciado:', result)
         self.assertIn('Resolvido: 01/11/2026 às 10:20:00', result)
 
     def test_recording_while_delivery_disabled_does_not_replay_history(self):
@@ -120,7 +122,8 @@ class NotificationIncidentTests(unittest.TestCase):
         self.assertIn('Iniciado: 01/11/2026 às 10:14:00', telegram_bot.summary(self.rows()))
         self.emit('Ping restabelecido. Equipamento online.', 'success', stamp=END)
         result = telegram_bot.summary([self.rows()[-1]])
-        self.assertIn('Iniciado: não registrado', result)
+        self.assertIn('Tempo fora: não registrado', result)
+        self.assertNotIn('Iniciado:', result)
         self.assertIn('Resolvido: 01/11/2026 às 10:20:00', result)
 
     def test_rollbacks_leave_no_incident_and_no_pending_notification(self):
@@ -140,7 +143,7 @@ class NotificationIncidentTests(unittest.TestCase):
         with patch.object(app, 'now', return_value=END):
             app.record_ping(self.device['id'], True, 2)
         self.assertEqual(self.rows()[-1]['incident_started_at'], START)
-        self.assertIn('Iniciado: 01/11/2026 às 10:14:00', telegram_bot.summary([self.rows()[-1]]))
+        self.assertIn('Tempo fora: 6 min', telegram_bot.summary([self.rows()[-1]]))
 
     def test_actual_sender_receives_simplified_text_and_keeps_original_panel_history(self):
         self.emit('Sem ping: 21 perdas consecutivas.')
@@ -162,6 +165,8 @@ class NotificationIncidentTests(unittest.TestCase):
         events = [dict(device_name='😎'*80, level='success', message='x', incident_cause='😎'*1000,
                        incident_started_at=START, event_at=END) for _ in range(3)]
         result = telegram_bot.summary(events)
-        self.assertEqual(result.count('Iniciado:'), 3)
+        self.assertEqual(result.count('Iniciado:'), 0)
+        self.assertEqual(result.count('Tempo fora: 6 min'), 3)
+        self.assertEqual(result.count('🟢'), 3)
         self.assertEqual(result.count('Resolvido:'), 3)
         self.assertLessEqual(len(result.encode('utf-16-le'))//2, 4000)

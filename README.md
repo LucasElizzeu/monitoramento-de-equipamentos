@@ -295,13 +295,13 @@ O programa identifica separadamente ID do próprio bot, conversa não encontrada
 
 ### Formato das mensagens
 
-Cada ocorrência mostra somente o nome do equipamento, a causa e **Iniciado: data e hora**, sem o cabeçalho do grupo, título de queda/recuperação ou IP do equipamento. Na normalização, repete o nome, a causa e o início original e acrescenta **Resolvido: data e hora**. Os horários enviados são de Manaus (UTC−4), inclusive ao executar no Windows, sem dependência adicional de fuso horário.
+A falha mostra **🔴 nome do equipamento**, a causa e **Iniciado: data e hora**, sem cabeçalho do grupo, título adicional ou IP do equipamento. Na normalização, mostra **🟢 nome do equipamento**, a mesma causa, **Resolvido: data e hora** e **Tempo fora** em dias, horas, minutos e segundos. O início não é repetido na mensagem de resolução, mas continua salvo para calcular a duração. Os horários enviados são de Manaus (UTC−4), inclusive ao executar no Windows, sem dependência adicional de fuso horário.
 
 O início corresponde à detecção registrada da falha: no ping, a entrada na 21ª perda consecutiva; nas portas, a leitura que identificou Down. A resolução usa o horário em que o monitor confirmou a recuperação. São horários de observação, não uma estimativa retroativa do instante físico da queda.
 
 A causa e o início ficam persistidos por equipamento e ocorrência (ping, porta física, circuito ou banda SIAE). Reiniciar o programa ou limpar mensagens antigas da fila não perde uma ocorrência aberta. A recuperação de uma porta não fecha outras portas ou o ping do mesmo equipamento. Renomear a porta mantém a causa registrada na abertura. Remover/trocar o alvo limpa a ocorrência correspondente.
 
-Na atualização, uma falha de ping ainda ativa pode recuperar o início pelo alerta original, se ele estiver no histórico. Ocorrências cujo início não foi registrado ou recuperado mostram **Iniciado: não registrado**, em vez de inventar um horário. A alteração de formato não modifica os textos originais do histórico do painel nem reenvia eventos já enviados.
+Na atualização, uma falha de ping ainda ativa pode recuperar o início pelo alerta original, se ele estiver no histórico. Ocorrências cujo início não foi registrado ou recuperado mostram **Tempo fora: não registrado** na resolução, em vez de inventar uma duração. Se o relógio de resolução for anterior ao início, mostram **Tempo fora: não disponível**. A alteração de formato não modifica os textos originais do histórico do painel nem reenvia eventos já enviados.
 
 **Aceito pelo Telegram** indica que a Bot API retornou um ID de mensagem para o destino configurado, e não uma confirmação de leitura pelo operador. O token também entra nos backups criptografado; ao restaurar uma cópia, as notificações ficam **desativadas** e os envios pendentes da cópia são cancelados. Confira o destino antes de reativar.
 

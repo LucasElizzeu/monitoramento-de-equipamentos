@@ -125,6 +125,27 @@ class TelegramBotTests(unittest.TestCase):
             builder.return_value.open.return_value=self.response(self.accepted())
             with self.assertRaises(telegram_bot.SendError): telegram_bot.send(CONFIG,TOKEN,'Teste')
 
+    def test_outage_duration_handles_days_offsets_zero_and_unknown_start(self):
+        cases=[('2026-11-01T00:00:00+00:00','2026-11-02T01:02:03+00:00','1 d 1 h 2 min 3 s'),
+               ('2026-11-01T10:14:00-04:00','2026-11-01T14:20:00+00:00','6 min'),
+               ('2026-11-01T14:14:00','2026-11-01T14:14:00+00:00','0 s'),
+               (None,'2026-11-01T14:20:00+00:00','não registrado'),
+               ('2026-11-01T14:20:00+00:00','2026-11-01T14:14:00+00:00','não disponível'),
+               ('invalid-time','2026-11-01T14:14:00+00:00','não disponível')]
+        for start,end,expected in cases:
+            with self.subTest(start=start,end=end):
+                self.assertEqual(telegram_bot.event_duration(start,end),expected)
+
+    def test_recovery_crosses_local_midnight_without_repeating_start_label(self):
+        event=dict(device_name='Rádio Centro',level='success',topic='ping',message='Ping restabelecido.',
+                   incident_cause='Sem resposta ao ping.',incident_started_at='2026-11-02T03:59:00+00:00',
+                   event_at='2026-11-02T04:01:00+00:00')
+        message=telegram_bot.summary([event])
+        self.assertTrue(message.startswith('🟢 Rádio Centro\n'))
+        self.assertNotIn('Iniciado:',message)
+        self.assertIn('Resolvido: 02/11/2026 às 00:01:00',message)
+        self.assertIn('Tempo fora: 2 min',message)
+
     def test_bot_id_is_not_accepted_as_destination_and_does_not_make_request(self):
         with patch.object(telegram_bot,'build_opener') as builder:
             with self.assertRaises(telegram_bot.SendError) as result:

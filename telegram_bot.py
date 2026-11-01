@@ -40,6 +40,29 @@ def event_time(value):
     return stamp.astimezone(timezone(timedelta(hours=-4))).strftime('%d/%m/%Y às %H:%M:%S')
 
 
+def event_duration(started, ended):
+    if not started:
+        return 'não registrado'
+    try:
+        start, end = datetime.fromisoformat(started), datetime.fromisoformat(ended)
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=timezone.utc)
+        if end.tzinfo is None:
+            end = end.replace(tzinfo=timezone.utc)
+        elapsed = (end - start).total_seconds()
+        if elapsed < 0:
+            return 'não disponível'
+        seconds = int(elapsed)
+    except (TypeError, ValueError, OverflowError):
+        return 'não disponível'
+    parts = []
+    for unit, divisor in (('d', 86400), ('h', 3600), ('min', 60), ('s', 1)):
+        value, seconds = divmod(seconds, divisor)
+        if value:
+            parts.append(f'{value} {unit}')
+    return ' '.join(parts) or '0 s'
+
+
 def summary(events):
     parts = []
     for event in events:
@@ -48,9 +71,12 @@ def summary(events):
         fault = event.get('incident_cause') or alert_labels.cause(event['message'], event['level'], event.get('topic'))
         name = text_limit(' '.join(event['device_name'].split()), 160)
         fault = text_limit(' '.join(fault.split()), 600)
-        lines = [name, f'Causa: {fault}', f'Iniciado: {event_time(started)}']
+        lines = [f'{"🟢" if resolved else "🔴"} {name}', f'Causa: {fault}']
         if resolved:
-            lines.append(f'Resolvido: {event_time(event["event_at"])}')
+            lines.extend([f'Resolvido: {event_time(event["event_at"])}',
+                          f'Tempo fora: {event_duration(started, event["event_at"])}'])
+        else:
+            lines.append(f'Iniciado: {event_time(started)}')
         parts.append('\n'.join(lines))
     return text_limit('\n\n'.join(parts))
 
