@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#081628"><title>VELOSONET MONITORAMENTO</title><link rel="icon" type="image/svg+xml" href="/static/favicon.svg"><link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/static/theme.css"><link rel="stylesheet" href="/static/layout.css"><script src="/static/app.js" defer></script><link rel="stylesheet" href="/static/traffic.css"><script src="/static/traffic.js" defer></script><link rel="stylesheet" href="/static/modern.css"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#081628"><title>VELOSONET MONITORAMENTO</title><link rel="icon" type="image/svg+xml" href="/static/favicon.svg"><link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/static/theme.css"><link rel="stylesheet" href="/static/layout.css"><script src="/static/app.js" defer></script><link rel="stylesheet" href="/static/traffic.css"><script src="/static/traffic.js" defer></script><link rel="stylesheet" href="/static/modern.css"><link rel="stylesheet" href="/static/data-management.css"><script src="/static/data-management.js" defer></script></head>
 <body data-layout="compact">
 <aside class="sidebar">
   <a class="brand" href="/" aria-label="VELOSONET MONITORAMENTO — início"><span class="brand-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="m4 6 7 13L21 5M15 5h6v6"/></svg></span><span class="brand-copy"><strong>VELOSONET</strong><small>MONITORAMENTO</small></span></a>
@@ -12,6 +12,8 @@
     <button class="nav-item" data-page="datacoms" title="Datacoms"><span data-icon="ports"></span>Datacoms<span class="nav-count" id="datacom-count">0</span></button>
     <button class="nav-item" data-page="siae" title="Rádios SIAE" aria-label="Rádios SIAE"><span data-icon="wifi"></span>Rádios SIAE<span class="nav-count" id="siae-count">0</span></button>
     <button class="nav-item" data-page="alerts"><span data-icon="bell"></span>Eventos<span class="alert-dot" id="alert-dot" hidden></span></button>
+    <button class="nav-item" data-page="availability" title="Disponibilidade" aria-label="Disponibilidade"><span data-icon="activity"></span>Disponibilidade</button>
+    <button class="nav-item" data-page="backups" title="Backups" aria-label="Backups"><span data-icon="shield"></span>Backups</button>
   </nav>
   <div class="sidebar-bottom"><div class="monitor-box"><span class="live-dot"></span><strong>Monitoramento contínuo</strong><p>Uma visão clara de cada conexão.</p><div class="mini-wave">▁▂▁▃▅▂▁▂▄▆▃▂▁▃▂▅▄▂▁▂▄▂</div></div><div class="profile"><span class="avatar">OP</span><div>Operador<small>Ambiente local · v0.1</small></div><span data-icon="shield"></span></div></div>
 </aside>
@@ -32,6 +34,26 @@
   <section class="panel" id="ports-section" hidden><div class="panel-heading"><div><h2>Portas, sinais & banda</h2><p>Consultas SSH a cada 30 segundos · sinais em dBm · consumo na porta</p></div><div class="traffic-panel-actions"><button type="button" class="button secondary" id="open-traffic-dashboard"><span data-icon="activity"></span>Consumo 24h</button><span class="subtle-tag">Datacom</span></div></div><div id="ports-content"></div></section>
   <section class="panel" id="siae-section" hidden><div class="panel-heading"><div><h2>Ping e consumo dos rádios</h2><p>Ping pelo computador · tráfego RX da interface TRX ou soma A + B</p></div></div><div id="siae-content" class="siae-cards"></div></section>
   <section class="panel" id="alerts-section" hidden><div class="panel-heading"><div><h2>Histórico de eventos</h2><p>Quedas, recuperações e erros de coleta.</p></div></div><div id="alerts-content"></div></section>
+  <section id="availability-section" hidden aria-labelledby="availability-title">
+    <div class="panel report-controls"><div><h2 id="availability-title">Histórico de disponibilidade</h2><p id="availability-period">Carregando período…</p></div><div class="report-actions"><label class="sr-only" for="availability-days">Período do relatório</label><select id="availability-days"><option value="7">7 dias</option><option value="30">30 dias</option></select><button class="button secondary" id="refresh-availability" type="button"><span data-icon="refresh"></span>Atualizar</button></div></div>
+    <p class="report-note">O histórico começa nesta atualização. A disponibilidade considera o tempo com resposta ou perda de ping. Erros de coleta e períodos sem medição ficam separados. Quedas confirmadas seguem a regra da 21ª perda consecutiva.</p>
+    <p id="availability-error" class="form-error" role="alert" hidden></p>
+    <div id="availability-summary" class="report-summary"></div>
+    <div class="report-toolbar"><label class="search"><span data-icon="search"></span><input type="search" id="availability-search" placeholder="Buscar nome ou IP…" aria-label="Buscar equipamento no histórico"></label><div class="availability-legend"><span><i class="up"></i>Com resposta</span><span><i class="down"></i>Sem resposta</span><span><i class="error"></i>Erro de coleta</span><span><i class="missing"></i>Sem medição</span></div></div>
+    <div id="availability-results" class="availability-grid" aria-live="polite"></div>
+  </section>
+  <section id="backups-section" hidden aria-labelledby="backups-title">
+    <div class="panel backup-intro"><div><div class="eyebrow">SEUS DADOS PROTEGIDOS</div><h2 id="backups-title">Backup do monitoramento</h2><p>Cadastros, histórico e chave das credenciais em um único arquivo.</p></div><button class="button primary" id="create-backup" type="button"><span data-icon="shield"></span>Criar e baixar backup</button></div>
+    <p class="report-note">O programa cria uma cópia automática por dia enquanto estiver ligado e mantém as últimas 7. Você também pode guardar até 5 cópias manuais neste computador. Baixe uma cópia para outro local: backups no mesmo disco não protegem contra a perda dele.</p>
+    <p class="backup-warning">O arquivo inclui a chave que permite recuperar as credenciais dos equipamentos. Guarde-o em um local protegido e compartilhe somente com pessoas autorizadas.</p>
+    <p id="backups-status" class="report-note" role="status"></p>
+    <p id="backups-error" class="form-error" role="alert" hidden></p>
+    <div class="panel" id="backups-list" aria-live="polite"></div>
+    <details class="panel restore-help"><summary>Como restaurar um backup</summary><p>Pare o programa, mantenha o ZIP baixado e restaure em uma pasta nova. Seus dados atuais serão preservados. O backup é validado antes da restauração.</p><h3>Windows · PowerShell</h3><p>Na pasta do projeto, ajuste o caminho do ZIP e execute:</p><pre>.venv\Scripts\python.exe backups.py restore "C:\caminho\backup.zip" --destination ".data-restaurada"
+$env:MONITOR_DATA_DIR = "$PWD\.data-restaurada"
+.venv\Scripts\python.exe -m uvicorn app:app --host 127.0.0.1 --port 8000</pre><h3>Linux / macOS</h3><pre>.venv/bin/python backups.py restore "/caminho/backup.zip" --destination ".data-restaurada"
+MONITOR_DATA_DIR="$PWD/.data-restaurada" bash start.sh</pre><p>Use uma pasta de destino que ainda não exista. Nas próximas inicializações, mantenha MONITOR_DATA_DIR apontando para a pasta restaurada. Não é necessário importar equipamentos novamente.</p></details>
+  </section>
   <footer class="footer"><span><span class="footer-logo">VELOSONET MONITORAMENTO</span> Clareza em cada conexão.</span><a class="design-options-link" href="/static/design-options.html">Comparar opções de visual</a><span>Limite de alerta: <strong>mais de 20 perdas consecutivas</strong></span></footer>
 </main>
 </div>

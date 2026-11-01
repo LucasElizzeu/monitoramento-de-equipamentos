@@ -1,0 +1,34 @@
+.report-controls,.backup-intro{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:22px}
+.report-controls p,.backup-intro p{color:var(--muted);font-size:12px;line-height:1.7;margin:8px 0 0}
+.report-actions{display:flex;align-items:center;gap:10px}.report-actions select{min-height:40px;padding:8px 14px}
+.report-note{color:var(--muted);font-size:12px;line-height:1.8;margin:18px 0}
+.report-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:20px 0}
+.report-summary article{padding:19px}.report-summary span,.report-summary small{display:block;color:var(--muted);font-size:11px;line-height:1.7}
+.report-summary strong{display:block;font-size:29px;letter-spacing:-.6px;margin:10px 0;font-variant-numeric:tabular-nums}
+.report-toolbar{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin:24px 0 16px}
+.availability-legend{display:flex;flex-wrap:wrap;gap:12px;font-size:10px;color:var(--muted)}.availability-legend span{display:flex;align-items:center;gap:6px}
+.availability-legend i{width:7px;height:7px;border-radius:2px}.availability-legend .up{background:var(--success)}.availability-legend .down{background:var(--red)}.availability-legend .error{background:var(--amber)}.availability-legend .missing{background:#304259}
+.availability-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.availability-card{padding:20px;min-width:0}.availability-card header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.availability-card h3{font-size:13px;margin:0 0 7px;overflow-wrap:anywhere;line-height:1.6}.availability-card header span{font-size:10px;color:var(--muted);overflow-wrap:anywhere}
+.availability-value{font-size:22px;font-weight:600;color:var(--success);flex-shrink:0;font-variant-numeric:tabular-nums}
+.availability-timeline{display:flex;gap:3px;margin-top:22px;height:38px}.availability-day{flex:1;min-width:0;border-radius:3px}
+.availability-range{display:flex;justify-content:space-between;color:var(--dim);font-size:9px;margin-top:8px;gap:8px}
+.availability-card dl{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:22px 0 18px}.availability-card dt{color:var(--muted);font-size:10px;line-height:1.6}
+.availability-card dd{font-size:15px;margin:5px 0 0;font-variant-numeric:tabular-nums}.availability-coverage{font-size:10px;line-height:1.8;border-top:1px solid var(--line);padding-top:14px;margin-bottom:0;color:var(--muted)}
+.report-empty{padding:28px;text-align:center;color:var(--muted);font-size:12px;line-height:1.8;grid-column:1/-1}
+.backup-intro h2{font-size:20px}.backup-warning{padding:15px 18px;background:var(--warning-bg);color:var(--amber);border:1px solid #80643a;border-radius:10px;font-size:12px;line-height:1.8}
+.backup-row{display:flex;align-items:center;gap:14px;padding:18px 22px;border-bottom:1px solid var(--line)}.backup-row:last-child{border-bottom:0}
+.backup-symbol{display:grid;place-items:center;width:36px;height:36px;border-radius:10px;background:var(--success-bg);color:var(--success);flex-shrink:0}
+.backup-description{flex:1;min-width:0}.backup-description strong{display:block;font-size:12px}.backup-description span{display:block;font-size:11px;color:var(--muted);margin-top:7px;line-height:1.6}
+.restore-help{padding:20px 22px;margin-top:22px}.restore-help summary{cursor:pointer;font-size:13px;font-weight:600}.restore-help p{font-size:12px;line-height:1.8;color:var(--muted)}.restore-help h3{font-size:12px;margin-top:22px}.restore-help pre{overflow:auto;line-height:1.9;padding:14px;white-space:pre}
+@media(min-width:641px){body[data-layout] .sidebar{overflow-y:auto}}
+@media(min-width:641px) and (max-height:820px){.sidebar .monitor-box{display:none}.sidebar .workspace{margin:24px 0}.sidebar .nav-item{padding-block:11px;min-height:42px;margin-bottom:4px}}
+@media(max-width:640px){
+ body[data-layout] .sidebar nav{gap:2px}body[data-layout] .sidebar .nav-item{width:34px;min-height:38px;padding:8px;justify-content:center;gap:0}
+ .report-controls,.backup-intro{padding:18px 15px;align-items:flex-start;flex-direction:column}.report-actions{width:100%}.report-actions select{flex:1}
+ .report-summary{grid-template-columns:1fr;gap:10px}.report-summary article{padding:15px}.report-summary strong{font-size:26px;margin:7px 0}
+ .availability-grid{grid-template-columns:1fr}.availability-card{padding:16px}.availability-value{font-size:20px}.availability-legend{gap:9px;font-size:9px}
+ .backup-intro .button{width:100%}.backup-row{padding:16px 12px;gap:10px}.backup-symbol{display:none}.backup-description span{font-size:10px}.backup-row .button{padding:9px 10px;font-size:11px}.restore-help{padding:18px 15px}
+}
+@media(max-width:360px){body[data-layout] .sidebar .nav-item{width:30px;padding:6px}.availability-value{font-size:18px}}

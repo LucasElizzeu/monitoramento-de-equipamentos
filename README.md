@@ -215,6 +215,46 @@ Se a leitura falhar, abra **Ver diagnóstico da consulta SSH**, abaixo do aviso.
 - Limite desta versão: 100 equipamentos. Ainda não foi feito teste de carga com esse volume.
 - Circuitos remotos: até 100 no painel, com máximo de 20 por Datacom.
 
+## Disponibilidade de 7 e 30 dias
+
+A aba **Disponibilidade** mostra o percentual de tempo com resposta ao ping, tempo sem resposta, quedas confirmadas e cobertura da coleta por equipamento. Escolha **7 dias** ou **30 dias** e busque pelo nome ou IP. As barras representam cada data, da mais antiga à atual; a legenda separa resposta, perda, erro e ausência de medição. A demonstração inclui um histórico simulado separado dos dados reais.
+
+- O período abrange 7 ou 30 **datas UTC, incluindo hoje até o momento da consulta**. As datas são identificadas como UTC no painel. Os relatórios são atualizados a cada 30 segundos e pelo botão Atualizar.
+- Disponibilidade = tempo com resposta ÷ (tempo com resposta + tempo sem resposta). É uma medida do **ping**, não da banda, do SSH ou do serviço entregue ao cliente. Perdas abaixo do limiar de alerta também entram no tempo sem resposta.
+- **Quedas confirmadas** conta cada entrada na 21ª perda consecutiva. Uma sequência longa gera uma queda, e uma recuperação permite contar a próxima. Não confundir essa contagem com o número de pacotes perdidos.
+- Erros locais de ICMP são mostrados separadamente e ficam fora do percentual. Períodos sem coleta também ficam fora: nunca se presume que o equipamento permaneceu online durante todo o tempo em que o programa esteve desligado.
+- Uma leitura vale até a próxima leitura ou seu prazo de validade: o maior entre duas vezes o intervalo e intervalo + timeout + 5 segundos. Intervalos maiores deixam lacunas. Ao reiniciar, a leitura pendente é descartada para não cobrir a interrupção.
+- **Coleta válida** informa a parte do período que efetivamente tem resposta ou perda medida. Um resultado de 100% com cobertura baixa não comprova disponibilidade de 100% durante o período inteiro. Sem tempo medido, o percentual aparece como `—`.
+
+O histórico começa após instalar esta versão: as 720 amostras antigas não representam os últimos 30 dias e não são usadas para inventar resultados retroativos. Totais diários ficam no SQLite por 31 datas UTC, sem acumular milhões de pings individuais. Reiniciar e renomear preservam o histórico; trocar o IP/tipo reinicia o histórico desse equipamento, e removê-lo também remove seus totais. Nesta primeira etapa, o relatório cobre o ping local de BBUs, Datacoms e SIAE; pings remotos dos circuitos e portas não entram nesse percentual.
+
+## Backups automáticos, exportação e restauração
+
+Na aba **Backups**, o programa cria uma cópia automática na primeira execução do dia e verifica novamente a cada minuto enquanto estiver ligado. Mantém os **7 backups automáticos** mais recentes e, separadamente, os **5 manuais** mais recentes em `.data/backups/` (ou `MONITOR_DATA_DIR/backups/`). Dias em que o programa não executar não geram uma cópia. A rotação só ocorre após criar uma cópia válida. Falhas de espaço, permissão, integridade ou chave são informadas nessa aba e não param o monitoramento.
+
+**Criar e baixar backup** gera um ZIP e inicia o download. Cada cópia também tem um botão **Baixar ZIP**. O SQLite é copiado pela API de backup, incluindo transações já confirmadas no WAL: não é uma cópia insegura do arquivo durante gravações. O ZIP contém `monitor.db`, `credentials.key` e um manifesto com versão e hashes SHA256. São verificadas a integridade do banco e a compatibilidade da chave com as credenciais criptografadas. O limite é de 512 MiB para o banco de cada cópia.
+
+**O ZIP contém a chave de descriptografia.** Guarde em local protegido e mantenha uma cópia fora do disco do programa. Os backups não são enviados automaticamente a serviços externos. No Linux, arquivos são criados com modo 600 e pastas com 700; no Windows, proteja o acesso à pasta pelas permissões do sistema. O modo demonstração não lista, cria ou baixa backups reais.
+
+Para restaurar, pare o programa e, na pasta do projeto, use **uma pasta nova que ainda não exista**. O utilitário valida o conteúdo, os hashes, o banco e a chave antes de criar o destino. Não sobrescreve sua pasta de dados atual.
+
+Windows, no PowerShell (ajuste o caminho do ZIP):
+
+```powershell
+.venv\Scripts\python.exe backups.py restore "C:\caminho\backup.zip" --destination ".data-restaurada"
+$env:MONITOR_DATA_DIR = "$PWD\.data-restaurada"
+.venv\Scripts\python.exe -m uvicorn app:app --host 127.0.0.1 --port 8000
+```
+
+Linux/macOS:
+
+```bash
+.venv/bin/python backups.py restore "/caminho/backup.zip" --destination ".data-restaurada"
+MONITOR_DATA_DIR="$PWD/.data-restaurada" bash start.sh
+```
+
+Mantenha `MONITOR_DATA_DIR` apontando para a pasta restaurada em cada nova inicialização, inclusive no seu serviço ou atalho. As pastas `.data/` e `.data-restaurada*/` são ignoradas pelo Git. Nunca envie o ZIP, o banco ou a chave ao repositório. Os comandos acima também estão disponíveis na ajuda da aba Backups.
+
 ## Validação
 
 ```bash

@@ -286,7 +286,7 @@ function render(){
  $('#ports-content').querySelectorAll('details').forEach(e=>e.open=openPorts.has(e.dataset.portKey));
  if(state.selected&&$('#detail-dialog').open){if(state.demo){state.detailSamples=samples.filter(s=>s.device_id===state.selected);renderDetail();}else{const selected=state.selected;api(`/api/devices/${selected}/history`).then(history=>{if(state.selected===selected){state.detailSamples=history;renderDetail();}}).catch(()=>{});}}
 }
-const pages={overview:['Visão geral','Tudo conectado. Tudo sob controle.'],bbus:["BBU's","Monitore o ping, a latência e as perdas das suas BBU's."],datacoms:['Datacoms','Disponibilidade, portas e sinais ópticos dos seus Datacoms.'],siae:['Rádios SIAE','Disponibilidade por ping e consumo real de banda do rádio.'],alerts:['Eventos','Cada mudança na rede, registrada em um só lugar.']};
+const pages={availability:['Disponibilidade','Acompanhe o tempo com resposta, as perdas de ping e a cobertura da coleta.'],backups:['Backups','Guarde uma cópia dos seus dados e recupere quando precisar.'],overview:['Visão geral','Tudo conectado. Tudo sob controle.'],bbus:["BBU's","Monitore o ping, a latência e as perdas das suas BBU's."],datacoms:['Datacoms','Disponibilidade, portas e sinais ópticos dos seus Datacoms.'],siae:['Rádios SIAE','Disponibilidade por ping e consumo real de banda do rádio.'],alerts:['Eventos','Cada mudança na rede, registrada em um só lugar.']};
 function navigate(page){
  window.getSelection()?.removeAllRanges();state.page=page;
  document.querySelectorAll('[data-page]').forEach(e=>{
@@ -299,13 +299,19 @@ function navigate(page){
  $('#devices-section').hidden=!['overview','bbus','datacoms','siae'].includes(page);
  $('#ports-section').hidden=page!=='datacoms';$('#siae-section').hidden=page!=='siae';$('#alerts-section').hidden=page!=='alerts';
  $('#search').value='';$('#state-filter').value='all';
+ $('#metrics').hidden=['availability','backups'].includes(page);
+ $('#availability-section')?.toggleAttribute('hidden',page!=='availability');
+ $('#backups-section')?.toggleAttribute('hidden',page!=='backups');
+ $('#add-device').hidden=Boolean(designPreview)||page==='backups';
  render();
+ window.dispatchEvent(new CustomEvent('monitor-page',{detail:{page,demo:state.demo}}));
 }
 function toggleDemo(value){
  if(designPreview)return;
  document.querySelectorAll('.port-card details[open], .port-ping details[open], .ssh-diagnostic[open]').forEach(e=>e.open=false);
  window.getSelection()?.removeAllRanges();
  state.demo=value;state.selected=null;localStorage.setItem('nexo-demo',String(value));load();
+ window.dispatchEvent(new CustomEvent('monitor-page',{detail:{page:state.page,demo:value}}));
 }
 function normalizedPorts(value){
  return value.split(/[,;\s]+/).map(port=>port.trim()).filter(Boolean).map(port=>/^\d+$/.test(port)?`1/1/${Number(port)}`:port);

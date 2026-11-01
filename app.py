@@ -26,6 +26,8 @@ from pydantic import BaseModel, Field, field_validator
 from remote_ping import RemotePingError, parse_remote_ping, read_remote_ping
 from siae import SiaeError, SiaeSessionError, login as siae_login, read_counters, calculate_rates
 import traffic_history
+import availability
+import backups
 
 ROOT = Path(__file__).resolve().parent
 DATA = Path(os.environ.get('MONITOR_DATA_DIR', ROOT / '.data'))
@@ -44,6 +46,7 @@ LOCK = threading.RLock()
 STOP = threading.Event()
 INFLIGHT = set()
 SIAE_BASELINES = {}
+BACKUP_ERROR = None
 IS_WINDOWS = sys.platform == 'win32'
 INTERFACE_LABELS = {
     'auto': 'Automático',
@@ -96,6 +99,7 @@ def init_db():
         CREATE UNIQUE INDEX IF NOT EXISTS circuit_target ON circuits(source_device_id, host);
         ''')
         traffic_history.init_schema(db)
+        availability.init_schema(db)
         columns = {row['name'] for row in db.execute('PRAGMA table_info(devices)')}
         for name, definition in (
                 ('siae_enabled', 'INTEGER NOT NULL DEFAULT 0'),
@@ -429,6 +433,8 @@ def record_ping(device_id, success, latency=None, error=None, expected_version=N
         if not device or (expected_version is not None and device['config_version'] != expected_version):
             return
         ping_at = started_at if started_at is not None else time.time()
+        availability.record(db, device, 'error' if error else 'up' if success else 'down', time.time(),
+                            outage=not error and not success and device['failures'] == 20)
         db.execute('UPDATE devices SET ping_detail=? WHERE id=?', ((detail or error or ('Resposta ICMP recebida.' if success else 'Sem resposta ICMP.'))[:5000], device_id))
         if error:
             if device['state'] != 'error':
@@ -1066,6 +1072,7 @@ def monitor():
             with LOCK, connect() as db:
                 if time.time() >= next_traffic_cleanup:
                     traffic_history.prune(db, time.time())
+                    availability.prune(db, time.time())
                     next_traffic_cleanup = time.time() + 300
                 devices = db.execute('SELECT * FROM devices').fetchall()
                 by_id = {row['id']: dict(row) for row in devices}
@@ -1095,16 +1102,34 @@ def monitor():
             STOP.wait(0.1)
 
 
+def automatic_backups():
+    global BACKUP_ERROR
+    while not STOP.is_set():
+        try:
+            backups.create(DATA, automatic=True)
+            BACKUP_ERROR = None
+        except Exception:
+            # Never expose paths or encrypted credential contents in an API error.
+            BACKUP_ERROR = 'O backup automático falhou. Verifique o espaço em disco e as permissões da pasta de dados.'
+        STOP.wait(60)
+
+
 @asynccontextmanager
 async def lifespan(app):
     init_db()
+    with connect() as db:
+        # Old live observations cannot cover the time the program was stopped.
+        db.execute('DELETE FROM availability_cursor')
     STOP.clear()
     thread = threading.Thread(target=monitor, daemon=True)
+    backup_thread = threading.Thread(target=automatic_backups, daemon=True)
     app.state.monitor_thread = thread
     thread.start()
+    backup_thread.start()
     yield
     STOP.set()
     thread.join(timeout=15)
+    backup_thread.join(timeout=15)
 
 
 app = FastAPI(title='VELOSONET MONITORAMENTO', lifespan=lifespan)
@@ -1149,6 +1174,42 @@ def dashboard(demo: bool = False):
         events = [public_alert(row, by_id) for row in db.execute('SELECT * FROM alerts ORDER BY id DESC LIMIT 60')]
         samples = [dict(row) for row in db.execute('SELECT * FROM samples ORDER BY id DESC LIMIT 720')][::-1]
     return dict(devices=devices, alerts=events, samples=samples, demo=False, updated_at=now())
+
+
+@app.get('/api/availability')
+def availability_report(days: int = 7, demo: bool = False):
+    if days not in (7, 30):
+        raise HTTPException(422, 'Escolha o período de 7 ou 30 dias.')
+    at = time.time()
+    if demo:
+        return availability.demo_report(demo_dashboard()['devices'], days, at)
+    with LOCK, connect() as db:
+        devices = db.execute('SELECT id,name,host,kind FROM devices ORDER BY name COLLATE NOCASE,id').fetchall()
+        return dict(availability.report(db, devices, days, at), demo=False)
+
+
+@app.get('/api/backups')
+def list_backups():
+    return dict(backups=backups.catalog(DATA / 'backups'), error=BACKUP_ERROR,
+                automatic_retention=7, manual_retention=5)
+
+
+@app.post('/api/backups', status_code=201)
+def create_backup():
+    try:
+        return backups.create(DATA)
+    except Exception:
+        raise HTTPException(503, 'Não foi possível criar o backup. Verifique o espaço em disco, as permissões e a chave das credenciais.') from None
+
+
+@app.get('/api/backups/{name}')
+def download_backup(name: str):
+    try:
+        path = backups.backup_path(DATA / 'backups', name)
+    except backups.BackupError:
+        raise HTTPException(404, 'Backup não encontrado.') from None
+    return FileResponse(path, media_type='application/zip', filename=path.name,
+                        headers={'Cache-Control': 'no-store'})
 
 
 def traffic_catalog(db, at, include_zero=False):
@@ -1376,6 +1437,7 @@ def update_device(device_id: int, device: DeviceInput):
         changed_ssh = any(values[key] != previous[key] for key in
                           ('ssh_port', 'username', 'password', 'fingerprint', 'ports', 'interface_type', 'status_command', 'optics_command', 'utilization_command'))
         if changed_target:
+            availability.reset(db, device_id)
             db.execute('DELETE FROM samples WHERE device_id=?', (device_id,))
             db.execute('DELETE FROM port_traffic_series WHERE device_id=?', (device_id,))
             values.update(state='pending', failures=0, latency=None, last_check=None, ping_detail=None)
