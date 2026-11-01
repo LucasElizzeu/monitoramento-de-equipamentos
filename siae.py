@@ -5,7 +5,7 @@ import math
 import re
 import socket
 import ssl
-from http.client import HTTPException
+from http.client import HTTPException, BadStatusLine, RemoteDisconnected
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
@@ -62,6 +62,31 @@ def parse_table(payload, indices):
     return result
 
 
+def invalid_http_message(error):
+    """Classify known protocol signatures without exposing response contents."""
+    if isinstance(error, RemoteDisconnected):
+        return ('O rádio fechou a conexão sem enviar o status HTTP (RemoteDisconnected). '
+                'Confira se a URL, HTTP/HTTPS e porta são os mesmos usados no navegador deste computador.')
+    if isinstance(error, BadStatusLine):
+        line = error.line if isinstance(error.line, str) else ''
+        if line.startswith('SSH-'):
+            return ('A porta configurada responde como SSH, não como interface web (BadStatusLine). '
+                    'Em Editar banda, informe a porta HTTP/HTTPS usada para abrir o rádio no navegador.')
+        if len(line) >= 2 and ord(line[0]) in (21, 22) and ord(line[1]) == 3:
+            return ('A porta respondeu com dados TLS a uma consulta HTTP (BadStatusLine). '
+                    'Confira se o acesso do navegador usa HTTPS e cadastre o mesmo protocolo e porta.')
+        if line.startswith('HTTP/'):
+            match = re.match(r'^HTTP/([0-9]\.[0-9])(?:[ \t]+([0-9]{1,4})(?=[ \t\r\n]|$))?', line)
+            signature = (f' Protocolo recebido: HTTP/{match[1]}' + (f', código {match[2]}' if match[2] else '') + '.') if match else ''
+            return (f'O rádio enviou uma linha de status HTTP fora do formato aceito (BadStatusLine).{signature} '
+                    'Confirme o modelo e firmware para verificar a compatibilidade da interface web.')
+        return ('A resposta não começa com um status HTTP válido (BadStatusLine). '
+                'Confira o endereço exato usado no navegador, o protocolo e a porta web. '
+                'A senha ainda não foi validada pelo coletor.')
+    return (f'O rádio enviou uma resposta HTTP incompleta ou inválida ({type(error).__name__}). '
+            'Confira HTTP/HTTPS e a porta web.')
+
+
 def post_json(host, scheme, port, endpoint, payload):
     host = str(ipaddress.ip_address(host))
     if scheme not in ('http', 'https') or not 1 <= port <= 65535:
@@ -70,8 +95,8 @@ def post_json(host, scheme, port, endpoint, payload):
     suffix = '' if port == (443 if scheme == 'https' else 80) else f':{port}'
     origin = f'{scheme}://{address}{suffix}'
     request = Request(origin + endpoint, method='POST',
-        data=json.dumps(payload).encode(),
-        headers={'Content-Type': 'application/json', 'Accept': 'application/json',
+        data=json.dumps(payload, separators=(',', ':'), ensure_ascii=False).encode('utf-8'),
+        headers={'Content-Type': 'application/json; charset=UTF-8', 'Accept': 'application/json',
                  'X-Requested-With': 'XMLHttpRequest', 'Origin': origin})
     try:
         with build_opener(NoRedirect()).open(request, timeout=5) as response:
@@ -86,6 +111,7 @@ def post_json(host, scheme, port, endpoint, payload):
             raise SiaeError('Resposta do login não reconhecida. Use a sessão Id manual e confira o formato do login.') from None
         return result
     except HTTPError as exc:
+        exc.close()
         if exc.code in (401, 403):
             if endpoint == '/Log.Login':
                 raise SiaeError('Login recusado pelo rádio. Confira usuário, senha e permissão de acesso.') from None
@@ -94,15 +120,19 @@ def post_json(host, scheme, port, endpoint, payload):
     except URLError as exc:
         if isinstance(exc.reason, ssl.SSLCertVerificationError):
             raise SiaeError('O certificado HTTPS do rádio não pôde ser validado. Confira o certificado e o protocolo configurado.') from None
+        if isinstance(exc.reason, ssl.SSLError):
+            raise SiaeError('A negociação HTTPS falhou antes da resposta HTTP. Confira se o navegador usa HTTP ou HTTPS e a mesma porta. A validação TLS permanece ativa.') from None
         if isinstance(exc.reason, TimeoutError):
             raise SiaeError('O rádio não respondeu à consulta web em até 5 segundos. Confira o acesso pelo navegador neste computador.') from None
         if isinstance(exc.reason, ConnectionRefusedError):
             raise SiaeError('A conexão web foi recusada. Confira HTTP/HTTPS e a porta web do rádio.') from None
         if isinstance(exc.reason, socket.gaierror):
             raise SiaeError('Falha ao localizar o destino da conexão web. Confira a rede e o proxy configurado no computador.') from None
+        if isinstance(exc.reason, HTTPException):
+            raise SiaeError(invalid_http_message(exc.reason)) from None
         raise SiaeError('Não foi possível acessar o rádio. Confira IP, HTTP/HTTPS, porta e rede.') from None
     except HTTPException as exc:
-        raise SiaeError(f'O rádio enviou uma resposta HTTP incompleta ou inválida ({type(exc).__name__}). Confira HTTP/HTTPS e a porta web.') from None
+        raise SiaeError(invalid_http_message(exc)) from None
     except TimeoutError:
         raise SiaeError('O rádio não respondeu à consulta web em até 5 segundos. Confira o acesso pelo navegador neste computador.') from None
     except OSError:

@@ -65,6 +65,14 @@ Falhas de sessão/conexão, interfaces ausentes ou tabelas incompletas deixam o 
 
 O modo demonstração usa exemplos explícitos de **120 Mbps + 80 Mbps = 200 Mbps**; esses números não são leituras reais. A validação automatizada usa respostas no formato enviado e um rádio HTTP simulado localmente; a leitura e o login no equipamento físico dependem da conexão, das credenciais e do formato de resposta do firmware na sua rede.
 
+### Diagnosticar acesso web da banda
+
+As requisições de login e contadores usam JSON compacto em UTF-8, com o charset declarado no Content-Type. O conteúdo das credenciais é preservado, inclusive acentos e espaços.
+
+O botão **Consultar banda agora** solicita uma coleta pela fila web existente, sem esperar os 30 segundos após uma falha. É preciso ter a leitura habilitada; uma consulta já em andamento não é duplicada. O cálculo continua exigindo duas leituras válidas e não altera o ping.
+
+`BadStatusLine` indica que o cliente não recebeu um status HTTP válido, antes de validar os contadores. O diagnóstico distingue uma porta que responde como SSH, uma resposta TLS recebida por HTTP, status HTTP fora do formato e conexão encerrada pelo rádio. Não é, por si só, uma confirmação de senha errada. Use o mesmo protocolo e porta do navegador; não desative a validação HTTPS. Se a página inicial retorna HTTP 200, mas o login falha, confira os metadados da requisição de login no navegador (URL, método, status e Content-Type), sem copiar senha, cookies, sessão ou o corpo da resposta.
+
 ## Ordem do circuito e nomes personalizados
 
 Na edição de cada Datacom (lápis da linha), preencha **Posição no circuito** com 1, 2, 3 ou posições intermediárias como **2.1** e **2.2**, para organizar trechos com duas rotas. O campo aceita ponto ou vírgula (`2.1` ou `2,1`), de 1 a 10000. A sequência será **2 → 2.1 → 2.2 → 3**. A aba Datacoms e os blocos de portas seguem essa ordem numérica. Os que estiverem sem posição aparecem no final; posições iguais mantêm a ordem de cadastro. Apague o número para voltar à ordenação sem posição. As posições são salvas no banco e permanecem ao reiniciar.

@@ -157,14 +157,14 @@ function siaeDiagnosticHTML(device){
  const data=device.siae_consumption||{};
  if(data.status!=='error')return '';
  const mode=device.siae_auth_mode==='login'?'Login automático':'Sessão manual';
- const text=`Rádio: ${device.name}\nIP: ${device.host}\nAcesso: ${mode}\nWeb: ${device.siae_scheme||'http'} · porta ${device.siae_port||80}\nÚltima consulta: ${data.checked_at?new Date(data.checked_at).toLocaleString('pt-BR'):'—'}\n${data.error||'Falha de coleta sem diagnóstico.'}\nPróxima tentativa automática: após 30 segundos da falha.`;
+ const text=`Rádio: ${device.name}\nIP: ${device.host}\nAcesso: ${mode}\nWeb: ${device.siae_scheme||'http'} · porta ${device.siae_port||80}\nInterfaces selecionadas: ${(device.siae_interfaces||[3]).join(', ')}\nÚltima consulta: ${data.checked_at?new Date(data.checked_at).toLocaleString('pt-BR'):'—'}\n${data.error||'Falha de coleta sem diagnóstico.'}\nPróxima tentativa automática: após 30 segundos da falha.`;
  return `<details class="siae-diagnostic"><summary>Ver diagnóstico da banda</summary><button type="button" class="button secondary output-copy" data-copy-output>${icon('copy')}Copiar diagnóstico</button><pre>${esc(text)}</pre></details>`;
 }
 function siaeCardHTML(device){
  const consumption=device.siae_consumption||{};
  const pair=consumption.status==='demo'||device.siae_interfaces?.length===2;
  const note=consumption.status==='demo'?'Dados simulados · TRX A + TRX B':consumption.error||consumption.note||(consumption.total_bps==null?'Ative a leitura em Configurar banda.':pair?'RX total = TRX A + TRX B':'RX da interface TRX selecionada.');
- return `<article class="port-card siae-card" data-siae="${device.id}"><div class="port-card-header"><h3>${esc(device.name)}</h3>${badge(device.state)}</div><p class="siae-address ip">${deviceAddressHTML(device)}</p><div class="port-ping-values siae-ping"><span>Latência<strong>${number(device.latency,2)} <small>ms</small></strong></span><span>Perdas<strong>${device.failures} <small>/ 21</small></strong></span></div><small>Ping ${ago(device.last_check)}</small><div class="port-traffic"><div class="traffic-heading">Consumo total · RX</div><div class="traffic-values"><strong>${bandwidth(consumption.total_bps)}</strong></div></div>${pair?`<div class="siae-trx"><span>TRX A<strong>${bandwidth(consumption.trx_a_bps)}</strong></span><span>TRX B<strong>${bandwidth(consumption.trx_b_bps)}</strong></span></div>`:`<p class="siae-source">Interface TRX · índice ${esc((device.siae_interfaces||[3])[0])}</p>`}${consumption.checked_at?`<small>Banda ${ago(consumption.checked_at)}</small>`:''}<p class="siae-note ${consumption.total_bps==null?'pending':''} ${consumption.status==='error'?'error':''}">${esc(note)}</p>${siaeDiagnosticHTML(device)}<button type="button" class="button secondary siae-configure" data-configure-siae="${device.id}">${icon('edit')}${device.siae_enabled?'Editar banda':'Configurar banda'}</button></article>`;
+ return `<article class="port-card siae-card" data-siae="${device.id}"><div class="port-card-header"><h3>${esc(device.name)}</h3>${badge(device.state)}</div><p class="siae-address ip">${deviceAddressHTML(device)}</p><div class="port-ping-values siae-ping"><span>Latência<strong>${number(device.latency,2)} <small>ms</small></strong></span><span>Perdas<strong>${device.failures} <small>/ 21</small></strong></span></div><small>Ping ${ago(device.last_check)}</small><div class="port-traffic"><div class="traffic-heading">Consumo total · RX</div><div class="traffic-values"><strong>${bandwidth(consumption.total_bps)}</strong></div></div>${pair?`<div class="siae-trx"><span>TRX A<strong>${bandwidth(consumption.trx_a_bps)}</strong></span><span>TRX B<strong>${bandwidth(consumption.trx_b_bps)}</strong></span></div>`:`<p class="siae-source">Interface TRX · índice ${esc((device.siae_interfaces||[3])[0])}</p>`}${consumption.checked_at?`<small>Banda ${ago(consumption.checked_at)}</small>`:''}<p class="siae-note ${consumption.total_bps==null?'pending':''} ${consumption.status==='error'?'error':''}">${esc(note)}</p>${siaeDiagnosticHTML(device)}${device.siae_enabled?`<button type="button" class="button secondary siae-configure" data-check-siae="${device.id}" ${state.siaeChecking?.has(device.id)?'disabled':''}>${icon('refresh')}Consultar banda agora</button>`:''}<button type="button" class="button secondary siae-configure" data-configure-siae="${device.id}">${icon('edit')}${device.siae_enabled?'Editar banda':'Configurar banda'}</button></article>`;
 }
 function renderSiae(){
  const radios=pageDevices('siae'),q=$('#search').value.toLowerCase(),filter=$('#state-filter').value;
@@ -415,6 +415,14 @@ document.querySelectorAll('[name="kind"]').forEach(el=>el.addEventListener('chan
 for(const name of ['siae_enabled','siae_mode','siae_auth_mode'])$(`[name="${name}"]`).addEventListener('change',syncSiaeFields);
 $('[name="siae_scheme"]').addEventListener('change',()=>{const port=$('[name="siae_port"]');if(['80','443'].includes(port.value))port.value=$('[name="siae_scheme"]').value==='https'?'443':'80';});
 $('#device-dialog').addEventListener('close',()=>{for(const name of ['siae_session','siae_password'])$(`[name="${name}"]`).value='';});
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-check-siae]');if(!button)return;
+ const id=Number(button.dataset.checkSiae);state.siaeChecking??=new Set();
+ if(state.siaeChecking.has(id))return;state.siaeChecking.add(id);button.disabled=true;
+ try{await api(`/api/devices/${id}/siae/check`,{method:'POST'});toast('Consulta de banda solicitada. Aguarde a próxima leitura; o cálculo precisa de duas amostras.');}
+ catch(error){toast(error.message);}
+ finally{state.siaeChecking.delete(id);button.disabled=false;}
+});
 document.addEventListener('click',event=>{const button=event.target.closest('[data-configure-siae]');if(!button)return;openEdit(Number(button.dataset.configureSiae));if($('#device-dialog').open){$('#siae-config').open=true;$('[name="siae_enabled"]').focus();}});
 document.querySelectorAll('[data-page]').forEach(e=>e.addEventListener('click',()=>navigate(e.dataset.page)));
 $('#all-events').addEventListener('click',()=>navigate('alerts'));

@@ -1275,6 +1275,21 @@ def dashboard(demo: bool = False):
     return dict(devices=devices, alerts=events, samples=samples, demo=False, updated_at=now())
 
 
+@app.post('/api/devices/{device_id}/siae/check', status_code=202)
+def request_siae_check(device_id: int):
+    with LOCK, connect() as db:
+        device = db.execute('SELECT kind,siae_enabled FROM devices WHERE id=?', (device_id,)).fetchone()
+        if not device:
+            raise HTTPException(404, 'Rádio não encontrado.')
+        if device['kind'] != 'siae' or not device['siae_enabled']:
+            raise HTTPException(422, 'Configure e ative a leitura de banda deste rádio antes de consultar.')
+        if (device_id, 'siae') in INFLIGHT:
+            raise HTTPException(409, 'A consulta de banda já está em andamento. Aguarde o resultado.')
+        # Reuse the bounded web worker pool; never start a thread per HTTP request.
+        db.execute('UPDATE devices SET last_siae=0 WHERE id=?', (device_id,))
+    return dict(status='scheduled')
+
+
 @app.get('/api/availability')
 def availability_report(days: int = 7, demo: bool = False):
     if days not in (7, 30):

@@ -30,6 +30,15 @@ class LoginProtocolTests(unittest.TestCase):
         self.assertEqual(json.loads(request.data), {'Usr': 'test-user', 'Pwd': 'test-password'})
         self.assertNotIn('test-password', request.full_url)
 
+    def test_json_matches_browser_compact_utf8_encoding_without_changing_credentials(self):
+        with patch.object(siae, 'build_opener') as opener:
+            opener.return_value.open.return_value = self.response({'Err': 0, 'Id': 'simulated-session'})
+            siae.login('192.0.2.70', 'http', 80, 'operadór', 'senhã de teste')
+        request = opener.return_value.open.call_args.args[0]
+        self.assertEqual(request.data, '{"Usr":"operadór","Pwd":"senhã de teste"}'.encode('utf-8'))
+        self.assertEqual(request.get_header('Content-type'), 'application/json; charset=UTF-8')
+        self.assertEqual(json.loads(request.data), {'Usr': 'operadór', 'Pwd': 'senhã de teste'})
+
     def test_unknown_rejected_or_missing_session_never_succeeds_or_echoes_values(self):
         for payload in ({'Err': 1, 'Id': 'sensitive-value'}, {'Err': '0', 'Id': 'sensitive-value'},
                         {'val': 'sensitive-value'}, {'Id': ''}, {'Id': 123}, {'Id': 'invalid value'},
@@ -68,6 +77,49 @@ class LoginProtocolTests(unittest.TestCase):
                     siae.login('192.0.2.70', 'http', 80, 'test-user', 'test-password')
                 self.assertIn(type(cause).__name__, str(error.exception))
                 self.assertNotIn('private-response-body', str(error.exception))
+
+    def test_bad_status_line_distinguishes_protocol_signatures_without_echoing_bytes(self):
+        from http.client import BadStatusLine, RemoteDisconnected
+        cases = [(BadStatusLine('SSH-2.0-private-response-body'), 'responde como SSH'),
+                 (BadStatusLine('\x15\x03\x03private-response-body'), 'dados TLS'),
+                 (BadStatusLine('HTTP/1.1 INVALID private-response-body'), 'formato aceito'),
+                 (BadStatusLine('<html>private-response-body</html>'), 'status HTTP válido'),
+                 (RemoteDisconnected('private-response-body'), 'fechou a conexão')]
+        for cause, expected in cases:
+            with self.subTest(expected=expected), patch.object(siae, 'build_opener') as opener:
+                opener.return_value.open.side_effect = cause
+                with self.assertRaises(siae.SiaeError) as error:
+                    siae.login('192.0.2.70', 'http', 80, 'test-user', 'test-password')
+                self.assertIn(expected, str(error.exception))
+                self.assertNotIn('private-response-body', str(error.exception))
+                self.assertNotIn('test-password', str(error.exception))
+
+    def test_invalid_http_status_includes_only_protocol_and_numeric_code(self):
+        from http.client import BadStatusLine
+        result = siae.invalid_http_message(BadStatusLine('HTTP/1.1 0 private-response-body'))
+        self.assertIn('HTTP/1.1, código 0', result)
+        self.assertNotIn('private-response-body', result)
+
+    def test_tls_protocol_mismatch_is_distinct_from_certificate_failure(self):
+        import ssl
+        from urllib.error import URLError
+        with patch.object(siae, 'build_opener') as opener:
+            opener.return_value.open.side_effect = URLError(ssl.SSLError('private-response-body'))
+            with self.assertRaises(siae.SiaeError) as error:
+                siae.login('192.0.2.70', 'https', 443, 'test-user', 'test-password')
+        self.assertIn('negociação HTTPS', str(error.exception))
+        self.assertIn('validação TLS permanece ativa', str(error.exception))
+        self.assertNotIn('private-response-body', str(error.exception))
+
+    def test_disconnect_wrapped_by_urllib_keeps_specific_diagnostic(self):
+        from http.client import RemoteDisconnected
+        from urllib.error import URLError
+        with patch.object(siae, 'build_opener') as opener:
+            opener.return_value.open.side_effect = URLError(RemoteDisconnected('private-response-body'))
+            with self.assertRaises(siae.SiaeError) as error:
+                siae.login('192.0.2.70', 'http', 80, 'test-user', 'test-password')
+        self.assertIn('fechou a conexão', str(error.exception))
+        self.assertNotIn('private-response-body', str(error.exception))
 
     def test_timeout_refused_connection_and_certificate_have_actionable_safe_messages(self):
         import ssl
@@ -111,6 +163,39 @@ class AutomaticLoginTests(unittest.TestCase):
 
     def check(self):
         app.check_siae(self.raw())
+
+    def test_manual_request_schedules_web_collection_without_logging_in_in_http_handler(self):
+        with app.connect() as db:
+            db.execute('UPDATE devices SET last_siae=12345 WHERE id=?', (self.device_id,))
+        before = self.raw()
+        with patch.object(app, 'siae_login') as login, patch.object(app, 'read_counters') as read:
+            self.assertEqual(app.request_siae_check(self.device_id), {'status': 'scheduled'})
+            login.assert_not_called(); read.assert_not_called()
+        after = self.raw()
+        self.assertEqual(after['last_siae'], 0)
+        for field in ('config_version', 'failures', 'last_ping', 'siae_password', 'siae_data'):
+            self.assertEqual(after[field], before[field])
+
+    def test_manual_request_rejects_disabled_missing_and_non_radio_targets(self):
+        self.edit(siae_enabled=False)
+        with self.assertRaises(app.HTTPException) as error:
+            app.request_siae_check(self.device_id)
+        self.assertEqual(error.exception.status_code, 422)
+        bbu = app.create_device(app.DeviceInput(name='BBU', host='192.0.2.90'))
+        with self.assertRaises(app.HTTPException): app.request_siae_check(bbu['id'])
+        with self.assertRaises(app.HTTPException) as error:
+            app.request_siae_check(99999)
+        self.assertEqual(error.exception.status_code, 404)
+
+    def test_manual_request_does_not_duplicate_an_inflight_collection(self):
+        key = (self.device_id, 'siae')
+        app.INFLIGHT.add(key)
+        try:
+            with self.assertRaises(app.HTTPException) as error:
+                app.request_siae_check(self.device_id)
+            self.assertEqual(error.exception.status_code, 409)
+        finally:
+            app.INFLIGHT.discard(key)
 
     def test_password_encrypted_and_never_returned_or_copied_to_other_destination(self):
         raw = self.raw()
