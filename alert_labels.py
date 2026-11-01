@@ -1,4 +1,21 @@
-"""Plain-language event titles shared by the dashboard and Telegram."""
+"""Human-readable notification text, keeping original panel history intact."""
+import re
+
+
+def cause(message, level, topic=None):
+    """Describe the fault, including when formatting its recovery event."""
+    ping = re.fullmatch(r'Sem ping: (\d+) perdas consecutivas\.', message)
+    if ping:
+        return f'Sem resposta ao ping ({ping[1]} perdas consecutivas).'
+    if topic == 'ping' or message.startswith('Ping restabelecido.'):
+        return 'Sem resposta ao ping.'
+    if topic == 'port' or message.startswith('Porta '):
+        return re.sub(r'(?:caiu \(link down\)|restabelecida)\.$', 'sem conexão.', message)
+    if topic == 'circuit' or message.startswith('Circuito '):
+        return message.replace('voltou a responder pelo Datacom.', 'sem resposta ao ping pelo Datacom.')
+    if message.startswith('Leitura de banda SIAE restabelecida.'):
+        return 'Falha na consulta de banda do rádio.'
+    return message
 
 def title(message, level, topic=None):
     if message.startswith('Falha ao ler banda SIAE:'):

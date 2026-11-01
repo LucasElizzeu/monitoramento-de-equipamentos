@@ -113,8 +113,10 @@ class TelegramBotTests(unittest.TestCase):
     def test_summary_has_timestamps_and_fits_telegram_limit_in_utf16(self):
         events=[dict(level=level,device_name='BBU <Centro>',host='192.0.2.10',message='Mensagem 😎'*300,event_at='2026-11-01T12:00:00+00:00') for level in ['critical','success','warning']]
         result=telegram_bot.summary(events)
-        self.assertIn('QUEDA',result); self.assertIn('RECUPERAÇÃO',result)
-        self.assertIn('01/11/2026 12:00 UTC',result)
+        self.assertNotIn('VELOSONET',result)
+        self.assertNotIn('QUEDA',result); self.assertNotIn('RECUPERAÇÃO',result)
+        self.assertIn('Iniciado: 01/11/2026 às 08:00:00',result)
+        self.assertIn('Resolvido: 01/11/2026 às 08:00:00',result)
         self.assertLessEqual(len(result.encode('utf-16-le'))//2,4000)
         self.assertLessEqual(len(telegram_bot.text_limit('😎'*5000).encode('utf-16-le'))//2,4000)
 

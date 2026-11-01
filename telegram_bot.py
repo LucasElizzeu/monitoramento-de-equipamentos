@@ -3,7 +3,7 @@ import json
 import alert_labels
 import re
 import ssl
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
@@ -29,15 +29,29 @@ def text_limit(text, units=4000):
     return text.encode('utf-16-le')[:units * 2].decode('utf-16-le', errors='ignore')
 
 
+def event_time(value):
+    if not value:
+        return 'não registrado'
+    stamp = datetime.fromisoformat(value)
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=timezone.utc)
+    # Manaus is UTC-4 with no DST. A fixed offset also works on Windows without
+    # installing the optional tzdata package. Storage remains UTC.
+    return stamp.astimezone(timezone(timedelta(hours=-4))).strftime('%d/%m/%Y às %H:%M:%S')
+
+
 def summary(events):
-    parts = ['VELOSONET · MONITORAMENTO']
+    parts = []
     for event in events:
-        kind = {'critical': 'QUEDA', 'success': 'RECUPERAÇÃO', 'warning': 'COLETA'}[event['level']]
-        kind += ' · ' + alert_labels.title(event['message'], event['level'], event.get('topic')).upper()
-        stamp = datetime.fromisoformat(event['event_at']).astimezone(timezone.utc).strftime('%d/%m/%Y %H:%M UTC')
-        name = ' '.join(event['device_name'].split())
-        message = ' '.join(event['message'].split())[:650]
-        parts.append(f"{kind}\n{name} ({event['host']})\n{message}\n{stamp}")
+        resolved = event['level'] == 'success'
+        started = event.get('incident_started_at') or (None if resolved else event['event_at'])
+        fault = event.get('incident_cause') or alert_labels.cause(event['message'], event['level'], event.get('topic'))
+        name = text_limit(' '.join(event['device_name'].split()), 160)
+        fault = text_limit(' '.join(fault.split()), 600)
+        lines = [name, f'Causa: {fault}', f'Iniciado: {event_time(started)}']
+        if resolved:
+            lines.append(f'Resolvido: {event_time(event["event_at"])}')
+        parts.append('\n'.join(lines))
     return text_limit('\n\n'.join(parts))
 
 

@@ -1,6 +1,7 @@
 """Durable, bounded alert outbox. Transport and monitoring run independently."""
 import json
 import time
+import alert_labels
 
 TOPICS = ('ping', 'port', 'circuit', 'collection')
 MAX_PENDING = 500
@@ -27,16 +28,31 @@ def init_schema(db):
           available_at REAL NOT NULL, sent_at REAL, error TEXT, provider_id TEXT,
           UNIQUE(event_id, revision));
         CREATE INDEX IF NOT EXISTS notification_due ON notification_outbox(status,available_at,id);
+        CREATE TABLE IF NOT EXISTS notification_incidents (
+          device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+          incident_key TEXT NOT NULL, started_at TEXT NOT NULL, cause TEXT NOT NULL,
+          PRIMARY KEY(device_id, incident_key));
     ''')
     columns = {row[1] for row in db.execute('PRAGMA table_info(notification_outbox)')}
     if 'provider' not in columns:
         db.execute("ALTER TABLE notification_outbox ADD COLUMN provider TEXT NOT NULL DEFAULT 'legacy'")
+    for name in ('incident_started_at', 'incident_cause'):
+        if name not in columns:
+            db.execute(f'ALTER TABLE notification_outbox ADD COLUMN {name} TEXT')
     previous = settings(db)
     if (previous['config'] or previous['token'] or previous['enabled']) and previous['config'].get('provider') != 'telegram':
         # Replacing the old provider must not reuse its token or destination.
         db.execute("UPDATE notification_settings SET enabled=0,token='',config='{}',revision=revision+1,"
                    'last_error=NULL,blocked=0,next_send_at=0,last_sent_at=NULL WHERE id=1')
     db.execute("UPDATE notification_outbox SET status='cancelled' WHERE provider!='telegram' AND status IN ('pending','sending')")
+    # A ping outage may already be active when this version is installed.
+    # Recover its actual detection timestamp if the original alert still exists.
+    for device in db.execute('SELECT id FROM devices WHERE failures>20'):
+        event = db.execute("SELECT at,message FROM alerts WHERE device_id=? AND level='critical' "
+                           "AND message LIKE 'Sem ping:%' ORDER BY id DESC LIMIT 1", (device['id'],)).fetchone()
+        if event:
+            db.execute('INSERT OR IGNORE INTO notification_incidents(device_id,incident_key,started_at,cause) '
+                       "VALUES(?,'ping',?,?)", (device['id'], event['at'], alert_labels.cause(event['message'], 'critical', 'ping')))
 
 
 def settings(db):
@@ -45,7 +61,29 @@ def settings(db):
     return row
 
 
-def enqueue(db, event_id, device, level, message, topic, event_at, at):
+def incident_snapshot(db, device_id, level, message, topic, event_at, incident_key=None):
+    fault = alert_labels.cause(message, level, topic)
+    key = incident_key or ('ping' if topic == 'ping' else None)
+    if key is None:
+        return (None if level == 'success' else event_at), fault
+    if level != 'success':
+        db.execute('INSERT OR IGNORE INTO notification_incidents(device_id,incident_key,started_at,cause) '
+                   'VALUES(?,?,?,?)', (device_id, key, event_at, fault))
+    row = db.execute('SELECT started_at,cause FROM notification_incidents WHERE device_id=? AND incident_key=?',
+                     (device_id, key)).fetchone()
+    if level == 'success':
+        db.execute('DELETE FROM notification_incidents WHERE device_id=? AND incident_key=?', (device_id, key))
+    return (row['started_at'], row['cause']) if row else (None, fault)
+
+
+def forget_incident(db, device_id, incident_key):
+    db.execute('DELETE FROM notification_incidents WHERE device_id=? AND incident_key=?', (device_id, incident_key))
+
+
+def enqueue(db, event_id, device, level, message, topic, event_at, at, incident_key=None):
+    # Track the occurrence even when delivery is disabled or the queue is full.
+    # This remains in the event transaction and survives queue pruning/restarts.
+    started, fault = incident_snapshot(db, device['id'], level, message, topic, event_at, incident_key)
     selected = settings(db)
     config = selected['config']
     if not selected['enabled'] or not config.get('topics', {}).get(topic, False):
@@ -59,9 +97,9 @@ def enqueue(db, event_id, device, level, message, topic, event_at, at):
     if count >= MAX_PENDING:
         db.execute("UPDATE notification_settings SET last_error='Fila cheia. Alguns alertas ficaram apenas no painel.' WHERE id=1")
         return
-    db.execute('INSERT OR IGNORE INTO notification_outbox(event_id,revision,created_at,event_at,device_name,host,topic,level,message,available_at,provider) '
-               "VALUES(?,?,?,?,?,?,?,?,?,?,'telegram')",
-               (event_id, selected['revision'], at, event_at, device['name'], device['host'], topic, level, message, at))
+    db.execute('INSERT OR IGNORE INTO notification_outbox(event_id,revision,created_at,event_at,device_name,host,topic,level,message,available_at,provider,incident_started_at,incident_cause) '
+               "VALUES(?,?,?,?,?,?,?,?,?,?,'telegram',?,?)",
+               (event_id, selected['revision'], at, event_at, device['name'], device['host'], topic, level, message, at, started, fault))
 
 
 def prepare(db, at):

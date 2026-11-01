@@ -439,11 +439,11 @@ def public_alert(row, devices):
     return value
 
 
-def alert(db, device, level, message, topic='collection'):
+def alert(db, device, level, message, topic='collection', incident_key=None):
     at = now()
     cursor = db.execute('INSERT INTO alerts(device_id,device_name,at,level,message) VALUES(?,?,?,?,?)',
                         (device['id'], device['name'], at, level, message))
-    notifications.enqueue(db, cursor.lastrowid, device, level, message, topic, at, time.time())
+    notifications.enqueue(db, cursor.lastrowid, device, level, message, topic, at, time.time(), incident_key)
 
 
 def record_ping(device_id, success, latency=None, error=None, expected_version=None, started_at=None, detail=None):
@@ -911,9 +911,9 @@ def check_ssh(device):
                 display_name = aliases.get(port_alias_key(port['name'], port['interface_type'])) or port.get('description', '')
                 alias_label = f' ({display_name})' if display_name else ''
                 if port['state'] == 'down' and old != 'down':
-                    alert(db, current, 'critical', f"Porta {label}{port['name']}{alias_label} caiu (link down).", 'port')
+                    alert(db, current, 'critical', f"Porta {label}{port['name']}{alias_label} caiu (link down).", 'port', f"port:{port['identity']}")
                 elif port['state'] == 'up' and old == 'down':
-                    alert(db, current, 'success', f"Porta {label}{port['name']}{alias_label} restabelecida.", 'port')
+                    alert(db, current, 'success', f"Porta {label}{port['name']}{alias_label} restabelecida.", 'port', f"port:{port['identity']}")
             db.execute("UPDATE devices SET ssh_error=NULL,last_ssh=?,port_data=?,ssh_diagnostic='{}' WHERE id=?",
                        (time.time(), json.dumps(ports), device['id']))
 
@@ -939,12 +939,12 @@ def record_circuit(circuit, device, result=None, error=None, output='', started_
         for success in result['probes']:
             if success:
                 if failures > 20:
-                    alert(db, parent, 'success', f"Circuito {current['name']} ({current['host']}) voltou a responder pelo Datacom.", 'circuit')
+                    alert(db, parent, 'success', f"Circuito {current['name']} ({current['host']}) voltou a responder pelo Datacom.", 'circuit', f"circuit:{current['id']}")
                 failures = 0
             else:
                 failures += 1
                 if failures == 21:
-                    alert(db, parent, 'critical', f"Circuito {current['name']} ({current['host']}): sem ping pelo Datacom, após 21 perdas consecutivas.", 'circuit')
+                    alert(db, parent, 'critical', f"Circuito {current['name']} ({current['host']}): sem ping pelo Datacom, após 21 perdas consecutivas.", 'circuit', f"circuit:{current['id']}")
         status = 'offline' if failures > 20 else 'unstable' if failures else 'online'
         db.execute('UPDATE circuits SET state=?,failures=?,latency=?,last_check=?,last_poll=?,output=?,error=NULL,transmitted=?,received=? WHERE id=?',
                    (status, failures, result['latency'], at, polled, output[:16000], result['transmitted'], result['received'], circuit['id']))
@@ -1066,7 +1066,7 @@ def check_siae(device):
         if error:
             SIAE_BASELINES.pop(device_id, None)
             if old_data.get('status') != 'error':
-                alert(db, current, 'warning', f'Falha ao ler banda SIAE: {error}')
+                alert(db, current, 'warning', f'Falha ao ler banda SIAE: {error}', incident_key='siae-band')
         else:
             if new_session:
                 db.execute('UPDATE devices SET siae_session=? WHERE id=?',
@@ -1086,7 +1086,7 @@ def check_siae(device):
                     data.update(siae_consumption(rates[indices[0]]['rx_bps'], rates[indices[1]]['rx_bps']))
                 data['interfaces'] = indices
                 if recovering:
-                    alert(db, current, 'success', 'Leitura de banda SIAE restabelecida.')
+                    alert(db, current, 'success', 'Leitura de banda SIAE restabelecida.', incident_key='siae-band')
                 data['recovering'] = False
         db.execute('UPDATE devices SET siae_data=?,last_siae=? WHERE id=?',
                    (json.dumps(data), time.time(), device_id))
@@ -1594,6 +1594,7 @@ def save_device_circuits(db, device_id, entries):
     for circuit_id, old in existing.items():
         entry = selected.get(circuit_id)
         if entry is None or entry.host != old['host']:
+            notifications.forget_incident(db, device_id, f'circuit:{circuit_id}')
             db.execute('DELETE FROM circuits WHERE id=?', (circuit_id,))
     for entry in entries:
         old = existing.get(entry.id)
@@ -1654,11 +1655,14 @@ def update_device(device_id: int, device: DeviceInput):
                           ('ssh_port', 'username', 'password', 'fingerprint', 'ports', 'interface_type', 'status_command', 'optics_command', 'utilization_command'))
         if changed_target:
             availability.reset(db, device_id)
+            db.execute('DELETE FROM notification_incidents WHERE device_id=?', (device_id,))
             db.execute('DELETE FROM samples WHERE device_id=?', (device_id,))
             db.execute('DELETE FROM port_traffic_series WHERE device_id=?', (device_id,))
             values.update(state='pending', failures=0, latency=None, last_check=None, ping_detail=None)
         if changed_target or changed_ssh:
             values.update(port_data='[]', ssh_error=None, ssh_diagnostic='{}')
+        if any(values[key] != previous[key] for key in ('ports', 'interface_type')):
+            db.execute("DELETE FROM notification_incidents WHERE device_id=? AND incident_key LIKE 'port:%'", (device_id,))
         changed_source = any(values[key] != previous[key] for key in ('host', 'kind', 'ssh_port', 'username', 'password', 'fingerprint'))
         if changed_source:
             db.execute("UPDATE circuits SET state='pending',failures=0,latency=NULL,last_check=NULL,last_poll=0,output='',error=NULL,transmitted=NULL,received=NULL,config_version=config_version+1 WHERE source_device_id=?", (device_id,))
@@ -1699,6 +1703,7 @@ def update_circuit(circuit_id: int, entry: CircuitInput):
         db.execute('UPDATE circuits SET name=?,host=?,interval=?,port_identity=?,last_poll=0,config_version=config_version+1 WHERE id=?',
                    (entry.name, entry.host, entry.interval, binding, circuit_id))
         if current['host'] != entry.host:
+            notifications.forget_incident(db, current['source_device_id'], f'circuit:{circuit_id}')
             db.execute("UPDATE circuits SET state='pending',failures=0,latency=NULL,last_check=NULL,output='',error=NULL,transmitted=NULL,received=NULL WHERE id=?", (circuit_id,))
         return dict(db.execute('SELECT * FROM circuits WHERE id=?', (circuit_id,)).fetchone())
 
@@ -1706,8 +1711,10 @@ def update_circuit(circuit_id: int, entry: CircuitInput):
 @app.delete('/api/circuits/{circuit_id}', status_code=204)
 def delete_circuit(circuit_id: int):
     with LOCK, connect() as db:
-        if not db.execute('SELECT id FROM circuits WHERE id=?', (circuit_id,)).fetchone():
+        current = db.execute('SELECT source_device_id FROM circuits WHERE id=?', (circuit_id,)).fetchone()
+        if not current:
             raise HTTPException(404, 'Circuito não encontrado.')
+        notifications.forget_incident(db, current['source_device_id'], f'circuit:{circuit_id}')
         db.execute('DELETE FROM circuits WHERE id=?', (circuit_id,))
 
 

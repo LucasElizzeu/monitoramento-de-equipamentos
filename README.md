@@ -288,10 +288,20 @@ O programa identifica separadamente ID do próprio bot, conversa não encontrada
 - Portas: avisa transições Down/Up, com tipo, número e nome personalizado da porta quando disponíveis.
 - Circuitos: avisa queda e recuperação do ping realizado pelo Datacom.
 - Erros de coleta são opcionais e vêm desmarcados, separados de perdas de ping. A opção inclui falhas de ICMP/SSH/banda SIAE e a recuperação da leitura de banda SIAE.
-- A fila é persistida no SQLite na mesma transação do evento. Um serviço separado envia **até 3 eventos por resumo**, por padrão a cada **30 segundos** (ajustável entre 15 e 300). Eventos adicionais aguardam o próximo resumo. Os horários das ocorrências são identificados em UTC.
+- A fila é persistida no SQLite na mesma transação do evento. Um serviço separado envia **até 3 eventos por resumo**, por padrão a cada **30 segundos** (ajustável entre 15 e 300). Eventos adicionais aguardam o próximo resumo. As mensagens usam o horário de Manaus (UTC−4); o armazenamento continua em UTC.
 - Falhas de conexão, indisponibilidade ou limite temporário do Telegram permitem até **3 tentativas**, com espera entre elas. O prazo de repetição informado pelo Telegram é respeitado entre 30 segundos e uma hora. Erros de token ou destino pausam a fila até corrigir e salvar ou realizar um teste bem-sucedido. O monitoramento continua independente dos envios.
 - Eventos com mais de **uma hora** expiram para evitar uma enxurrada de avisos antigos após uma interrupção. A fila comporta até **500 eventos**; no limite, novos eventos continuam no painel, mas não entram na fila. O histórico de envios guarda até **1.000 eventos por até 7 dias**.
 - Salvar ou remover a configuração cancela envios pendentes para não enviá-los a outro destino. Uma solicitação já iniciada pode terminar no destino anterior. Uma interrupção após o Telegram aceitar a mensagem e antes de o programa registrar a resposta pode causar duplicidade em uma nova tentativa.
+
+### Formato das mensagens
+
+Cada ocorrência mostra somente o nome do equipamento, a causa e **Iniciado: data e hora**, sem o cabeçalho do grupo, título de queda/recuperação ou IP do equipamento. Na normalização, repete o nome, a causa e o início original e acrescenta **Resolvido: data e hora**. Os horários enviados são de Manaus (UTC−4), inclusive ao executar no Windows, sem dependência adicional de fuso horário.
+
+O início corresponde à detecção registrada da falha: no ping, a entrada na 21ª perda consecutiva; nas portas, a leitura que identificou Down. A resolução usa o horário em que o monitor confirmou a recuperação. São horários de observação, não uma estimativa retroativa do instante físico da queda.
+
+A causa e o início ficam persistidos por equipamento e ocorrência (ping, porta física, circuito ou banda SIAE). Reiniciar o programa ou limpar mensagens antigas da fila não perde uma ocorrência aberta. A recuperação de uma porta não fecha outras portas ou o ping do mesmo equipamento. Renomear a porta mantém a causa registrada na abertura. Remover/trocar o alvo limpa a ocorrência correspondente.
+
+Na atualização, uma falha de ping ainda ativa pode recuperar o início pelo alerta original, se ele estiver no histórico. Ocorrências cujo início não foi registrado ou recuperado mostram **Iniciado: não registrado**, em vez de inventar um horário. A alteração de formato não modifica os textos originais do histórico do painel nem reenvia eventos já enviados.
 
 **Aceito pelo Telegram** indica que a Bot API retornou um ID de mensagem para o destino configurado, e não uma confirmação de leitura pelo operador. O token também entra nos backups criptografado; ao restaurar uma cópia, as notificações ficam **desativadas** e os envios pendentes da cópia são cancelados. Confira o destino antes de reativar.
 
