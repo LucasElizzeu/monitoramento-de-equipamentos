@@ -118,3 +118,15 @@ body[data-layout] .footer { margin-top: 26px; color: var(--dim); }
 @media (prefers-reduced-motion:reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* Focus the workspace on real equipment and operational actions. */
+body[data-layout] .workspace{margin:26px 0 28px;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:0 0 22px;background:transparent}
+body[data-layout] .sidebar{background:#0c1421}
+body[data-layout] .nav-item{min-height:44px;border-radius:8px;margin-bottom:5px}
+body[data-layout] .page-heading{padding-bottom:22px;border-bottom:1px solid var(--line)}
+body[data-layout] .eyebrow{color:var(--dim);font-size:9px;letter-spacing:1.4px}
+body[data-layout] h1{font-size:28px}
+body[data-layout] .metric-card{box-shadow:none;background:var(--surface)}
+body[data-layout] .panel{box-shadow:none}
+.heading-actions:has(>.button:only-child){display:flex;justify-content:flex-end}
+@media(max-width:640px){.heading-actions:has(>.button:only-child)>.button{width:100%}body[data-layout] .page-heading{padding-bottom:20px}.topbar-right{gap:10px}}

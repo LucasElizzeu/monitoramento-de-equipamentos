@@ -12,17 +12,13 @@ python -m venv .venv
 .venv/bin/uvicorn app:app --host 127.0.0.1 --port 8000
 ```
 
-Abra a interface na porta 8000 do computador que executa o programa. O botão **Ver demonstração** apresenta dados simulados, separados dos equipamentos reais. Nenhum IP de exemplo é consultado. Ao adicionar um equipamento, o painel passa para a sua rede real.
+Abra a interface na porta 8000 do computador que executa o programa. O painel abre diretamente os equipamentos cadastrados. O modo demonstração e os elementos decorativos da lateral foram removidos.
 
 Use somente **um processo/worker** do servidor, para evitar consultas e eventos duplicados. A máquina precisa permanecer ligada para monitorar. Os horários são armazenados em UTC e exibidos no fuso do navegador.
 
 ## Abas do painel
 
 O painel principal usa o **visual Compacto**, com cartões menores, menos espaçamento e letras proporcionais. A largura dos cartões é padronizada entre os Datacoms na mesma tela: equipamentos com poucas portas mantêm o mesmo tamanho compacto dos que têm muitas portas, sem esticar os cartões para ocupar a linha inteira. No celular, a grade usa uma coluna. Sinais, consumo e pings permanecem juntos; os detalhes continuam disponíveis ao expandir cada saída.
-
-Para comparar propostas de cartões e letras menores, use **Comparar opções de visual** no rodapé ou abra `/static/design-options.html`. Os modelos **1 · Equilibrado**, **2 · Compacto** e **3 · Em lista** usam a interface real com dados de demonstração, sem alterar os equipamentos cadastrados ou salvar uma preferência de visual. O modelo em lista usa linhas no desktop e cartões em telas menores. Escolher um modelo nesta página muda apenas a prévia; o painel principal permanece no modelo Compacto.
-
-Imagens das propostas: [1 · Equilibrado](docs/visual-equilibrado.png), [2 · Compacto](docs/visual-compacto.png) e [3 · Em lista](docs/visual-lista.png).
 
 - **BBU's:** equipamentos cadastrados como ping, com disponibilidade, latência e perdas consecutivas.
 - **Datacoms:** equipamentos SSH, com disponibilidade, portas, descrições e sinais RX/TX.
@@ -44,7 +40,7 @@ Passe o mouse, toque no gráfico ou use as setas do teclado para consultar horá
 
 As leituras ficam no SQLite existente (`.data/monitor.db`), continuam disponíveis depois de reiniciar o programa e são removidas periodicamente quando saem da janela de 24 horas. O programa precisa permanecer ligado para coletar o período inteiro. Renomear uma porta atualiza o título do gráfico e preserva as amostras. Trocar o IP ou tipo do equipamento reinicia seu histórico, evitando misturar fontes diferentes; remover o equipamento também remove suas séries.
 
-Para explorar um exemplo completo antes de acumular o dia inteiro, use **Ver demonstração → Datacoms → Consumo 24h**. Os gráficos de demonstração são simulados, identificados e separados da sua rede real.
+Os dados de teste simulados são utilizados somente nas validações automatizadas; o painel operacional não oferece modo demonstração.
 
 ## Rádios SIAE — ping e consumo de banda
 

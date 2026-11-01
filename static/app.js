@@ -27,14 +27,9 @@ const esc = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'
 const number = (n,digits=1) => n==null?'—':Number(n).toLocaleString('pt-BR',{maximumFractionDigits:digits});
 const interfaceLabels={'auto':'Automático','mixed':'Gigabit + Ten (portas selecionadas)','gigabit-ethernet':'Gigabit Ethernet','ten-gigabit-ethernet':'Ten Gigabit Ethernet','hundred-gigabit-ethernet':'Hundred Gigabit Ethernet'};
 const labels = {online:'Online',offline:'Sem ping',unstable:'Instável',pending:'Aguardando',error:'Erro de coleta',up:'Ativa',down:'Inativa',unknown:'Não identificado'};
-const previewParam=new URLSearchParams(location.search).get('design-preview');
-const designPreview=['balanced','compact','list'].includes(previewParam)?previewParam:null;
-if(designPreview){
- document.body.dataset.designPreview=designPreview;
- document.body.dataset.layout=designPreview;
- const sheet=document.createElement('link');sheet.rel='stylesheet';sheet.href='/static/design-preview.css';document.head.append(sheet);
-}
-const state = {demo:Boolean(designPreview)||localStorage.getItem('nexo-demo')==='true', page:'overview', data:{devices:[],alerts:[],samples:[]}, loading:false, selected:null, deleting:null, editing:null, portNaming:null, removingCircuit:null, metricCards:{}, metricView:null, dataRevision:0};
+const designPreview=null;
+localStorage.removeItem('nexo-demo');
+const state = {demo:false, page:'overview', data:{devices:[],alerts:[],samples:[]}, loading:false, selected:null, deleting:null, editing:null, portNaming:null, removingCircuit:null, metricCards:{}, metricView:null, dataRevision:0};
 function badge(status){return `<span class="status-pill ${esc(status)}"><i></i>${esc(labels[status]||status)}</span>`;}
 function formatTime(date){return date?new Date(date).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'Aguardando';}
 function ago(date){if(!date)return 'Aguardando';const seconds=Math.max(0,Math.floor((Date.now()-new Date(date))/1000));return seconds<10?'Agora':seconds<60?`há ${seconds}s`:seconds<3600?`há ${Math.floor(seconds/60)}min`:`há ${Math.floor(seconds/3600)}h`;}
@@ -143,7 +138,7 @@ function renderDevices(){
  $('#table-title').textContent=state.page==='bbus'?"BBU's":state.page==='datacoms'?'Datacoms':state.page==='siae'?'Rádios SIAE':'Equipamentos';
  $('#table-description').textContent=state.page==='bbus'?"Disponibilidade e latência das suas BBU's.":state.page==='datacoms'?'Disponibilidade dos Datacoms. Consulte circuitos e portas abaixo.':state.page==='siae'?'Disponibilidade dos rádios. Consulte o consumo dos TRX abaixo.':'Acompanhe a disponibilidade de cada ponto da rede.';
  $('#table-count').textContent=all.length;$('#table-summary').textContent=`Exibindo ${devices.length} de ${all.length} equipamentos`;
- $('#device-rows').innerHTML=devices.length?devices.map(d=>`<tr class="device-row"><td class="device-name-cell"><div class="device-cell"><span class="device-icon">${icon(d.kind==='datacom'?'ports':d.kind==='siae'?'wifi':'server')}</span><div><strong>${esc(d.name)}</strong><small>${d.kind==='datacom'?`DATACOM · SSH${d.circuit_position!=null?' · POSIÇÃO '+d.circuit_position:''}`:d.kind==='siae'?"SIAE · PING ICMP":"BBU · PING ICMP"}</small></div></div><span class="mobile-device-status">${badge(d.state)}</span></td><td class="ip" data-label="Endereço IP">${deviceAddressHTML(d)}</td><td class="device-state-cell">${badge(d.state)}</td><td class="latency" data-label="Latência">${d.latency!=null?`<span class="tiny-bars">▂▄▆</span>${number(d.latency)} <small>ms</small>`:'—'}</td><td data-label="Perdas consecutivas"><span class="loss-value ${d.failures>20?'critical':''}"><span class="loss-track"><i style="width:${Math.min(d.failures/21*100,100)}%"></i></span>${d.failures}<span class="muted">/ 21</span></span></td><td data-label="Última checagem">${ago(d.last_check)}</td><td class="device-actions-cell"><div class="device-actions"><button class="icon-button" data-edit="${d.id}" title="Editar equipamento" aria-label="Editar ${esc(d.name)}">${icon('edit')}<span class="action-label">Editar</span></button><button class="icon-button" data-detail="${d.id}" title="Ver detalhes" aria-label="Ver detalhes de ${esc(d.name)}">${icon('arrow')}<span class="action-label">Detalhes</span></button><button class="icon-button" data-remove="${d.id}" title="Remover equipamento" aria-label="Remover ${esc(d.name)}">${icon('trash')}<span class="action-label">Remover</span></button></div></td></tr>`).join(''):`<tr><td colspan="7">${empty(all.length?'Nenhum resultado encontrado':state.page==='bbus'?"Cadastre sua primeira BBU":state.page==='datacoms'?'Conecte seu primeiro Datacom':state.page==='siae'?'Cadastre seu primeiro rádio SIAE':'Sua rede, em um só lugar',all.length?'Tente outro nome, IP ou filtro.':'Adicione um equipamento ou explore a demonstração para conhecer o painel.',!all.length)}</td></tr>`;
+ $('#device-rows').innerHTML=devices.length?devices.map(d=>`<tr class="device-row"><td class="device-name-cell"><div class="device-cell"><span class="device-icon">${icon(d.kind==='datacom'?'ports':d.kind==='siae'?'wifi':'server')}</span><div><strong>${esc(d.name)}</strong><small>${d.kind==='datacom'?`DATACOM · SSH${d.circuit_position!=null?' · POSIÇÃO '+d.circuit_position:''}`:d.kind==='siae'?"SIAE · PING ICMP":"BBU · PING ICMP"}</small></div></div><span class="mobile-device-status">${badge(d.state)}</span></td><td class="ip" data-label="Endereço IP">${deviceAddressHTML(d)}</td><td class="device-state-cell">${badge(d.state)}</td><td class="latency" data-label="Latência">${d.latency!=null?`<span class="tiny-bars">▂▄▆</span>${number(d.latency)} <small>ms</small>`:'—'}</td><td data-label="Perdas consecutivas"><span class="loss-value ${d.failures>20?'critical':''}"><span class="loss-track"><i style="width:${Math.min(d.failures/21*100,100)}%"></i></span>${d.failures}<span class="muted">/ 21</span></span></td><td data-label="Última checagem">${ago(d.last_check)}</td><td class="device-actions-cell"><div class="device-actions"><button class="icon-button" data-edit="${d.id}" title="Editar equipamento" aria-label="Editar ${esc(d.name)}">${icon('edit')}<span class="action-label">Editar</span></button><button class="icon-button" data-detail="${d.id}" title="Ver detalhes" aria-label="Ver detalhes de ${esc(d.name)}">${icon('arrow')}<span class="action-label">Detalhes</span></button><button class="icon-button" data-remove="${d.id}" title="Remover equipamento" aria-label="Remover ${esc(d.name)}">${icon('trash')}<span class="action-label">Remover</span></button></div></td></tr>`).join(''):`<tr><td colspan="7">${empty(all.length?'Nenhum resultado encontrado':state.page==='bbus'?"Cadastre sua primeira BBU":state.page==='datacoms'?'Conecte seu primeiro Datacom':state.page==='siae'?'Cadastre seu primeiro rádio SIAE':'Sua rede, em um só lugar',all.length?'Tente outro nome, IP ou filtro.':'Adicione um equipamento para iniciar a coleta de dados.',!all.length)}</td></tr>`;
 }
 function sshDiagnosticHTML(d){
  const diagnostic=d.ssh_diagnostic||{};
@@ -277,7 +272,7 @@ function render(){
  const paused=readingOutput()||Boolean(window.getSelection()?.toString());
  $('#reading-banner').hidden=!paused;
  if(paused)return;
- const {devices,alerts,samples}=state.data;$('#demo-banner').hidden=!state.demo;$('#demo-label').textContent=state.demo?'Sair da demonstração':'Ver demonstração';$('#last-update').textContent=`${state.demo?'Simulação':'Atualizado'} às ${formatTime(state.data.updated_at)}`;
+ const {devices,alerts,samples}=state.data;$('#last-update').textContent=`${state.demo?'Simulação':'Atualizado'} às ${formatTime(state.data.updated_at)}`;
  renderMetrics();renderDevices();renderSiae();const average=chart(samples,$('#latency-chart'));$('#chart-average').innerHTML=`${number(average)} <small>ms</small>`;
  $('#recent-events').innerHTML=alerts.length?alerts.slice(0,3).map(eventHTML).join(''):empty('Nenhum evento por aqui','Quedas e recuperações aparecerão neste espaço.');
  $('#alerts-content').innerHTML=alerts.length?alerts.map(eventHTML).join(''):empty('Sua linha do tempo começa aqui','Eventos serão registrados automaticamente quando houver uma mudança na rede.');
@@ -286,7 +281,7 @@ function render(){
  $('#ports-content').querySelectorAll('details').forEach(e=>e.open=openPorts.has(e.dataset.portKey));
  if(state.selected&&$('#detail-dialog').open){if(state.demo){state.detailSamples=samples.filter(s=>s.device_id===state.selected);renderDetail();}else{const selected=state.selected;api(`/api/devices/${selected}/history`).then(history=>{if(state.selected===selected){state.detailSamples=history;renderDetail();}}).catch(()=>{});}}
 }
-const pages={notifications:['Notificações','Receba avisos de queda e recuperação pelo Telegram.'],availability:['Disponibilidade','Acompanhe o tempo com resposta, as perdas de ping e a cobertura da coleta.'],backups:['Backups','Guarde uma cópia dos seus dados e recupere quando precisar.'],overview:['Visão geral','Tudo conectado. Tudo sob controle.'],bbus:["BBU's","Monitore o ping, a latência e as perdas das suas BBU's."],datacoms:['Datacoms','Disponibilidade, portas e sinais ópticos dos seus Datacoms.'],siae:['Rádios SIAE','Disponibilidade por ping e consumo real de banda do rádio.'],alerts:['Eventos','Cada mudança na rede, registrada em um só lugar.']};
+const pages={notifications:['Notificações','Receba avisos de queda e recuperação pelo Telegram.'],availability:['Disponibilidade','Acompanhe o tempo com resposta, as perdas de ping e a cobertura da coleta.'],backups:['Backups','Guarde uma cópia dos seus dados e recupere quando precisar.'],overview:['Visão geral','Disponibilidade, sinais e eventos da sua rede.'],bbus:["BBU's","Monitore o ping, a latência e as perdas das suas BBU's."],datacoms:['Datacoms','Disponibilidade, portas e sinais ópticos dos seus Datacoms.'],siae:['Rádios SIAE','Disponibilidade por ping e consumo real de banda do rádio.'],alerts:['Eventos','Cada mudança na rede, registrada em um só lugar.']};
 function navigate(page){
  window.getSelection()?.removeAllRanges();state.page=page;
  document.querySelectorAll('[data-page]').forEach(e=>{
@@ -306,13 +301,6 @@ function navigate(page){
  $('#add-device').hidden=Boolean(designPreview)||['backups','notifications'].includes(page);
  render();
  window.dispatchEvent(new CustomEvent('monitor-page',{detail:{page,demo:state.demo}}));
-}
-function toggleDemo(value){
- if(designPreview)return;
- document.querySelectorAll('.port-card details[open], .port-ping details[open], .ssh-diagnostic[open]').forEach(e=>e.open=false);
- window.getSelection()?.removeAllRanges();
- state.demo=value;state.selected=null;localStorage.setItem('nexo-demo',String(value));load();
- window.dispatchEvent(new CustomEvent('monitor-page',{detail:{page:state.page,demo:value}}));
 }
 function normalizedPorts(value){
  return value.split(/[,;\s]+/).map(port=>port.trim()).filter(Boolean).map(port=>/^\d+$/.test(port)?`1/1/${Number(port)}`:port);
@@ -432,7 +420,6 @@ document.querySelectorAll('[data-page]').forEach(e=>e.addEventListener('click',(
 $('#all-events').addEventListener('click',()=>navigate('alerts'));
 $('#add-device').addEventListener('click',openAdd);
 $('#refresh').addEventListener('click',()=>load());
-$('#demo-toggle').addEventListener('click',()=>toggleDemo(!state.demo));$('#exit-demo').addEventListener('click',()=>toggleDemo(false));
 $('#search').addEventListener('input',()=>{renderDevices();renderSiae();});$('#state-filter').addEventListener('change',()=>{renderDevices();renderSiae();});
 document.querySelectorAll('.close-dialog').forEach(e=>e.addEventListener('click',()=>$('#device-dialog').close()));
 document.querySelectorAll('.close-confirm').forEach(e=>e.addEventListener('click',()=>$('#confirm-dialog').close()));
@@ -487,11 +474,4 @@ document.addEventListener('selectionchange',()=>{
 });
 $('#confirm-remove').addEventListener('click',async()=>{$('#confirm-remove').disabled=true;try{await api(state.removingCircuit?`/api/circuits/${state.removingCircuit}`:`/api/devices/${state.deleting}`,{method:'DELETE'});$('#confirm-dialog').close();toast(state.removingCircuit?'Circuito removido.':'Equipamento removido.');state.removingCircuit=null;state.deleting=null;await load();}catch(e){toast(e.message);}finally{$('#confirm-remove').disabled=false;}});
 for(const dialog of document.querySelectorAll('dialog'))dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});
-if(designPreview){
- const names={balanced:'1 · Equilibrado',compact:'2 · Compacto',list:'3 · Em lista'};
- $('#demo-banner strong').textContent=`Prévia de visual: ${names[designPreview]}`;
- $('#demo-banner div>span').textContent='Dados de demonstração · compare os tamanhos dos cartões, das letras e dos valores.';
- $('#exit-demo').hidden=true;$('#demo-toggle').hidden=true;$('#add-device').hidden=true;
- navigate('datacoms');
-}
 hydrateIcons();load();setInterval(load,1000);
