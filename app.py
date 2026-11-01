@@ -32,7 +32,6 @@ import availability
 import backups
 import notifications
 import telegram_bot
-import alert_labels
 
 ROOT = Path(__file__).resolve().parent
 DATA = Path(os.environ.get('MONITOR_DATA_DIR', ROOT / '.data'))
@@ -411,7 +410,7 @@ def public_device(row, db=None):
     return value
 
 
-def _enrich_alert(row, devices):
+def public_alert(row, devices):
     """Enrich old unnamed port events without rewriting the stored history."""
     value = dict(row)
     match = re.fullmatch(
@@ -437,12 +436,6 @@ def _enrich_alert(row, devices):
     if name:
         prefix = f"{match['family']} " if match['family'] else ''
         value['message'] = f"Porta {prefix}{match['port']} ({name}) {match['change']}"
-    return value
-
-
-def public_alert(row, devices):
-    value = _enrich_alert(row, devices)
-    value['title'] = alert_labels.title(value['message'], value['level'])
     return value
 
 

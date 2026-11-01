@@ -123,7 +123,7 @@ function chart(samples, target){
  target.innerHTML=`<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Gráfico de latência das últimas amostras"><defs><linearGradient id="${unique}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#70d1b3" stop-opacity=".22"/><stop offset="100%" stop-color="#70d1b3" stop-opacity=".01"/></linearGradient></defs>${lines}${pathsSVG}<circle cx="${x(ei)}" cy="${y(end.v)}" r="3" fill="#3aab8c" stroke="white" stroke-width="2"/>${ticks}</svg>`;
  return valid.reduce((s,p)=>s+p.v,0)/valid.length;
 }
-function eventHTML(event){const i=event.level==='success'?'check':'warning';return `<div class="event-item"><span class="event-icon ${esc(event.level)}">${icon(i)}</span><div class="event-body"><strong>${esc(event.title||event.message)}</strong>${event.title?`<p>${esc(event.message)}</p>`:''}<p>${esc(event.device_name)}</p></div><span class="event-time" title="${esc(new Date(event.at).toLocaleString('pt-BR'))}">${ago(event.at)}</span></div>`;}
+function eventHTML(event){const i=event.level==='success'?'check':'warning';return `<div class="event-item"><span class="event-icon ${esc(event.level)}">${icon(i)}</span><div class="event-body"><strong>${esc(event.message)}</strong><p>${esc(event.device_name)}</p></div><span class="event-time" title="${esc(new Date(event.at).toLocaleString('pt-BR'))}">${ago(event.at)}</span></div>`;}
 function empty(title,description,action=false){return `<div class="empty-state">${icon('activity')}<h3>${title}</h3><p>${description}</p>${action?'<button class="button primary" data-action="add">Adicionar equipamento</button>':''}</div>`;}
 function deviceAddressHTML(device){
  if(!['ping','siae'].includes(device.kind))return esc(device.host);
