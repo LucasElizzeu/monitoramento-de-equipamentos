@@ -210,7 +210,7 @@ Se a leitura falhar, abra **Ver diagnóstico da consulta SSH**, abaixo do aviso.
 - Credenciais criptografadas com Fernet; a API nunca retorna a senha.
 - Arquivos locais em `.data/`, ignorados pelo Git. O banco e a chave têm permissões restritas; guarde ambos ao fazer backup e proteja o volume. A chave local permite descriptografar o banco, portanto criptografia não substitui controle de acesso ao servidor.
 - Diretório alternativo: variável `MONITOR_DATA_DIR`.
-- Esta versão é de uso **local**, sem login/múltiplos usuários, notificações por e-mail/WhatsApp ou gestão de permissões. Os alertas aparecem no painel e no histórico.
+- Esta versão é de uso **local**, sem login/múltiplos usuários ou gestão de permissões. Os alertas aparecem no painel e no histórico; o envio por Telegram é opcional e configurado na aba Notificações.
 - Mantenha o bind em `127.0.0.1`. Antes de expor para uma equipe, acrescente autenticação, HTTPS e regras de acesso. Não publique a porta diretamente na internet.
 - Limite desta versão: 100 equipamentos. Ainda não foi feito teste de carga com esse volume.
 - Circuitos remotos: até 100 no painel, com máximo de 20 por Datacom.
@@ -255,38 +255,39 @@ MONITOR_DATA_DIR="$PWD/.data-restaurada" bash start.sh
 
 Mantenha `MONITOR_DATA_DIR` apontando para a pasta restaurada em cada nova inicialização, inclusive no seu serviço ou atalho. As pastas `.data/` e `.data-restaurada*/` são ignoradas pelo Git. Nunca envie o ZIP, o banco ou a chave ao repositório. Os comandos acima também estão disponíveis na ajuda da aba Backups.
 
-## Notificações pelo WhatsApp (API oficial da Meta)
+## Notificações pelo Telegram
 
-A aba **Notificações** configura o envio de quedas e recuperações para **um número individual de WhatsApp**. A integração usa a WhatsApp Cloud API oficial, com modelo de mensagem aprovado, inclusive fora da janela de conversa de 24 horas. Não usa WhatsApp Web, QR code ou disparo para grupos. O envio pode ter cobrança pela Meta.
+A aba **Notificações** envia quedas e recuperações para uma **conversa, grupo ou canal do Telegram**, usando um bot. A configuração precisa somente do **token do bot** e do **Chat ID** do destino. Não exige modelo de mensagem aprovado nem conta empresarial.
 
-### Preparar a conta e o modelo
+### Configurar o bot e escolher o destino
 
-1. Crie uma aplicação empresarial com o produto WhatsApp no [Meta for Developers](https://developers.facebook.com/docs/whatsapp/cloud-api/get-started) e cumpra os requisitos exibidos para sua conta/número. Em testes, use um destinatário autorizado na configuração da API.
-2. Obtenha o **Phone number ID** do remetente e um token com a permissão `whatsapp_business_messaging` e acesso ao número da empresa. O ID não é o número de telefone. Tokens temporários expiram: para operação contínua, configure as credenciais apropriadas de produção pela Meta.
-3. No Gerenciador do WhatsApp, crie um modelo de texto chamado `velosonet_alerta`, idioma português do Brasil (`pt_BR`), com **exatamente uma variável de texto no corpo**, sem variáveis em cabeçalhos ou botões. Sugestão de texto:
+1. No Telegram, abra o perfil oficial [@BotFather](https://t.me/BotFather), envie `/newbot` e siga as instruções. Copie o token fornecido pelo BotFather.
+2. Na aba Notificações, informe o token e salve, ainda com alertas desativados. Não envie o token pelo chat.
+3. Abra a conversa com o novo bot e envie `/start`. Para receber em grupo, adicione o bot e envie `/start@NomeDoSeuBot` no grupo. O bot precisa ter permissão para enviar mensagens; em canais, normalmente precisa ser administrador.
+4. Clique em **Buscar conversas**, escolha o destino e salve. Se já souber o Chat ID, pode informá-lo diretamente. IDs de grupos normalmente são negativos: mantenha o sinal de menos. O Chat ID **não é o número do telefone**.
+5. Clique em **Enviar teste** e confira o recebimento no Telegram. Esse botão envia uma mensagem real; salvar a configuração não envia um teste.
+6. Marque **Ativar alertas automáticos** e salve. Apenas novos eventos entram na fila. Não há envio de eventos da demonstração nem replay do histórico anterior.
 
-   > Atualização do monitoramento VELOSONET. {{1}} Consulte o painel para mais detalhes.
+**Buscar conversas** consulta até 20 atualizações recentes do bot e retorna somente nomes, tipos e IDs das conversas, nunca o conteúdo das mensagens. A consulta não confirma/remove atualizações e não altera os filtros ou o webhook do bot. Se a conversa não aparecer, envie `/start` novamente e repita a busca. Use um bot dedicado: um webhook ou outro coletor pode impedir essa consulta; o programa não remove integrações existentes automaticamente.
 
-   Como exemplo para a variável, informe `QUEDA: BBU Centro (10.0.0.1), sem ping após 21 perdas consecutivas.` Aguarde a aprovação da Meta; criação/aprovação não é feita pelo programa. O destinatário precisa estar autorizado a receber mensagens da empresa.
-4. Na aba Notificações, informe token, Phone number ID, destino com DDI/DDD, nome e idioma do modelo. Salve ainda com alertas desativados, clique em **Enviar teste** e confira o recebimento no destino. Esse botão envia uma mensagem real; salvar a configuração não envia um teste.
-5. Marque **Ativar alertas automáticos** e salve. Somente eventos gerados depois disso entram na fila. Não há envio de eventos da demonstração ou replay do histórico do painel.
-
-A versão inicial da Graph API é `v23.0`, ajustável em **Versão da API** para uma versão suportada pela aplicação Meta. O servidor que executa o programa precisa alcançar `https://graph.facebook.com` na porta 443, mantendo a verificação TLS. Tokens são informados na interface local, nunca pelo chat, e ficam criptografados no banco com a mesma chave das outras credenciais. A API retorna somente a indicação de que existe um token salvo; deixar o campo vazio mantém o atual.
+O servidor precisa alcançar `https://api.telegram.org` na porta 443, mantendo a verificação TLS. O token fica criptografado no banco com a mesma chave das outras credenciais e nunca é retornado pela API. Deixe o campo vazio para manter um token já salvo. A Bot API exige o token no caminho da requisição HTTPS; erros exibidos pelo programa são tratados para não expor esse endereço nem o token, e redirecionamentos são recusados.
 
 ### Eventos, agrupamento e tentativas
 
-- Ping: avisa a entrada na **21ª perda consecutiva** e a recuperação. Perdas adicionais da mesma sequência não criam novas mensagens.
+- Ping: avisa a entrada na **21ª perda consecutiva** e a recuperação. Perdas adicionais na mesma sequência não geram novos eventos.
 - Portas: avisa transições Down/Up, com tipo, número e nome personalizado da porta quando disponíveis.
 - Circuitos: avisa queda e recuperação do ping realizado pelo Datacom.
-- Erros de coleta são opcionais e vêm desmarcados, separados de perdas de ping. Essa opção inclui falhas de ICMP/SSH/banda SIAE e a recuperação da leitura de banda SIAE.
-- A fila é persistida no SQLite na mesma transação do evento. Um serviço separado envia **até 3 eventos por resumo**, por padrão a cada **30 segundos** (ajustável entre 15 e 300). Eventos adicionais aguardam o próximo resumo. Os horários enviados são identificados em UTC.
-- Falhas de conexão, indisponibilidade ou limite temporário da Meta permitem até **3 tentativas**, com espera entre elas. Erros de token, modelo ou destino pausam a fila até corrigir e salvar ou realizar um teste bem-sucedido. O monitoramento continua independente dos envios.
-- Eventos com mais de **uma hora** expiram para evitar uma enxurrada de avisos antigos após uma interrupção. A fila comporta até **500 eventos**; ao atingir o limite, novos eventos continuam no painel, mas não entram na fila. O histórico de envios guarda até **1.000 eventos por até 7 dias**.
-- Salvar ou remover a configuração cancela os envios pendentes para não enviá-los a outro destino. Uma solicitação que já começou pode terminar no destino anterior. Uma interrupção após a Meta aceitar a mensagem e antes de o programa registrar a resposta pode causar duplicidade em uma nova tentativa; a API não oferece uma confirmação transacional junto ao SQLite.
+- Erros de coleta são opcionais e vêm desmarcados, separados de perdas de ping. A opção inclui falhas de ICMP/SSH/banda SIAE e a recuperação da leitura de banda SIAE.
+- A fila é persistida no SQLite na mesma transação do evento. Um serviço separado envia **até 3 eventos por resumo**, por padrão a cada **30 segundos** (ajustável entre 15 e 300). Eventos adicionais aguardam o próximo resumo. Os horários das ocorrências são identificados em UTC.
+- Falhas de conexão, indisponibilidade ou limite temporário do Telegram permitem até **3 tentativas**, com espera entre elas. O prazo de repetição informado pelo Telegram é respeitado entre 30 segundos e uma hora. Erros de token ou destino pausam a fila até corrigir e salvar ou realizar um teste bem-sucedido. O monitoramento continua independente dos envios.
+- Eventos com mais de **uma hora** expiram para evitar uma enxurrada de avisos antigos após uma interrupção. A fila comporta até **500 eventos**; no limite, novos eventos continuam no painel, mas não entram na fila. O histórico de envios guarda até **1.000 eventos por até 7 dias**.
+- Salvar ou remover a configuração cancela envios pendentes para não enviá-los a outro destino. Uma solicitação já iniciada pode terminar no destino anterior. Uma interrupção após o Telegram aceitar a mensagem e antes de o programa registrar a resposta pode causar duplicidade em uma nova tentativa.
 
-**Aceito pela Meta** confirma somente que a API recebeu a solicitação e retornou um ID. Não comprova entrega ou leitura no aparelho: este programa ainda não recebe webhooks de status. O token também entra nos backups criptografado; ao restaurar um backup, as notificações ficam **desativadas** e os envios pendentes da cópia são cancelados. Confira o destino e reative manualmente quando desejar.
+**Aceito pelo Telegram** indica que a Bot API retornou um ID de mensagem para o destino configurado, e não uma confirmação de leitura pelo operador. O token também entra nos backups criptografado; ao restaurar uma cópia, as notificações ficam **desativadas** e os envios pendentes da cópia são cancelados. Confira o destino antes de reativar.
 
-A validação automatizada usa respostas simuladas da Meta e verifica fila, tentativas, criptografia, modelo e isolamento da demonstração. O envio real depende da conta, do token, do modelo aprovado e da conectividade do servidor e precisa ser confirmado pelo botão de teste no seu ambiente.
+Na atualização que substitui o WhatsApp, a configuração anterior é desativada, o token antigo é removido e seus envios pendentes são cancelados. Esse histórico de envio não entra nos contadores do Telegram. Cadastros, eventos de monitoramento, disponibilidade e backups são preservados.
+
+Os testes automatizados usam respostas simuladas do Telegram e verificam fila, tentativas, migração, criptografia, seleção de conversas e isolamento da demonstração. O recebimento real deve ser confirmado pelo botão de teste após configurar o seu bot e a conectividade do servidor.
 
 ## Validação
 

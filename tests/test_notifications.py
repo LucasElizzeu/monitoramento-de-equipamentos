@@ -10,12 +10,12 @@ TEMP = tempfile.TemporaryDirectory()
 os.environ.setdefault('MONITOR_DATA_DIR', TEMP.name)
 import app
 import notifications
-import whatsapp_meta
+import telegram_bot
 import backups
 from fastapi import HTTPException
 from pydantic import ValidationError
 
-TOKEN = 'test_meta_token_not_a_real_credential_12345'
+TOKEN = '123456789:AA_fake_token_for_tests_only_1234567890'
 
 
 class NotificationTests(unittest.TestCase):
@@ -33,8 +33,7 @@ class NotificationTests(unittest.TestCase):
         self.at = time.time()
 
     def configure(self, **kwargs):
-        data = dict(token=TOKEN, phone_number_id='123456789', recipient='+55 (11) 99999-9999',
-                    template_name='velosonet_alerta', enabled=True, batch_seconds=30)
+        data = dict(token=TOKEN, chat_id='123456789', enabled=True, batch_seconds=30)
         data.update(kwargs)
         return app.save_notification_settings(app.NotificationInput(**data))
 
@@ -66,15 +65,14 @@ class NotificationTests(unittest.TestCase):
             original = notifications.settings(db)['token']
         self.assertNotIn(TOKEN, original)
         self.assertEqual(app.CIPHER.decrypt(original.encode()).decode(), TOKEN)
-        self.configure(token='', recipient='5511888888888')
+        self.configure(token='', chat_id='-1001234567890')
         with app.connect() as db:
             self.assertEqual(notifications.settings(db)['token'], original)
-        self.assertEqual(app.notification_settings()['config']['recipient'], '5511888888888')
+        self.assertEqual(app.notification_settings()['config']['chat_id'], '-1001234567890')
 
     def test_requires_complete_configuration_and_valid_inputs_before_enabling(self):
-        for values in [dict(token=''), dict(phone_number_id='../secret'), dict(recipient='https://other.invalid'),
-                       dict(language='pt/BR'), dict(api_version='https://other.invalid'),
-                       dict(template_name='Wrong Name'), dict(token='bad\nAuthorization'),
+        for values in [dict(token=''), dict(chat_id='../secret'), dict(chat_id='https://other.invalid'),
+                       dict(chat_id='0'), dict(chat_id='@somebody'), dict(token='bad\nAuthorization'),
                        dict(notify_ping=False,notify_ports=False,notify_circuits=False,notify_collection=False)]:
             with self.subTest(values=list(values)):
                 with self.assertRaises((HTTPException, ValidationError)): self.configure(**values)
@@ -83,7 +81,7 @@ class NotificationTests(unittest.TestCase):
     def test_groups_three_events_and_rate_limits_remaining_events(self):
         self.configure()
         for i in range(4): self.enqueue(at=self.at+i)
-        with patch.object(whatsapp_meta,'send',return_value='simulated-id') as sender:
+        with patch.object(telegram_bot,'send',return_value='simulated-id') as sender:
             self.process(self.at+29); sender.assert_not_called()
             self.process(self.at+30)
             self.assertEqual(sender.call_count, 1)
@@ -113,7 +111,7 @@ class NotificationTests(unittest.TestCase):
 
     def test_transient_errors_retry_three_times_then_stop(self):
         self.configure(); self.enqueue()
-        with patch.object(whatsapp_meta,'send',side_effect=whatsapp_meta.SendError('Temporário', True)) as sender:
+        with patch.object(telegram_bot,'send',side_effect=telegram_bot.SendError('Temporário', True)) as sender:
             for delta in [30,90,150,210]: self.process(self.at+delta)
             self.assertEqual(sender.call_count, 3)
         result=self.rows()[0]
@@ -122,7 +120,7 @@ class NotificationTests(unittest.TestCase):
 
     def test_permanent_error_pauses_queue_without_stopping_monitoring(self):
         self.configure(); self.enqueue()
-        with patch.object(whatsapp_meta,'send',side_effect=whatsapp_meta.SendError('Token recusado')) as sender:
+        with patch.object(telegram_bot,'send',side_effect=telegram_bot.SendError('Token recusado')) as sender:
             self.process(self.at+30); self.enqueue(at=self.at+31)
             self.process(self.at+90); self.assertEqual(sender.call_count, 1)
         self.assertTrue(app.notification_settings()['blocked'])
@@ -132,9 +130,19 @@ class NotificationTests(unittest.TestCase):
         self.assertFalse(app.notification_settings()['blocked'])
         self.assertEqual(self.rows()[-1]['status'], 'cancelled')
 
+    def test_rate_limit_wait_applies_to_other_queued_events_too(self):
+        self.configure()
+        for i in range(4): self.enqueue(at=self.at+i)
+        with patch.object(telegram_bot,'send',side_effect=telegram_bot.SendError('Limite',True,120)) as sender:
+            self.process(self.at+30)
+            self.process(self.at+90)
+            self.assertEqual(sender.call_count,1)
+            self.process(self.at+150)
+            self.assertEqual(sender.call_count,2)
+
     def test_changes_and_removal_cancel_pending_events(self):
         self.configure(); self.enqueue()
-        self.configure(recipient='5511888888888')
+        self.configure(chat_id='-1001234567890')
         self.assertEqual(self.rows()[0]['status'], 'cancelled')
         self.enqueue(at=self.at+1)
         app.remove_notification_settings()
@@ -144,15 +152,15 @@ class NotificationTests(unittest.TestCase):
 
     def test_conflicting_settings_revision_does_not_overwrite_current(self):
         original=self.configure()
-        self.configure(recipient='5511888888888')
+        self.configure(chat_id='-1001234567890')
         with self.assertRaises(HTTPException) as result:
             self.configure(revision=original['revision'])
         self.assertEqual(result.exception.status_code,409)
-        self.assertEqual(app.notification_settings()['config']['recipient'],'5511888888888')
+        self.assertEqual(app.notification_settings()['config']['chat_id'],'-1001234567890')
 
     def test_expired_events_are_not_sent_after_a_long_interruption(self):
         self.configure(); self.enqueue()
-        with patch.object(whatsapp_meta,'send') as sender:
+        with patch.object(telegram_bot,'send') as sender:
             self.process(self.at+3601); sender.assert_not_called()
         self.assertEqual(self.rows()[0]['status'], 'expired')
 
@@ -177,7 +185,7 @@ class NotificationTests(unittest.TestCase):
 
     def test_test_send_is_explicit_works_while_disabled_and_does_not_enqueue(self):
         self.configure(enabled=False)
-        with patch.object(whatsapp_meta,'send',return_value='simulated-test') as sender:
+        with patch.object(telegram_bot,'send',return_value='simulated-test') as sender:
             self.assertEqual(app.test_notification()['status'],'accepted')
             sender.assert_called_once()
         self.assertEqual(self.rows(),[])
@@ -203,3 +211,40 @@ class NotificationTests(unittest.TestCase):
             db.rollback()
         finally: db.close()
         self.assertEqual(self.rows(),[])
+
+    def test_discovery_requires_saved_token_and_does_not_send_or_enable(self):
+        with self.assertRaises(HTTPException):
+            app.discover_notification_chats()
+        self.configure(enabled=False,chat_id='')
+        found=[dict(id='-1001234567890',title='Rede',type='supergroup')]
+        with patch.object(telegram_bot,'chats',return_value=found),patch.object(telegram_bot,'send') as sender:
+            self.assertEqual(app.discover_notification_chats(),dict(chats=found))
+            sender.assert_not_called()
+        self.assertFalse(app.notification_settings()['enabled'])
+        self.assertEqual(self.rows(),[])
+
+    def test_existing_telegram_configuration_survives_repeated_initialization(self):
+        self.configure(); self.enqueue()
+        app.init_db()
+        self.assertTrue(app.notification_settings()['enabled'])
+        self.assertTrue(app.notification_settings()['has_token'])
+        self.assertEqual(self.rows()[0]['status'],'pending')
+
+    def test_migration_from_whatsapp_cancels_old_jobs_without_touching_devices(self):
+        self.configure(); self.enqueue()
+        with app.connect() as db:
+            # Recreate the previous release's schema and configuration.
+            db.execute('ALTER TABLE notification_outbox DROP COLUMN provider')
+            db.execute('UPDATE notification_settings SET config=?',
+                       (json.dumps(dict(phone_number_id='123',recipient='5511999999999')),))
+        app.init_db()
+        current=app.notification_settings()
+        self.assertFalse(current['enabled'])
+        self.assertFalse(current['has_token'])
+        self.assertEqual(current['recent'],[])
+        self.assertEqual(self.rows()[0]['status'],'cancelled')
+        self.assertEqual(self.rows()[0]['provider'],'legacy')
+        self.assertEqual(app.dashboard()['devices'][0]['name'],'BBU Centro')
+        self.configure(); self.enqueue(at=self.at+1)
+        self.assertEqual(self.rows()[-1]['provider'],'telegram')
+        self.assertEqual(len(app.notification_settings()['recent']),1)

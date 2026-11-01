@@ -31,7 +31,7 @@ import traffic_history
 import availability
 import backups
 import notifications
-import whatsapp_meta
+import telegram_bot
 
 ROOT = Path(__file__).resolve().parent
 DATA = Path(os.environ.get('MONITOR_DATA_DIR', ROOT / '.data'))
@@ -150,11 +150,7 @@ def init_db():
 class NotificationInput(BaseModel):
     enabled: bool = False
     token: str = Field(default='', max_length=4096)
-    phone_number_id: str = Field(default='', max_length=30)
-    recipient: str = Field(default='', max_length=40)
-    template_name: str = Field(default='velosonet_alerta', max_length=512)
-    language: str = Field(default='pt_BR', max_length=10)
-    api_version: str = Field(default='v23.0', max_length=10)
+    chat_id: str = Field(default='', max_length=21)
     batch_seconds: int = Field(default=30, ge=15, le=300)
     notify_ping: bool = True
     notify_ports: bool = True
@@ -1151,13 +1147,13 @@ def send_pending_notifications():
             return
     try:
         token = CIPHER.decrypt(job['settings']['token'].encode()).decode()
-        provider_id = whatsapp_meta.send(job['settings']['config'], token, whatsapp_meta.summary(job['events']))
+        provider_id = telegram_bot.send(job['settings']['config'], token, telegram_bot.summary(job['events']))
     except (InvalidToken, ValueError):
-        error = whatsapp_meta.SendError('A chave local não abriu o token. Informe o token novamente na configuração.')
-    except whatsapp_meta.SendError as failure:
+        error = telegram_bot.SendError('A chave local não abriu o token. Informe o token novamente na configuração.')
+    except telegram_bot.SendError as failure:
         error = failure
     except Exception:
-        error = whatsapp_meta.SendError('Falha inesperada no envio. Revise a configuração antes de retomar.')
+        error = telegram_bot.SendError('Falha inesperada no envio. Revise a configuração antes de retomar.')
     else:
         with LOCK, connect() as db:
             notifications.finish(db, job, time.time(), provider_id=provider_id)
@@ -1300,9 +1296,9 @@ def notification_settings():
                              ('notify_circuits', 'circuit'), ('notify_collection', 'collection')):
             defaults[field] = config.get('topics', {}).get(topic, defaults[field])
         counts = {row['status']: row['total'] for row in db.execute(
-            'SELECT status,count(*) AS total FROM notification_outbox GROUP BY status')}
+            "SELECT status,count(*) AS total FROM notification_outbox WHERE provider='telegram' GROUP BY status")}
         recent = [dict(row) for row in db.execute('SELECT id,created_at,event_at,device_name,level,message,status,attempts,error '
-                                                 'FROM notification_outbox ORDER BY id DESC LIMIT 20')]
+                                                 "FROM notification_outbox WHERE provider='telegram' ORDER BY id DESC LIMIT 20")]
     thread = getattr(app.state, 'notification_thread', None)
     return dict(config=defaults, enabled=bool(selected['enabled']), has_token=bool(selected['token']),
                 revision=selected['revision'], blocked=bool(selected['blocked']),
@@ -1315,21 +1311,12 @@ def notification_settings():
 def save_notification_settings(value: NotificationInput):
     config = value.model_dump(exclude={'token', 'revision', 'enabled', 'notify_ping', 'notify_ports', 'notify_circuits', 'notify_collection'})
     config = {key: field.strip() if isinstance(field, str) else field for key, field in config.items()}
-    recipient = config['recipient']
-    if recipient and not re.fullmatch(r'\+?[0-9 ()-]+', recipient):
-        raise HTTPException(422, 'Informe o destino com DDI, DDD e número.')
-    config['recipient'] = re.sub(r'\D', '', recipient)
-    for name, pattern, message in (
-            ('phone_number_id', r'\d{1,30}', 'Informe o ID numérico do número remetente fornecido pela Meta.'),
-            ('recipient', r'[1-9]\d{7,14}', 'Informe o destino com DDI, DDD e número, sem zero inicial.'),
-            ('template_name', r'[a-z0-9_]{1,512}', 'Use o nome aprovado do modelo, com letras minúsculas, números e sublinhado.'),
-            ('language', r'[a-z]{2}(?:_[A-Z]{2})?', 'Informe o idioma do modelo, por exemplo pt_BR.'),
-            ('api_version', r'v\d{1,3}\.0', 'Informe uma versão da Graph API, por exemplo v23.0.')):
-        if (config[name] or value.enabled) and not re.fullmatch(pattern, config[name]):
-            raise HTTPException(422, message)
+    config['provider'] = 'telegram'
+    if (config['chat_id'] or value.enabled) and not re.fullmatch(telegram_bot.CHAT_PATTERN, config['chat_id']):
+        raise HTTPException(422, 'Informe o Chat ID numérico. Para grupos, mantenha o sinal de menos inicial.')
     token = value.token.strip()
-    if token and not re.fullmatch(r'[A-Za-z0-9_.|:-]{20,4096}', token):
-        raise HTTPException(422, 'Formato de token inválido. Copie o token de acesso fornecido pela Meta.')
+    if token and not re.fullmatch(telegram_bot.TOKEN_PATTERN, token):
+        raise HTTPException(422, 'Formato de token inválido. Copie o token fornecido pelo BotFather.')
     config['topics'] = dict(ping=value.notify_ping, port=value.notify_ports,
                             circuit=value.notify_circuits, collection=value.notify_collection)
     with LOCK, connect() as db:
@@ -1338,8 +1325,8 @@ def save_notification_settings(value: NotificationInput):
             raise HTTPException(409, 'A configuração mudou em outra janela. Recarregue antes de salvar.')
         saved_token = CIPHER.encrypt(token.encode()).decode() if token else previous['token']
         if value.enabled:
-            if not saved_token or not all(config[key] for key in ('phone_number_id', 'recipient', 'template_name', 'language', 'api_version')):
-                raise HTTPException(422, 'Preencha token, ID do número, destino e modelo antes de ativar os alertas.')
+            if not saved_token or not config['chat_id']:
+                raise HTTPException(422, 'Preencha o token do bot e o Chat ID antes de ativar os alertas.')
             if not any(config['topics'].values()):
                 raise HTTPException(422, 'Selecione pelo menos um tipo de evento para enviar.')
             try:
@@ -1369,9 +1356,9 @@ def test_notification():
         raise HTTPException(422, 'Salve as credenciais antes de testar o envio.')
     try:
         token = CIPHER.decrypt(selected['token'].encode()).decode()
-        whatsapp_meta.send(selected['config'], token,
-            'Teste solicitado no painel VELOSONET. A configuração do WhatsApp recebeu uma solicitação de envio.')
-    except whatsapp_meta.SendError as error:
+        telegram_bot.send(selected['config'], token,
+            'Teste solicitado no painel VELOSONET. A configuração do Telegram recebeu uma solicitação de envio.')
+    except telegram_bot.SendError as error:
         with LOCK, connect() as db:
             db.execute('UPDATE notification_settings SET last_error=? WHERE id=1 AND revision=?',
                        (str(error), selected['revision']))
@@ -1381,7 +1368,23 @@ def test_notification():
     with LOCK, connect() as db:
         db.execute('UPDATE notification_settings SET last_error=NULL,blocked=0,last_sent_at=? WHERE id=1 AND revision=?',
                    (time.time(), selected['revision']))
-    return dict(status='accepted', message='A Meta aceitou a mensagem de teste. Confira o WhatsApp do destinatário.')
+    return dict(status='accepted', message='O Telegram aceitou a mensagem de teste. Confira a conversa configurada.')
+
+
+@app.post('/api/notifications/chats')
+def discover_notification_chats():
+    with LOCK, connect() as db:
+        selected = notifications.settings(db)
+    if not selected['token']:
+        raise HTTPException(422, 'Salve o token do bot antes de buscar as conversas.')
+    try:
+        token = CIPHER.decrypt(selected['token'].encode()).decode()
+        found = telegram_bot.chats(token)
+    except telegram_bot.SendError as error:
+        raise HTTPException(502, str(error)) from None
+    except InvalidToken:
+        raise HTTPException(422, 'A chave local não abriu o token salvo. Informe o token novamente.') from None
+    return dict(chats=found)
 
 
 def traffic_catalog(db, at, include_zero=False):
