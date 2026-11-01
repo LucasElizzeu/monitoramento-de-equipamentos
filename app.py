@@ -536,13 +536,18 @@ def fingerprint(key):
     return 'SHA256:' + base64.b64encode(hashlib.sha256(key.asbytes()).digest()).decode().rstrip('=')
 
 
+class HostKeyMismatch(paramiko.SSHException):
+    pass
+
+
 class VerifyFingerprint(paramiko.MissingHostKeyPolicy):
     def __init__(self, expected):
         self.expected = expected
 
     def missing_host_key(self, client, hostname, key):
         if fingerprint(key) != self.expected:
-            raise paramiko.SSHException('Chave SSH não corresponde à impressão digital cadastrada.')
+            raise HostKeyMismatch(f'Chave SSH {key.get_name()} divergente. Impressão apresentada: {fingerprint(key)}. '
+                                  'Confirme a chave pelo console ou administrador antes de atualizar o cadastro.')
 
 
 def clean_cli(output):
@@ -859,12 +864,33 @@ def check_ssh(device):
         collect_utilization(client, device, ports)
     except (CommandRejected, InterfaceSelectionError) as exc:
         error = str(exc)
+    except HostKeyMismatch as exc:
+        error = str(exc)
+        diagnostic['error_type'] = 'HostKeyMismatch'
+    except InvalidToken:
+        error = 'A chave local não abriu a senha SSH salva. Edite o equipamento e informe a senha novamente.'
+        diagnostic['error_type'] = 'InvalidToken'
     except paramiko.AuthenticationException:
         error = 'Autenticação SSH recusada. Verifique usuário e senha.'
-    except Exception:
-        error = 'Consulta SSH falhou. Verifique acesso, chave SSH e comandos do modelo.'
+        diagnostic['error_type'] = 'AuthenticationException'
+    except paramiko.ssh_exception.IncompatiblePeer:
+        error = 'Negociação SSH incompatível. Confira os algoritmos habilitados no DmOS e a versão do firmware. A verificação de segurança permanece ativa.'
+        diagnostic['error_type'] = 'IncompatiblePeer'
+    except paramiko.ssh_exception.NoValidConnectionsError:
+        error = 'Não foi possível abrir a conexão SSH no IP e porta cadastrados. Confira acesso a partir do computador do programa.'
+        diagnostic['error_type'] = 'NoValidConnectionsError'
+    except TimeoutError:
+        error = 'A conexão ou consulta SSH excedeu o tempo de espera. Confira a carga e o acesso ao equipamento.'
+        diagnostic['error_type'] = 'TimeoutError'
+    except Exception as exc:
+        diagnostic['error_type'] = type(exc).__name__
+        error = ('Falha no protocolo SSH. O servidor pode ter fechado a sessão ou não enviado um banner válido. '
+                 'Confira os registros SSH do equipamento.' if isinstance(exc, paramiko.SSHException) else
+                 'Consulta SSH falhou. Consulte a etapa e o tipo de erro no diagnóstico.')
     finally:
         client.close()
+    if error:
+        diagnostic['error'] = error
     with LOCK, connect() as db:
         current = db.execute('SELECT * FROM devices WHERE id=?', (device['id'],)).fetchone()
         if not current or current['config_version'] != device.get('config_version', 0):

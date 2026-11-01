@@ -148,7 +148,7 @@ function renderDevices(){
 function sshDiagnosticHTML(d){
  const diagnostic=d.ssh_diagnostic||{};
  const family=interfaceLabels[diagnostic.interface_type||d.interface_type]||'Automático';
- const metadata=`Tipo salvo: ${family}\nEtapa: ${diagnostic.stage||'Aguardando nova consulta'}`;
+ const metadata=`Tipo salvo: ${family}\nEtapa: ${diagnostic.stage||'Aguardando nova consulta'}\nTipo de erro: ${diagnostic.error_type||'Não registrado'}\nMotivo: ${diagnostic.error||d.ssh_error||'Não registrado'}`;
  const status=`Comando de portas: ${diagnostic.status_command||d.status_command||'—'}\n${diagnostic.status_output||'Nenhuma saída registrada nesta tentativa.'}`;
  const optics=`Comando de sinais: ${diagnostic.optics_command||d.optics_command||'—'}\n${diagnostic.optics_output||'Nenhuma saída registrada nesta tentativa.'}`;
  return `<details class="ssh-diagnostic" data-port-key="${d.id}:ssh-diagnostic"><summary>Ver diagnóstico da consulta SSH</summary><button type="button" class="button secondary output-copy" data-copy-output>${icon('copy')}Copiar diagnóstico</button><pre>${esc(metadata)}</pre><pre>${esc(status)}</pre><pre>${esc(optics)}</pre></details>`;
