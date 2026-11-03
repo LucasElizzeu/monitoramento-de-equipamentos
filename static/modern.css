@@ -13,6 +13,9 @@ body[data-layout] .sidebar { width: 210px; padding: 16px 14px; background: var(-
 body[data-layout] .app-shell { margin-left: 210px; }
 body[data-layout] .brand { display: flex; align-items: center; width: 100%; height: 64px; overflow: hidden; }
 body[data-layout] .brand-logo { flex-shrink: 0; width: 182px; max-width: none; height: auto; }
+.client-brand { display: flex; justify-content: center; padding: 0 0 12px; border-bottom: 1px solid var(--line); }
+.client-brand img { display: block; width: 112px; height: auto; }
+.client-brand-mobile { display: none; }
 body[data-layout] .sidebar>.nav-label { margin-top: 18px; }
 body[data-layout] .workspace { margin: 14px 0 20px; padding: 0 0 16px; background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; }
 .workspace .chevron { display: none; }
@@ -157,14 +160,15 @@ body[data-view=datacoms] .circuit-legend { border-top: 1px solid var(--line); bo
   body[data-layout] .sidebar { width: 76px; padding: 16px 13px; }
   body[data-layout] .app-shell { margin-left: 76px; }
   body[data-layout] .brand { height: 44px; width: 46px; }
-  body[data-layout] .brand-logo { width: 200px; transform: translateX(-3px); }
+  body[data-layout] .brand-logo { width: 160px; transform: translateX(-3px); }
   body[data-layout] .sidebar .nav-item { font-size: 0; justify-content: center; gap: 0; }
   .sidebar .workspace, .sidebar .nav-label, .sidebar .nav-count, .sidebar .alert-dot { display: none; }
 }
 @media (max-width:640px) {
+  .topbar-right .live-label, .topbar-right .top-divider { display: none; }
   body[data-layout] .sidebar { width: 100%; height: 58px; padding: 7px 10px; gap: 8px; background: var(--surface); border-bottom: 1px solid var(--line); }
   body[data-layout] .brand { flex: 0 0 44px; width: 44px; height: 44px; }
-  body[data-layout] .brand-logo { width: 200px; transform: translateX(-3px); }
+  body[data-layout] .brand-logo { width: 160px; transform: translateX(-3px); }
   body[data-layout] .sidebar nav { flex: 1; min-width: 0; width: auto; overflow-x: auto; justify-content: flex-end; }
   body[data-layout] .sidebar .nav-item { flex-shrink: 0; width: 34px; min-height: 40px; padding: 8px; gap: 0; margin-bottom: 0; font-size: 0; }
   body[data-layout] .app-shell { margin-left: 0; }
@@ -197,6 +201,10 @@ body[data-view=datacoms] .circuit-legend { border-top: 1px solid var(--line); bo
 @media (max-width:360px) {
   body[data-layout] .sidebar nav { justify-content: flex-start; gap: 0; }
   body[data-layout] .sidebar .nav-item { width: 30px; padding: 6px; }
+}
+@media (max-width:900px) {
+  .client-brand { display: none; }
+  .client-brand-mobile { display: block; width: 84px; height: 28px; object-fit: contain; }
 }
 @media (prefers-reduced-motion:reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }

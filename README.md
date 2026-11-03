@@ -1,5 +1,7 @@
 # VELOSONET MONITORAMENTO
 
+A interface usa AlwaysUp como marca principal e a logo Velosonet NOC em tamanho menor, sem texto adicional. No celular e no tablet, a marca menor aparece na barra superior.
+
 Painel local para monitorar ping e interfaces de equipamentos Datacom por SSH. Interface em português, responsiva, com a logo VELOSONET NOC e tema branco compacto. Textos escuros e indicadores em verde, vermelho e âmbar destacam os estados dos equipamentos. Não requer etapa de compilação ou serviços de fontes externos. Python 3.12+, FastAPI, SQLite e JavaScript.
 
 ## Executar
