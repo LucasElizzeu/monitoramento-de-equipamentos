@@ -115,9 +115,15 @@ Os circuitos ficam no mesmo SQLite, na pasta `.data`. A tabela é criada automat
 
 O tema **branco compacto** usa a logo **VELOSONET NOC**, fundo branco, textos escuros e detalhes azuis na navegação e nas ações. Em telas menores, a lista de equipamentos vira cartões com status, IP, latência, perdas e última checagem visíveis juntos, além dos botões **Editar**, **Detalhes** e **Remover**. Nos Datacoms, pings e portas compartilham a mesma grade; pings vinculados aparecem dentro do cartão da porta. O cabeçalho resume portas ativas e inativas. Os nomes das portas ganham destaque, com sinal óptico e consumo separados.
 
+Na aba **Datacoms**, os cartões aparecem diretamente abaixo do resumo, da busca e dos filtros, sem repetir a tabela de equipamentos acima deles. Em telas grandes, há quatro cartões por linha; no celular, uma coluna. Editar, abrir detalhes, remover e configurar IPs continuam disponíveis no cabeçalho de cada Datacom. A busca e o filtro de status atuam sobre esses grupos de cartões.
+
+O resumo **Online** informa o ping do Datacom. **Em alerta** lista Datacoms com instabilidade, erro de coleta, porta inativa ou circuito com alerta; um Datacom que responde ao ping pode ter alerta em uma porta ou circuito. Datacoms sem ping aparecem no resumo separado **Sem ping**. Isso não altera o estado coletado de cada equipamento.
+
 O bloco de ping do circuito mostra **verde quando online**, **amarelo em instabilidade ou erro de coleta**, **vermelho quando sem ping** e **cinza enquanto aguarda leitura**. O texto do estado continua visível, sem depender apenas da cor. O estado do circuito é independente do estado da porta física; uma porta ativa pode conter um circuito sem ping. As cores não alteram os critérios do monitoramento nem o alerta na 21ª perda consecutiva.
 
 [Ver captura do tema branco compacto com dados fictícios](docs/visual-branco-compacto.png).
+
+[Ver captura da tela completa de Datacoms com dados fictícios](docs/painel-branco-compacto.png).
 
 ## Ping
 

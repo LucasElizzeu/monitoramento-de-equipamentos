@@ -30,7 +30,7 @@ const labels = {online:'Online',offline:'Sem ping',unstable:'Instável',pending:
 const designPreview=null;
 localStorage.removeItem('nexo-demo');
 const state = {demo:false, page:'overview', data:{devices:[],alerts:[],samples:[]}, loading:false, selected:null, deleting:null, editing:null, portNaming:null, removingCircuit:null, metricCards:{}, metricView:null, dataRevision:0};
-function badge(status){return `<span class="status-pill ${esc(status)}"><i></i>${esc(labels[status]||status)}</span>`;}
+function badge(status,label=labels[status]||status){return `<span class="status-pill ${esc(status)}"><i></i>${esc(label)}</span>`;}
 function formatTime(date){return date?new Date(date).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'Aguardando';}
 function ago(date){if(!date)return 'Aguardando';const seconds=Math.max(0,Math.floor((Date.now()-new Date(date))/1000));return seconds<10?'Agora':seconds<60?`há ${seconds}s`:seconds<3600?`há ${Math.floor(seconds/60)}min`:`há ${Math.floor(seconds/3600)}h`;}
 function toast(message){$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('#toast').hidden=true,4500);}
@@ -48,8 +48,17 @@ function deviceKindLabel(device){return device.kind==='datacom'?'Datacom':device
 function collectedPorts(devices){
  return orderedDatacoms(devices).filter(d=>!d.ssh_error).flatMap(device=>(device.port_data||[]).map(port=>({device,port})));
 }
+function datacomWarnings(d){
+ return [
+  ['unstable','error'].includes(d.state)?labels[d.state]:null,
+  d.ssh_error?'Erro na consulta SSH':null,
+  !d.ssh_error&&(d.port_data||[]).some(p=>p.state==='down')?'Porta inativa':null,
+  (d.circuits||[]).some(c=>['offline','unstable','error'].includes(c.state))?'Circuito com alerta':null
+ ].filter(Boolean);
+}
 function metricEntries(key,devices){
  if(key==='down-ports')return collectedPorts(devices).filter(entry=>entry.port.state==='down');
+ if(key==='attention')return devices.filter(d=>d.kind==='datacom'&&d.state!=='offline'&&datacomWarnings(d).length).map(device=>({device}));
  return devices.filter(d=>key==='all'||d.state===key).map(device=>({device}));
 }
 function renderMetrics(){const d=pageDevices();const online=metricEntries('online',d).length;const offline=metricEntries('offline',d).length;const downPorts=metricEntries('down-ports',d).length;
@@ -61,13 +70,14 @@ function renderMetrics(){const d=pageDevices();const online=metricEntries('onlin
   cards[1][0]=`${subject} online`;cards[2][0]=`${subject} sem ping`;
   cards[3]=[`${subject} instáveis`,d.filter(x=>x.state==='unstable').length,'activity','amber','De 1 a 20 perdas','consecutivas'];
  }else if(state.page==='datacoms'){
-  cards[0].splice(4,2,'Monitoramento SSH','ping e portas');
-  cards[1][0]='Datacoms online';cards[2][0]='Datacoms sem ping';
+  cards[0][0]='Datacoms';cards[1][0]='Online';cards[1][2]='check';
+  cards[2]=['Em alerta',metricEntries('attention',d).length,'warning','amber','Equipamentos, portas ou circuitos','com alerta'];
+  cards[3]=['Sem ping',offline,'close','red','Ping do Datacom','21 perdas consecutivas'];
  }
- const keys=['all','online','offline',['bbus','siae'].includes(state.page)?'unstable':'down-ports'];
+ const keys=state.page==='datacoms'?['all','online','attention','offline']:['all','online','offline',['bbus','siae'].includes(state.page)?'unstable':'down-ports'];
  state.metricCards=Object.fromEntries(keys.map((key,index)=>[key,{title:cards[index][0],page:state.page,entries:metricEntries(key,d),at:state.data.updated_at,demo:state.demo,sshErrors:key==='down-ports'&&d.some(x=>x.kind==='datacom'&&x.ssh_error)}]));
  const focused=document.activeElement?.dataset.metric;
- $('#metrics').innerHTML=cards.map(([title,value,i,color,a,b],index)=>`<article class="metric-card ${color}"><div class="metric-title">${title}<button type="button" class="metric-icon metric-details" data-metric="${keys[index]}" title="Listar ${title.toLowerCase()}" aria-label="Listar ${title.toLowerCase()}" aria-haspopup="dialog" aria-controls="metric-dialog">${icon('attention')}</button></div><div class="metric-value">${value.toString().padStart(2,'0')}</div><div class="metric-bottom"><strong>${a}</strong><span>· ${b}</span></div></article>`).join('');
+ $('#metrics').innerHTML=cards.map(([title,value,i,color,a,b],index)=>`<article class="metric-card ${color}"><div class="metric-title">${title}<button type="button" class="metric-icon metric-details" data-metric="${keys[index]}" title="Listar ${title.toLowerCase()}" aria-label="Listar ${title.toLowerCase()}" aria-haspopup="dialog" aria-controls="metric-dialog">${icon(state.page==='datacoms'?i:'attention')}</button></div><div class="metric-value">${value.toString().padStart(2,'0')}</div><div class="metric-bottom"><strong>${a}</strong><span>· ${b}</span></div></article>`).join('');
  if(focused)$(`[data-metric="${focused}"]`)?.focus({preventScroll:true});
  const errors=d.filter(x=>x.state==='error'||x.ssh_error||(x.circuits||[]).some(c=>c.state==='error')).length;const unstable=d.filter(x=>x.state==='unstable'||(x.circuits||[]).some(c=>c.state==='unstable')).length;const remoteOffline=d.some(x=>(x.circuits||[]).some(c=>c.state==='offline'));
  $('#network-status').textContent=!d.length?'Sua rede começa aqui':errors?'Há erros de coleta':offline||downPorts||remoteOffline?'Sua rede precisa de atenção':unstable?'Há equipamentos com perda de ping':'Sua rede está operando normalmente';
@@ -80,11 +90,11 @@ function renderMetricList(){
  $('#metric-dialog-title').textContent=view.title;
  $('#metric-dialog-description').textContent=`${pages[view.page][0]} · ${count} ${ports?(count===1?'porta':'portas'):(count===1?'equipamento':'equipamentos')} · ${view.demo?'Demonstração':'Leitura'} às ${formatTime(view.at)}`;
  $('#metric-dialog-note').hidden=!view.sshErrors;
- const emptyMessages={all:'Nenhum equipamento cadastrado nesta aba.',online:'Nenhum equipamento online nesta aba.',offline:'Nenhum equipamento sem ping nesta aba.',unstable:view.page==='siae'?'Nenhum rádio SIAE instável nesta aba.':"Nenhuma BBU instável nesta aba.",'down-ports':'Nenhuma porta inativa nas leituras disponíveis.'};
+ const emptyMessages={attention:'Nenhum Datacom em alerta nesta aba.',all:'Nenhum equipamento cadastrado nesta aba.',online:'Nenhum equipamento online nesta aba.',offline:'Nenhum equipamento sem ping nesta aba.',unstable:view.page==='siae'?'Nenhum rádio SIAE instável nesta aba.':"Nenhuma BBU instável nesta aba.",'down-ports':'Nenhuma porta inativa nas leituras disponíveis.'};
  $('#metric-dialog-results').innerHTML=count?`<ul class="metric-results">${view.entries.map(({device:d,port:p})=>{
   const name=p?(p.custom_name||p.display_name||p.description||`Porta ${p.name}`):d.name;
   const family=p?(interfaceLabels[p.interface_type||d.interface_type]||'Interface'):`${deviceKindLabel(d)} · ${d.kind==='datacom'?'SSH':'Ping'}`;
-  const context=p?`${family} · Porta ${p.name}`:family;
+ const context=p?`${family} · Porta ${p.name}`:view.key==='attention'?datacomWarnings(d).join(' · '):family;
   return `<li class="metric-result"><div class="metric-result-main"><strong class="metric-result-name">${esc(name)}</strong><p>${esc(p?`${d.name} · ${d.host}`:d.host)}</p><small>${esc(context)}${d.circuit_position!=null?` · Posição ${esc(d.circuit_position)}`:''}</small>${p?`<small>Leitura ${ago(p.checked_at)}</small>`:`<small>${d.failures} perdas consecutivas · ${ago(d.last_check)}</small>`}</div><div class="metric-result-actions">${badge(p?p.state:d.state)}<button type="button" class="button secondary" data-metric-device="${d.id}" aria-label="Ver equipamento ${esc(d.name)}">Ver equipamento ${icon('arrow')}</button></div></li>`;
  }).join('')}</ul>`:`<p class="metric-empty">${emptyMessages[view.key]}</p>`;
 }
@@ -132,9 +142,12 @@ function deviceAddressHTML(device){
  const suffix=port===(scheme==='https'?443:80)?'':`:${port}`;
  return `<a class="device-web-link" href="${esc(scheme)}://${esc(host)}${suffix}/" target="_blank" rel="noopener noreferrer" title="Abrir site de ${esc(deviceKindLabel(device))} em nova aba" aria-label="Abrir site de ${esc(device.name)} (${esc(device.host)}) em nova aba"><span>${esc(device.host)}</span>${icon('arrow')}</a>`;
 }
+function filteredDevices(devices=pageDevices()){
+ const q=$('#search').value.trim().toLowerCase(),filter=$('#state-filter').value;
+ return devices.filter(d=>(d.name.toLowerCase().includes(q)||d.host.includes(q))&&(filter==='all'||d.state===filter));
+}
 function renderDevices(){
- const q=$('#search').value.toLowerCase(),filter=$('#state-filter').value,all=pageDevices();
- const devices=all.filter(d=>(d.name.toLowerCase().includes(q)||d.host.includes(q))&&(filter==='all'||d.state===filter));
+ const all=pageDevices(),devices=filteredDevices(all);
  $('#table-title').textContent=state.page==='bbus'?"BBU's":state.page==='datacoms'?'Datacoms':state.page==='siae'?'Rádios SIAE':'Equipamentos';
  $('#table-description').textContent=state.page==='bbus'?"Disponibilidade e latência das suas BBU's.":state.page==='datacoms'?'Disponibilidade dos Datacoms. Consulte circuitos e portas abaixo.':state.page==='siae'?'Disponibilidade dos rádios. Consulte o consumo dos TRX abaixo.':'Acompanhe a disponibilidade de cada ponto da rede.';
  $('#table-count').textContent=all.length;$('#table-summary').textContent=`Exibindo ${devices.length} de ${all.length} equipamentos`;
@@ -190,11 +203,11 @@ function shortPortLabel(identity){
 }
 function portPingHTML(c,d){
  const circuitState=['online','offline','unstable','error'].includes(c.state)?c.state:'pending';
- return `<section class="port-ping" data-state="${circuitState}" data-ping-id="${c.id}"><div class="port-ping-heading"><strong>Ping · ${esc(c.name)}</strong>${badge(c.state)}</div><div class="port-ping-meta"><code class="port-ping-ip">${esc(c.host)}</code><small class="port-ping-time">${ago(c.last_check)}</small></div><div class="port-ping-values"><span>Latência<strong>${number(c.latency,2)} <small>ms</small></strong></span><span>Perdas<strong>${c.failures} <small>/ 21</small></strong></span></div>${c.error?`<p class="signal-note">${esc(c.error)}</p>`:''}<details data-port-key="${d.id}:circuit:${c.id}"><summary>Detalhes do ping</summary><p class="port-ping-batch">${c.transmitted!=null?`${c.received} de ${c.transmitted} respostas`:'Aguardando resultado válido'} · intervalo ${c.interval}s</p><div class="port-ping-actions"><button type="button" class="button secondary" data-test-circuit="${c.id}" aria-label="Testar circuito ${esc(c.name)}">${icon('refresh')}Testar agora</button><button type="button" class="icon-button" data-edit-circuit="${c.id}" title="Configurar ping" aria-label="Configurar circuito ${esc(c.name)}">${icon('edit')}</button><button type="button" class="icon-button" data-remove-circuit="${c.id}" title="Remover ping" aria-label="Remover circuito ${esc(c.name)}">${icon('trash')}</button></div><button type="button" class="button secondary output-copy" data-copy-output>${icon('copy')}Copiar saída</button><pre>${esc(c.output||'Aguardando a primeira consulta pelo Datacom.')}</pre></details></section>`;
+ return `<section class="port-ping" data-state="${circuitState}" data-ping-id="${c.id}"><div class="port-ping-heading"><strong>Ping · ${esc(c.name)}</strong>${badge(c.state,circuitState==='pending'?'Sem leitura':labels[c.state]||c.state)}</div><div class="port-ping-values"><span>Latência<strong>${number(c.latency,2)} <small>ms</small></strong></span><span>Perdas<strong>${c.failures} <small>/ 21</small></strong></span></div>${c.error?`<p class="signal-note">${esc(c.error)}</p>`:''}<details data-port-key="${d.id}:circuit:${c.id}"><summary>Detalhes do ping</summary><div class="port-ping-meta"><code class="port-ping-ip">${esc(c.host)}</code><small class="port-ping-time">${ago(c.last_check)}</small></div><p class="port-ping-batch">${c.transmitted!=null?`${c.received} de ${c.transmitted} respostas`:'Aguardando resultado válido'} · intervalo ${c.interval}s</p><div class="port-ping-actions"><button type="button" class="button secondary" data-test-circuit="${c.id}" aria-label="Testar circuito ${esc(c.name)}">${icon('refresh')}Testar agora</button><button type="button" class="icon-button" data-edit-circuit="${c.id}" title="Configurar ping" aria-label="Configurar circuito ${esc(c.name)}">${icon('edit')}</button><button type="button" class="icon-button" data-remove-circuit="${c.id}" title="Remover ping" aria-label="Remover circuito ${esc(c.name)}">${icon('trash')}</button></div><button type="button" class="button secondary output-copy" data-copy-output>${icon('copy')}Copiar saída</button><pre>${esc(c.output||'Aguardando a primeira consulta pelo Datacom.')}</pre></details></section>`;
 }
 function datacomHTML(d){
- const ports=d.ssh_error?[]:d.port_data,circuits=d.circuits||[];
- return `<div class="port-device" data-datacom="${d.id}"><div class="datacom-heading"><div><div class="port-device-title"><span class="circuit-position" title="Posição no circuito">${d.circuit_position??'—'}</span><h3>${esc(d.name)}</h3></div><p class="datacom-meta"><span class="ip">${esc(d.host)}</span><span>${esc(interfaceLabels[d.interface_type]||'Automático')}</span></p></div><div class="datacom-port-counts">${d.ssh_error?badge('error'):`<span class="status-pill up">${ports.filter(p=>p.state==='up').length} ativas</span><span class="status-pill down">${ports.filter(p=>p.state==='down').length} inativas</span>`}</div></div><div class="datacom-section-heading ports-subheading"><div><h4>Portas, sinais e pings</h4><p>${ports.length} portas${circuits.length?` · ${circuits.length} ${circuits.length===1?'destino':'destinos'} de ping`:''}</p></div>${circuits.length?`<button type="button" class="button secondary" data-configure-circuits="${d.id}">${icon('edit')}Configurar IPs</button>`:''}</div>${portsHTML(d)}</div>`;
+ const ports=d.ssh_error?[]:(d.port_data||[]);
+ return `<div class="port-device" data-datacom="${d.id}"><div class="datacom-heading"><div><div class="port-device-title"><span class="circuit-position" title="Posição no circuito">${d.circuit_position??'—'}</span><h3>${esc(d.name)}</h3></div><p class="datacom-meta"><span class="ip">${esc(d.host)}</span>${badge(d.state)}<span>Ping ${number(d.latency,2)} ms</span></p></div><div class="datacom-tools"><div class="datacom-port-counts">${d.ssh_error?badge('error'):`<span class="status-pill up">${ports.filter(p=>p.state==='up').length} ativas</span>${ports.some(p=>p.state==='down')?`<span class="status-pill down">${ports.filter(p=>p.state==='down').length} inativas</span>`:''}`}</div><div class="device-actions"><button type="button" class="icon-button" data-edit="${d.id}" title="Editar Datacom" aria-label="Editar ${esc(d.name)}">${icon('edit')}</button><button type="button" class="icon-button" data-detail="${d.id}" title="Ver detalhes" aria-label="Ver detalhes de ${esc(d.name)}">${icon('arrow')}</button><button type="button" class="icon-button" data-remove="${d.id}" title="Remover Datacom" aria-label="Remover ${esc(d.name)}">${icon('trash')}</button></div><button type="button" class="button secondary" data-configure-circuits="${d.id}">Configurar IPs</button></div></div>${portsHTML(d)}</div>`;
 }
 function findCircuit(id){
  for(const device of state.data.devices){const circuit=(device.circuits||[]).find(c=>c.id===id);if(circuit)return{device,circuit};}
@@ -255,7 +268,7 @@ document.addEventListener('click',async event=>{
 });
 function portCardHTML(d,p){
  const linked=(d.circuits||[]).filter(c=>c.port_identity===portIdentity(p,d));
- return `<article class="port-card" data-port-identity="${esc(portIdentity(p,d))}"><div class="port-card-header"><strong>${esc(p.name)}</strong>${badge(p.state)}</div>${p.interface_type&&p.interface_type!=='auto'?`<small class="port-family">${esc(interfaceLabels[p.interface_type]||p.interface_type)}</small>`:''}<div class="port-title-row"><p class="port-display-name">${esc(p.display_name||p.description||'Nomear porta')}</p><button type="button" class="icon-button" data-port-alias="${d.id}" data-port="${esc(p.name)}" data-family="${esc(p.interface_type||d.interface_type||'auto')}" title="Editar nome da porta" aria-label="Editar nome da porta ${esc(p.name)}">${icon('edit')}</button></div><div class="optical-heading">Sinal óptico</div><div class="optical"><span>RX · RECEPÇÃO<strong>${number(p.rx,2)} <small>dBm</small></strong></span><span>TX · TRANSMISSÃO<strong>${number(p.tx,2)} <small>dBm</small></strong></span></div>${utilizationHTML(p)}${p.rx_bps!=null||p.traffic_series_id?`<button type="button" class="port-traffic-history" data-traffic-device="${d.id}" data-traffic-identity="${esc(portIdentity(p,d))}">${icon('activity')}Ver gráfico 24h</button>`:''}<small>Leitura ${ago(p.checked_at)}</small>${p.rx==null&&p.tx==null?'<p class="signal-note">Sinal não informado ou formato não reconhecido.</p>':''}${linked.map(c=>portPingHTML(c,d)).join('')}<details data-port-key="${d.id}:${esc(p.interface_type||d.interface_type||'auto')}:${esc(p.name)}"><summary>Ver saída do equipamento</summary><button type="button" class="button secondary output-copy" data-copy-output>${icon('copy')}Copiar saída</button><pre>${esc(p.status_output)}</pre><pre>${esc(p.optics_output)}</pre><pre>${esc(p.utilization_output)}</pre></details></article>`;
+ return `<article class="port-card" data-port-identity="${esc(portIdentity(p,d))}"><div class="port-card-header"><strong>${esc(p.name)}</strong>${badge(p.state)}</div>${p.interface_type&&p.interface_type!=='auto'?`<small class="port-family">${esc(interfaceLabels[p.interface_type]||p.interface_type)}</small>`:''}<div class="port-title-row"><p class="port-display-name">${esc(p.display_name||p.description||'Nomear porta')}</p><button type="button" class="icon-button" data-port-alias="${d.id}" data-port="${esc(p.name)}" data-family="${esc(p.interface_type||d.interface_type||'auto')}" title="Editar nome da porta" aria-label="Editar nome da porta ${esc(p.name)}">${icon('edit')}</button></div><div class="optical-heading">Sinal óptico</div><div class="optical"><span>RX · RECEPÇÃO<strong>${number(p.rx,2)} <small>dBm</small></strong></span><span>TX · TRANSMISSÃO<strong>${number(p.tx,2)} <small>dBm</small></strong></span></div>${utilizationHTML(p)}<div class="port-reading"><small>Leitura ${ago(p.checked_at)}</small>${p.rx_bps!=null||p.traffic_series_id?`<button type="button" class="port-traffic-history" data-traffic-device="${d.id}" data-traffic-identity="${esc(portIdentity(p,d))}">${icon('activity')}Ver gráfico 24h</button>`:''}</div>${p.rx==null&&p.tx==null?'<p class="signal-note">Sinal não informado ou formato não reconhecido.</p>':''}${linked.map(c=>portPingHTML(c,d)).join('')}<details data-port-key="${d.id}:${esc(p.interface_type||d.interface_type||'auto')}:${esc(p.name)}"><summary>Ver saída do equipamento</summary><button type="button" class="button secondary output-copy" data-copy-output>${icon('copy')}Copiar saída</button><pre>${esc(p.status_output)}</pre><pre>${esc(p.optics_output)}</pre><pre>${esc(p.utilization_output)}</pre></details></article>`;
 }
 function portsHTML(d){
  const ports=d.ssh_error?[]:(d.port_data||[]),keys=new Set(ports.map(p=>portIdentity(p,d)));
@@ -278,13 +291,16 @@ function render(){
  $('#recent-events').innerHTML=alerts.length?alerts.slice(0,3).map(eventHTML).join(''):empty('Nenhum evento por aqui','Quedas e recuperações aparecerão neste espaço.');
  $('#alerts-content').innerHTML=alerts.length?alerts.map(eventHTML).join(''):empty('Sua linha do tempo começa aqui','Eventos serão registrados automaticamente quando houver uma mudança na rede.');
  const openPorts=new Set([...$('#ports-content').querySelectorAll('details[open]')].map(e=>e.dataset.portKey));
- const datacoms=orderedDatacoms(devices);$('#ports-content').innerHTML=datacoms.length?datacoms.map(datacomHTML).join(''):empty('Conecte seu primeiro Datacom','Cadastre uma conexão SSH para acompanhar portas, sinais e circuitos.',true);
+ const allDatacoms=orderedDatacoms(devices),datacoms=state.page==='datacoms'?filteredDevices(allDatacoms):allDatacoms;$('#ports-content').innerHTML=datacoms.length?datacoms.map(datacomHTML).join(''):allDatacoms.length?empty('Nenhum Datacom neste filtro','Tente outro nome, IP ou status.'):empty('Conecte seu primeiro Datacom','Cadastre uma conexão SSH para acompanhar portas, sinais e circuitos.',true);
  $('#ports-content').querySelectorAll('details').forEach(e=>e.open=openPorts.has(e.dataset.portKey));
  if(state.selected&&$('#detail-dialog').open){if(state.demo){state.detailSamples=samples.filter(s=>s.device_id===state.selected);renderDetail();}else{const selected=state.selected;api(`/api/devices/${selected}/history`).then(history=>{if(state.selected===selected){state.detailSamples=history;renderDetail();}}).catch(()=>{});}}
 }
-const pages={notifications:['Notificações','Receba avisos de queda e recuperação pelo Telegram.'],availability:['Disponibilidade','Acompanhe o tempo com resposta, as perdas de ping e a cobertura da coleta.'],backups:['Backups','Guarde uma cópia dos seus dados e recupere quando precisar.'],overview:['Visão geral','Disponibilidade, sinais e eventos da sua rede.'],bbus:["BBU's","Monitore o ping, a latência e as perdas das suas BBU's."],datacoms:['Datacoms','Disponibilidade, portas e sinais ópticos dos seus Datacoms.'],siae:['Rádios SIAE','Disponibilidade por ping e consumo real de banda do rádio.'],alerts:['Eventos','Cada mudança na rede, registrada em um só lugar.']};
+const pages={notifications:['Notificações','Receba avisos de queda e recuperação pelo Telegram.'],availability:['Disponibilidade','Acompanhe o tempo com resposta, as perdas de ping e a cobertura da coleta.'],backups:['Backups','Guarde uma cópia dos seus dados e recupere quando precisar.'],overview:['Visão geral','Disponibilidade, sinais e eventos da sua rede.'],bbus:["BBU's","Monitore o ping, a latência e as perdas das suas BBU's."],datacoms:['Datacoms','Portas, sinais e circuitos em uma só tela.'],siae:['Rádios SIAE','Disponibilidade por ping e consumo real de banda do rádio.'],alerts:['Eventos','Cada mudança na rede, registrada em um só lugar.']};
 function navigate(page){
- window.getSelection()?.removeAllRanges();state.page=page;
+ window.getSelection()?.removeAllRanges();state.page=page;document.body.dataset.view=page;
+ const datacom=page==='datacoms';$('#datacom-toolbar').hidden=!datacom;
+ (datacom?$('#datacom-toolbar'):$('#devices-section .table-heading')).append($('#device-filters'));
+ (datacom?$('#datacom-toolbar'):$('#ports-section .traffic-panel-actions')).append($('#open-traffic-dashboard'));
  document.querySelectorAll('[data-page]').forEach(e=>{
   e.classList.toggle('active',e.dataset.page===page);
   if(e.dataset.page===page)e.setAttribute('aria-current','page');else e.removeAttribute('aria-current');
@@ -292,7 +308,7 @@ function navigate(page){
  $('#page-title').textContent=pages[page][0];$('#breadcrumb').textContent=pages[page][0];$('#page-description').textContent=pages[page][1];
  $('#add-device-label').textContent=page==='bbus'?'Adicionar BBU':page==='datacoms'?'Adicionar Datacom':page==='siae'?'Adicionar rádio SIAE':'Adicionar equipamento';
  $('#overview-charts').hidden=page!=='overview';
- $('#devices-section').hidden=!['overview','bbus','datacoms','siae'].includes(page);
+ $('#devices-section').hidden=!['overview','bbus','siae'].includes(page);
  $('#ports-section').hidden=page!=='datacoms';$('#siae-section').hidden=page!=='siae';$('#alerts-section').hidden=page!=='alerts';
  $('#search').value='';$('#state-filter').value='all';
  $('#metrics').hidden=['availability','backups','notifications'].includes(page);
@@ -429,7 +445,7 @@ document.querySelectorAll('[data-page]').forEach(e=>e.addEventListener('click',(
 $('#all-events').addEventListener('click',()=>navigate('alerts'));
 $('#add-device').addEventListener('click',openAdd);
 $('#refresh').addEventListener('click',()=>load());
-$('#search').addEventListener('input',()=>{renderDevices();renderSiae();});$('#state-filter').addEventListener('change',()=>{renderDevices();renderSiae();});
+$('#search').addEventListener('input',render);$('#state-filter').addEventListener('change',render);
 document.querySelectorAll('.close-dialog').forEach(e=>e.addEventListener('click',()=>$('#device-dialog').close()));
 document.querySelectorAll('.close-confirm').forEach(e=>e.addEventListener('click',()=>$('#confirm-dialog').close()));
 document.addEventListener('click',event=>{const alias=event.target.closest('[data-port-alias]');if(alias)openPortName(Number(alias.dataset.portAlias),alias.dataset.port,alias.dataset.family);const copy=event.target.closest('[data-copy-output]');if(copy)copyOutput(copy);const edit=event.target.closest('[data-edit]'),detail=event.target.closest('[data-detail]'),remove=event.target.closest('[data-remove]');if(edit)openEdit(Number(edit.dataset.edit));if(detail)openDetail(Number(detail.dataset.detail));if(event.target.closest('[data-close-detail]')){$('#detail-dialog').close();state.selected=null;}if(event.target.closest('[data-action="add"]'))openAdd();if(remove){if(state.demo){toast('Os equipamentos de demonstração são exemplos. Saia do modo demonstração para gerenciar sua rede.');return;}state.deleting=Number(remove.dataset.remove);state.removingCircuit=null;$('#confirm-dialog h2').textContent='Remover equipamento?';$('#confirm-note').textContent='O monitoramento e as amostras de ping serão removidos. O histórico de eventos será preservado.';const d=state.data.devices.find(d=>d.id===state.deleting);$('#confirm-description').textContent=`Deseja remover “${d.name}” (${d.host})?`;$('#confirm-dialog').showModal();}});

@@ -4,6 +4,7 @@ body[data-layout] .sidebar { width: 210px; padding: 16px 14px; background: var(-
 body[data-layout] .app-shell { margin-left: 210px; }
 body[data-layout] .brand { display: flex; align-items: center; width: 100%; height: 64px; overflow: hidden; }
 body[data-layout] .brand-logo { flex-shrink: 0; width: 182px; max-width: none; height: auto; }
+body[data-layout] .sidebar>.nav-label { margin-top: 18px; }
 body[data-layout] .workspace { margin: 14px 0 20px; padding: 0 0 16px; background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; }
 .workspace .chevron { display: none; }
 .nav-label { font-size: 9px; letter-spacing: 1.2px; }
@@ -74,6 +75,69 @@ body[data-layout] .port-ping[data-state] .port-ping-values strong { color: var(-
 body[data-layout] .standalone-circuit .port-ping[data-state] { margin-top: 0; }
 body[data-layout] .port-ping[data-state] pre { max-width: 100%; }
 
+/* Datacoms follow the approved preview: summary, filters, then port cards. */
+body[data-view=datacoms] .page-heading { border: 0; padding-bottom: 0; }
+body[data-layout][data-view=datacoms] .topbar { height: 48px; }
+body[data-layout][data-view=datacoms] main { padding-top: 14px; }
+body[data-layout][data-view=datacoms] .page-heading h1 { margin: 0 0 4px; line-height: 1.2; }
+body[data-layout][data-view=datacoms] .page-heading p { margin: 0; line-height: 1.5; }
+body[data-view=datacoms] .page-heading .eyebrow, body[data-view=datacoms] .status-strip { display: none; }
+body[data-layout][data-view=datacoms] .metric-card { position: relative; min-height: 64px; padding: 8px 12px 8px 52px; border: 1px solid var(--line); }
+body[data-layout][data-view=datacoms] .metric-title { display: block; font-size: 12px; line-height: 1.5; color: var(--ink); }
+body[data-layout][data-view=datacoms] .metric-icon { position: absolute; left: 12px; top: 17px; width: 28px; height: 28px; background: transparent; color: var(--accent); }
+body[data-view=datacoms] .metric-icon svg { width: 25px; height: 25px; }
+body[data-layout][data-view=datacoms] .metric-value { margin: 0; font-size: 23px; line-height: 1.2; color: var(--ink); }
+body[data-layout][data-view=datacoms] .metric-card.green .metric-icon { color: var(--success); }
+body[data-layout][data-view=datacoms] .metric-card.amber .metric-icon { color: var(--amber); }
+body[data-layout][data-view=datacoms] .metric-card.red .metric-icon { color: var(--red); }
+.datacom-toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; }
+.datacom-toolbar .table-controls { display: flex; gap: 12px; align-items: center; }
+.datacom-toolbar .search { width: min(340px,35vw); min-height: 34px; padding: 7px 10px; }
+.datacom-toolbar .search input { width: 100%; min-width: 0; }
+body[data-layout] .datacom-toolbar .search { min-height: 34px; padding: 6px 10px; }
+body[data-layout] .datacom-toolbar .search input { padding: 0; }
+.datacom-toolbar select { min-height: 34px; padding-block: 7px; }
+.datacom-toolbar .button { min-height: 34px; padding: 7px 12px; font-size: 12px; color: var(--accent); }
+body[data-view=datacoms] #ports-section { margin-top: 0; border: 0; background: transparent; }
+body[data-view=datacoms] #ports-section>.panel-heading { display: none; }
+body[data-layout][data-view=datacoms] .port-device { padding: 8px 0 12px; }
+body[data-layout][data-view=datacoms] .datacom-heading { margin-bottom: 6px; gap: 12px; align-items: center; }
+body[data-layout][data-view=datacoms] .port-device-title { margin-bottom: 0; }
+body[data-layout][data-view=datacoms] .datacom-meta { gap: 8px; margin: 4px 0 0 36px; font-size: 10px; }
+body[data-layout][data-view=datacoms] .datacom-meta .status-pill { font-size: 9px; padding: 2px 5px; }
+.datacom-tools { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.datacom-tools .device-actions { gap: 2px; }
+body[data-layout] .datacom-tools .device-actions button { width: 28px; height: 28px; padding: 4px; }
+.datacom-tools .button { min-height: 30px; padding: 6px 10px; font-size: 11px; }
+body[data-layout][data-view=datacoms] .port-cards { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; }
+body[data-layout][data-view=datacoms] .port-card { padding: 10px 12px; }
+body[data-layout][data-view=datacoms] .port-title-row { margin: 4px 0; }
+body[data-layout][data-view=datacoms] .port-title-row .icon-button { width: 24px; height: 24px; }
+body[data-layout][data-view=datacoms] .optical-heading { padding-top: 6px; }
+body[data-layout][data-view=datacoms] .optical { margin-top: 4px; }
+body[data-layout][data-view=datacoms] .port-traffic { padding-top: 6px; margin: 6px 0 0; }
+body[data-layout][data-view=datacoms] .traffic-heading { margin-bottom: 0; }
+body[data-layout][data-view=datacoms] .traffic-values strong { margin: 0; }
+.port-reading { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--dim); font-size: 10px; }
+.port-reading>small { font-size: inherit; }
+.port-reading .port-traffic-history { margin: 0; min-height: 20px; }
+body[data-layout][data-view=datacoms] .port-ping[data-state] { margin-top: 6px; padding: 7px 9px; }
+body[data-layout][data-view=datacoms] .port-ping-values { margin-top: 5px; }
+body[data-layout][data-view=datacoms] .port-card>details { margin-top: 4px; padding-top: 4px; }
+body[data-view=datacoms] .circuit-legend { border-top: 1px solid var(--line); border-bottom: 0; padding: 12px 0; }
+
+@media (min-width:1101px) {
+  body[data-layout] .sidebar { width: 232px; }
+  body[data-layout] .app-shell { margin-left: 232px; }
+  body[data-layout] .brand-logo { width: 204px; }
+}
+@media (max-width:1199px) and (min-width:901px) {
+  body[data-layout][data-view=datacoms] .port-cards { grid-template-columns: repeat(3,minmax(0,1fr)); }
+}
+@media (max-width:900px) and (min-width:641px) {
+  body[data-layout][data-view=datacoms] .port-cards { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  body[data-layout][data-view=datacoms] .datacom-heading { align-items: flex-start; flex-direction: column; }
+}
 @media (max-width:1100px) and (min-width:901px) {
   body[data-layout] .sidebar { width: 190px; padding-inline: 12px; }
   body[data-layout] .app-shell { margin-left: 190px; }
@@ -109,6 +173,17 @@ body[data-layout] .port-ping[data-state] pre { max-width: 100%; }
   body[data-layout] .device-row td { padding: 0; }
   body[data-layout] .port-cards { grid-template-columns: 1fr; }
   .circuit-legend { padding-inline: 12px; gap: 8px 12px; font-size: 10px; }
+  .datacom-toolbar { flex-wrap: wrap; gap: 8px; }
+  .datacom-toolbar .table-controls { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 8px; }
+  .datacom-toolbar .search { width: auto; min-width: 0; }
+  .datacom-toolbar select { width: 100%; min-width: 0; font-size: 11px; }
+  body[data-layout][data-view=datacoms] .metric-card { padding-left: 42px; }
+  body[data-layout][data-view=datacoms] .metric-icon { left: 8px; }
+  body[data-layout][data-view=datacoms] .metric-title { font-size: 11px; }
+  body[data-layout][data-view=datacoms] .port-cards { grid-template-columns: 1fr; }
+  body[data-layout][data-view=datacoms] .datacom-heading { flex-direction: column; align-items: stretch; }
+  .datacom-tools { justify-content: flex-start; }
+  .datacom-tools>.button { margin-left: auto; }
 }
 @media (max-width:360px) {
   body[data-layout] .sidebar nav { justify-content: flex-start; gap: 0; }
