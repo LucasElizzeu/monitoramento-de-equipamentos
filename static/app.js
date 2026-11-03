@@ -306,7 +306,7 @@ function navigate(page){
   e.classList.toggle('active',e.dataset.page===page);
   if(e.dataset.page===page)e.setAttribute('aria-current','page');else e.removeAttribute('aria-current');
  });
- $('#page-title').textContent=pages[page][0];$('#breadcrumb').textContent=pages[page][0];$('#page-description').textContent=pages[page][1];
+ document.title=`${pages[page][0]} · AlwaysUp`;$('#page-title').textContent=pages[page][0];$('#breadcrumb').textContent=pages[page][0];$('#page-description').textContent=pages[page][1];
  $('#add-device-label').textContent=page==='bbus'?'Adicionar BBU':page==='datacoms'?'Adicionar Datacom':page==='siae'?'Adicionar rádio SIAE':'Adicionar equipamento';
  $('#overview-charts').hidden=page!=='overview';
  $('#devices-section').hidden=!['overview','bbus','siae'].includes(page);
@@ -319,6 +319,7 @@ function navigate(page){
  $('#notifications-section')?.toggleAttribute('hidden',page!=='notifications');
  $('#add-device').hidden=Boolean(designPreview)||['backups','notifications','backbone'].includes(page);
  render();
+ $('#page-title').focus({preventScroll:true});window.scrollTo({top:0,behavior:'instant'});
  window.dispatchEvent(new CustomEvent('monitor-page',{detail:{page,demo:state.demo}}));
 }
 function normalizedPorts(value){

@@ -129,6 +129,14 @@ Os circuitos ficam no mesmo SQLite, na pasta `.data`. A tabela é criada automat
 
 ## Organização da interface
 
+### Ajustes do menu e navegação por teclado
+
+No computador ou tablet, o botão **☰** recolhe o menu para uma faixa de 72 px e o expande novamente. O botão **Ajustar menu** (engrenagem) permite escolher uma largura de 180 a 300 px. As preferências ficam salvas neste navegador; **Restaurar padrão** volta a 232 px.
+
+A primeira parada do teclado é **Pular para o conteúdo principal**. Ao mudar de aba, o título da janela é atualizado e o foco vai para o título da página. Os controles têm indicação de foco visível, e os itens do menu mantêm nomes acessíveis quando recolhidos. Essas mudanças atendem a aspectos de navegação dos critérios WCAG 2.4; não representam uma auditoria completa de conformidade do site.
+
+No mapa, arraste com o mouse ou com um dedo para mover a visualização. Use **+**, **−** e **Ajustar à tela** para zoom. Com a área do mapa focada, as setas movem a visualização e as teclas `+` e `−` ajustam o zoom; os atalhos de zoom do navegador com Ctrl/Command são preservados. O link **Pular o desenho do mapa** evita percorrer todas as fibras com Tab. Isso movimenta a visualização e não altera os pontos ou as conexões cadastradas.
+
 Os ícones dos equipamentos seguem o mesmo estilo azul e verde: torre LTE para BBU, torre com antenas de prato para SIAE e switch para Datacom. Eles aparecem na navegação, na seleção de tipo e junto aos equipamentos. São ilustrações fixas; o estado real continua indicado pelos textos e pelas cores de status.
 
 O tema **branco compacto** usa a logo **VELOSONET NOC**, fundo branco, textos escuros e detalhes azuis na navegação e nas ações. Em telas menores, a lista de equipamentos vira cartões com status, IP, latência, perdas e última checagem visíveis juntos, além dos botões **Editar**, **Detalhes** e **Remover**. Nos Datacoms, pings e portas compartilham a mesma grade; pings vinculados aparecem dentro do cartão da porta. O cabeçalho resume portas ativas e inativas. Os nomes das portas ganham destaque, com sinal óptico e consumo separados.

@@ -31,7 +31,7 @@
  function captionOffset(link){return link.bend===0&&!link.label?-32:link.bend<0?-30:60;}
  function draw(){
   svg.innerHTML=config.links.map(link=>{const p=path(link);return `<g class="backbone-fiber" data-link="${link.id}" tabindex="0" role="button"><path class="fiber-stroke" d="${p.d}"/><path class="fiber-hit" d="${p.d}"/><text class="fiber-caption" x="${p.labelX}" y="${p.y+captionOffset(link)}" text-anchor="${p.anchor}"></text></g>`;}).join('')+config.nodes.map(n=>`<g class="backbone-node" data-node="${n.id}" transform="translate(${n.x} ${n.y})" tabindex="0" role="button" aria-label="${esc(n.name+' '+n.host)}"><circle r="20"/><image href="/static/icons/datacom.png" x="-18" y="-18" width="36" height="36"/><text y="36" text-anchor="middle">${esc(n.name)}</text><text class="node-ip" y="51" text-anchor="middle">${n.host}${n.kind==='huawei'?' · Huawei':''}</text></g>`).join('');
-  refresh();
+  if(!svg.style.width)applyZoom(1,false);refresh();
  }
  function refresh(){
   if(!config||state.page!=='backbone')return;
@@ -72,9 +72,39 @@
   editing=config.links.find(l=>l.id===button.dataset.editFiber);const f=$('#backbone-port-form');f.elements.port_a.value=editing.port_a||'';f.elements.port_b.value=editing.port_b||'';f.elements.maintenance.checked=editing.maintenance;
   $('#backbone-port-context').textContent=`${byId(editing.a).name} ↔ ${byId(editing.b).name}`;$('#backbone-port-error').hidden=true;$('#backbone-port-dialog').showModal();
  });
+ $('#backbone-port-dialog').addEventListener('close',()=>{const target=editing&&svg.querySelector(`[data-link="${editing.id}"]`);if(target&&state.page==='backbone')target.focus();});
  $('#backbone-port-close').onclick=()=>$('#backbone-port-dialog').close();
  $('#backbone-port-form').onsubmit=async e=>{e.preventDefault();const f=e.target,button=f.querySelector('[type="submit"]');button.disabled=true;try{config=await api(`/api/backbone/links/${editing.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({port_a:f.elements.port_a.value,port_b:f.elements.port_b.value,maintenance:f.elements.maintenance.checked})});$('#backbone-port-dialog').close();draw();}catch(error){$('#backbone-port-error').textContent=error.message;$('#backbone-port-error').hidden=false;}finally{button.disabled=false;}};
- $('#backbone-fit').onclick=()=>{$('.backbone-scroll').scrollTo({left:0,top:0});svg.classList.toggle('fit-map');};
+ const viewport=$('.backbone-scroll');let zoom=1,drag=null,didDrag=false;
+ function applyZoom(next,center=true){
+  const oldW=svg.getBoundingClientRect().width||1500,oldH=svg.getBoundingClientRect().height||600;
+  const cx=(viewport.scrollLeft+viewport.clientWidth/2)/oldW,cy=(viewport.scrollTop+viewport.clientHeight/2)/oldH;
+  zoom=Math.min(3,Math.max(.1,next));svg.style.minWidth='0';svg.style.width=`${1500*zoom}px`;
+  $('#backbone-zoom-level').value=`${Math.round(zoom*100)}%`;$('#backbone-zoom-in').disabled=zoom>=3;$('#backbone-zoom-out').disabled=zoom<=.1;
+  if(center){viewport.scrollLeft=cx*svg.getBoundingClientRect().width-viewport.clientWidth/2;viewport.scrollTop=cy*svg.getBoundingClientRect().height-viewport.clientHeight/2;}
+  else{viewport.scrollLeft=0;viewport.scrollTop=0;}
+ }
+ $('#backbone-zoom-in').onclick=()=>applyZoom(zoom+.2);
+ $('#backbone-zoom-out').onclick=()=>applyZoom(zoom-.2);
+ $('#backbone-fit').onclick=()=>applyZoom(viewport.clientWidth/1500,false);
+ viewport.addEventListener('pointerdown',e=>{if(e.button!==0||drag)return;didDrag=false;drag={id:e.pointerId,x:e.clientX,y:e.clientY,left:viewport.scrollLeft,top:viewport.scrollTop};});
+ viewport.addEventListener('pointermove',e=>{
+  if(!drag||e.pointerId!==drag.id)return;
+  const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
+  if(!didDrag&&Math.hypot(dx,dy)<5)return;
+  if(!didDrag){didDrag=true;viewport.setPointerCapture(e.pointerId);viewport.classList.add('is-dragging');active=null;pinned=false;info.hidden=true;}
+  e.preventDefault();viewport.scrollLeft=drag.left-dx;viewport.scrollTop=drag.top-dy;
+ });
+ function finishDrag(e){if(!drag||drag.id!==e.pointerId)return;if(viewport.hasPointerCapture(e.pointerId))viewport.releasePointerCapture(e.pointerId);drag=null;viewport.classList.remove('is-dragging');}
+ viewport.addEventListener('pointerup',finishDrag);viewport.addEventListener('pointercancel',finishDrag);
+ viewport.addEventListener('click',e=>{if(didDrag){e.preventDefault();e.stopPropagation();didDrag=false;}},true);
+ viewport.addEventListener('keydown',e=>{
+  if(e.ctrlKey||e.metaKey||e.altKey)return;
+  const moves={ArrowLeft:[-70,0],ArrowRight:[70,0],ArrowUp:[0,-70],ArrowDown:[0,70]};
+  if(moves[e.key]){e.preventDefault();viewport.scrollBy(...moves[e.key]);}
+  else if(['+','=','-','−'].includes(e.key)){e.preventDefault();applyZoom(zoom+(['-','−'].includes(e.key)?-.2:.2));}
+ });
+
  async function start(){if(state.page!=='backbone'){active=null;pinned=false;info.hidden=true;return;}if(config){refresh();return;}try{config=await api('/api/backbone');draw();$('#backbone-error').hidden=true;}catch(error){$('#backbone-error').hidden=false;$('#backbone-error').textContent=error.message;}}
  window.addEventListener('keydown',e=>{if(e.key==='Escape'){active=null;pinned=false;info.hidden=true;}});
  $('#refresh').addEventListener('click',()=>{if(state.page==='backbone'&&!config)start();});
