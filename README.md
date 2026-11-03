@@ -113,6 +113,8 @@ Os circuitos ficam no mesmo SQLite, na pasta `.data`. A tabela é criada automat
 
 ## Organização da interface
 
+Os ícones dos equipamentos seguem o mesmo estilo azul e verde: torre LTE para BBU, torre com antenas de prato para SIAE e switch para Datacom. Eles aparecem na navegação, na seleção de tipo e junto aos equipamentos. São ilustrações fixas; o estado real continua indicado pelos textos e pelas cores de status.
+
 O tema **branco compacto** usa a logo **VELOSONET NOC**, fundo branco, textos escuros e detalhes azuis na navegação e nas ações. Em telas menores, a lista de equipamentos vira cartões com status, IP, latência, perdas e última checagem visíveis juntos, além dos botões **Editar**, **Detalhes** e **Remover**. Nos Datacoms, pings e portas compartilham a mesma grade; pings vinculados aparecem dentro do cartão da porta. O cabeçalho resume portas ativas e inativas. Os nomes das portas ganham destaque, com sinal óptico e consumo separados.
 
 Na aba **Datacoms**, os cartões aparecem diretamente abaixo do resumo, da busca e dos filtros, sem repetir a tabela de equipamentos acima deles. Em telas grandes, há quatro cartões por linha; no celular, uma coluna. Editar, abrir detalhes, remover e configurar IPs continuam disponíveis no cabeçalho de cada Datacom. A busca e o filtro de status atuam sobre esses grupos de cartões.
