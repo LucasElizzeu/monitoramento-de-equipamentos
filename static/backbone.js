@@ -1,6 +1,6 @@
 /* Physical fibers are independent; no readings are inferred from topology. */
 (() => {
- let config=null, active=null, pinned=false, editing=null, pointer={x:20,y:100};
+ let config=null, active=null, pinned=false, editing=null, pointer={x:20,y:100}, modality='mouse', dismissTimer, suppressFocus=false;
  const svg=$('#backbone-map'), info=$('#backbone-info');
  const byId=id=>config.nodes.find(n=>n.id===id);
  const device=n=>state.data.devices.find(d=>d.host===n.host&&d.kind==='datacom')||state.data.devices.find(d=>d.host===n.host);
@@ -53,30 +53,53 @@
   if(info.innerHTML!==html)info.innerHTML=html;
   info.hidden=false;info.style.left=Math.max(8,Math.min(innerWidth-info.offsetWidth-8,pointer.x+12))+'px';info.style.top=Math.max(8,Math.min(innerHeight-info.offsetHeight-8,pointer.y+12))+'px';
  }
- function show(target,event,pin=false){active=target.dataset.link;pinned=pin;const rect=target.getBoundingClientRect();pointer={x:event.clientX??rect.x,y:event.clientY??rect.y};details(active);}
- svg.addEventListener('pointerover',e=>{const target=e.target.closest('[data-link]');if(target&&!pinned)show(target,e);});
- svg.addEventListener('pointerout',e=>{if(!pinned&&!svg.contains(e.relatedTarget)&&!info.contains(e.relatedTarget)){active=null;info.hidden=true;}});
- svg.addEventListener('focusin',e=>{const target=e.target.closest('[data-link]');if(target)show(target,{},true);});
+ function hideInfo(){clearTimeout(dismissTimer);active=null;pinned=false;info.hidden=true;}
+ function dismissInfo(){
+  const restore=info.contains(document.activeElement),target=active&&svg.querySelector(`[data-link="${active}"]`);
+  hideInfo();
+  if(restore&&target){suppressFocus=true;try{target.focus({preventScroll:true});}finally{suppressFocus=false;}}
+ }
+ function scheduleHide(){clearTimeout(dismissTimer);dismissTimer=setTimeout(()=>{if(!pinned)hideInfo();},200);}
+ function show(target,event,pin=false){clearTimeout(dismissTimer);active=target.dataset.link;pinned=pin;const rect=target.getBoundingClientRect();pointer={x:event.clientX??rect.x,y:event.clientY??rect.y};details(active);}
+ document.addEventListener('keydown',()=>{modality='keyboard';},true);
+ document.addEventListener('pointerdown',e=>{
+  modality=e.pointerType==='touch'?'touch':'mouse';
+  if(modality==='mouse')pinned=false;
+  if(!$('#backbone-port-dialog').open&&!e.target.closest('[data-link], #backbone-info'))hideInfo();
+ },true);
+ svg.addEventListener('pointerover',e=>{const target=e.target.closest('[data-link]');if(target&&e.pointerType!=='touch'&&!drag)show(target,e);});
+ svg.addEventListener('pointerout',e=>{
+  const from=e.target.closest('[data-link]'),to=e.relatedTarget?.closest?.('[data-link]');
+  if(from&&from!==to&&!info.contains(e.relatedTarget)&&!pinned)scheduleHide();
+ });
+ info.addEventListener('pointerenter',()=>clearTimeout(dismissTimer));
+ info.addEventListener('pointerleave',()=>{if(!pinned)scheduleHide();});
+ svg.addEventListener('focusin',e=>{const target=e.target.closest('[data-link]');if(target&&modality==='keyboard'&&!suppressFocus)show(target,{},true);});
+ function focusLeaves(e){
+  if(modality==='keyboard'&&!$('#backbone-port-dialog').open&&!info.contains(e.relatedTarget)&&!e.relatedTarget?.closest?.('[data-link]'))hideInfo();
+ }
+ svg.addEventListener('focusout',focusLeaves);info.addEventListener('focusout',focusLeaves);
  function activate(e){
-  const fiber=e.target.closest('[data-link]');if(fiber){show(fiber,e,true);return;}
+  const fiber=e.target.closest('[data-link]');if(fiber){show(fiber,e,modality!=='mouse');return;}
   const target=e.target.closest('[data-node]');if(!target)return;
   const n=byId(target.dataset.node),d=device(n);if(d){openDetail(d.id);return;}
   openAdd();$('#device-form [name="name"]').value=n.name;$('#device-form [name="host"]').value=n.host;
   $(`#device-form [name="kind"][value="${n.kind==='huawei'?'ping':'datacom'}"]`).checked=true;syncDeviceKind();
  }
  svg.addEventListener('click',activate);
- svg.addEventListener('keydown',e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();activate(e);}if(e.key==='Escape'){active=null;pinned=false;info.hidden=true;}});
+ svg.addEventListener('keydown',e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();activate(e);}if(e.key==='Escape')dismissInfo();});
  info.addEventListener('click',e=>{
-  if(e.target.closest('.backbone-dismiss')){active=null;pinned=false;info.hidden=true;return;}
+  if(e.target.closest('.backbone-dismiss')){dismissInfo();return;}
   const button=e.target.closest('[data-edit-fiber]');if(!button)return;
   editing=config.links.find(l=>l.id===button.dataset.editFiber);const f=$('#backbone-port-form');f.elements.port_a.value=editing.port_a||'';f.elements.port_b.value=editing.port_b||'';f.elements.maintenance.checked=editing.maintenance;
-  $('#backbone-port-context').textContent=`${byId(editing.a).name} ↔ ${byId(editing.b).name}`;$('#backbone-port-error').hidden=true;$('#backbone-port-dialog').showModal();
+  $('#backbone-port-context').textContent=`${byId(editing.a).name} ↔ ${byId(editing.b).name}`;$('#backbone-port-error').hidden=true;hideInfo();$('#backbone-port-dialog').showModal();
  });
  $('#backbone-port-dialog').addEventListener('close',()=>{const target=editing&&svg.querySelector(`[data-link="${editing.id}"]`);if(target&&state.page==='backbone')target.focus();});
  $('#backbone-port-close').onclick=()=>$('#backbone-port-dialog').close();
  $('#backbone-port-form').onsubmit=async e=>{e.preventDefault();const f=e.target,button=f.querySelector('[type="submit"]');button.disabled=true;try{config=await api(`/api/backbone/links/${editing.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({port_a:f.elements.port_a.value,port_b:f.elements.port_b.value,maintenance:f.elements.maintenance.checked})});$('#backbone-port-dialog').close();draw();}catch(error){$('#backbone-port-error').textContent=error.message;$('#backbone-port-error').hidden=false;}finally{button.disabled=false;}};
  const viewport=$('.backbone-scroll');let zoom=1,drag=null,didDrag=false;
  function applyZoom(next,center=true){
+  hideInfo();
   const oldW=svg.getBoundingClientRect().width||1500,oldH=svg.getBoundingClientRect().height||600;
   const cx=(viewport.scrollLeft+viewport.clientWidth/2)/oldW,cy=(viewport.scrollTop+viewport.clientHeight/2)/oldH;
   zoom=Math.min(3,Math.max(.1,next));svg.style.minWidth='0';svg.style.width=`${1500*zoom}px`;
@@ -92,7 +115,7 @@
   if(!drag||e.pointerId!==drag.id)return;
   const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
   if(!didDrag&&Math.hypot(dx,dy)<5)return;
-  if(!didDrag){didDrag=true;viewport.setPointerCapture(e.pointerId);viewport.classList.add('is-dragging');active=null;pinned=false;info.hidden=true;}
+  if(!didDrag){didDrag=true;viewport.setPointerCapture(e.pointerId);viewport.classList.add('is-dragging');hideInfo();}
   e.preventDefault();viewport.scrollLeft=drag.left-dx;viewport.scrollTop=drag.top-dy;
  });
  function finishDrag(e){if(!drag||drag.id!==e.pointerId)return;if(viewport.hasPointerCapture(e.pointerId))viewport.releasePointerCapture(e.pointerId);drag=null;viewport.classList.remove('is-dragging');}
@@ -105,8 +128,8 @@
   else if(['+','=','-','−'].includes(e.key)){e.preventDefault();applyZoom(zoom+(['-','−'].includes(e.key)?-.2:.2));}
  });
 
- async function start(){if(state.page!=='backbone'){active=null;pinned=false;info.hidden=true;return;}if(config){refresh();return;}try{config=await api('/api/backbone');draw();$('#backbone-error').hidden=true;}catch(error){$('#backbone-error').hidden=false;$('#backbone-error').textContent=error.message;}}
- window.addEventListener('keydown',e=>{if(e.key==='Escape'){active=null;pinned=false;info.hidden=true;}});
+ async function start(){if(state.page!=='backbone'){hideInfo();return;}if(config){refresh();return;}try{config=await api('/api/backbone');draw();$('#backbone-error').hidden=true;}catch(error){$('#backbone-error').hidden=false;$('#backbone-error').textContent=error.message;}}
+ window.addEventListener('keydown',e=>{if(e.key==='Escape')dismissInfo();});
  $('#refresh').addEventListener('click',()=>{if(state.page==='backbone'&&!config)start();});
  window.addEventListener('monitor-page',start);window.addEventListener('monitor-data',refresh);setInterval(refresh,1500);
 })();
