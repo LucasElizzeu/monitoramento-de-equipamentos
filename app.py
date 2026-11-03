@@ -1263,7 +1263,7 @@ class BackbonePortsInput(BaseModel):
 
 
 def backbone_config():
-    config = json.loads((ROOT / 'static' / 'backbone.json').read_text())
+    config = json.loads((ROOT / 'static' / 'backbone.json').read_text(encoding='utf-8'))
     with LOCK, connect() as db:
         db.execute('CREATE TABLE IF NOT EXISTS backbone_ports (link_id TEXT PRIMARY KEY, port_a TEXT, port_b TEXT, maintenance INTEGER)')
         overrides = {row['link_id']: dict(row) for row in db.execute('SELECT * FROM backbone_ports')}

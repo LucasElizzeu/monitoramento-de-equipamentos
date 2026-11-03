@@ -75,7 +75,8 @@
  $('#backbone-port-close').onclick=()=>$('#backbone-port-dialog').close();
  $('#backbone-port-form').onsubmit=async e=>{e.preventDefault();const f=e.target,button=f.querySelector('[type="submit"]');button.disabled=true;try{config=await api(`/api/backbone/links/${editing.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({port_a:f.elements.port_a.value,port_b:f.elements.port_b.value,maintenance:f.elements.maintenance.checked})});$('#backbone-port-dialog').close();draw();}catch(error){$('#backbone-port-error').textContent=error.message;$('#backbone-port-error').hidden=false;}finally{button.disabled=false;}};
  $('#backbone-fit').onclick=()=>{$('.backbone-scroll').scrollTo({left:0,top:0});svg.classList.toggle('fit-map');};
- async function start(){if(state.page!=='backbone'){active=null;pinned=false;info.hidden=true;return;}if(config){refresh();return;}try{config=await api('/api/backbone');draw();}catch(error){$('#backbone-error').hidden=false;$('#backbone-error').textContent=error.message;}}
+ async function start(){if(state.page!=='backbone'){active=null;pinned=false;info.hidden=true;return;}if(config){refresh();return;}try{config=await api('/api/backbone');draw();$('#backbone-error').hidden=true;}catch(error){$('#backbone-error').hidden=false;$('#backbone-error').textContent=error.message;}}
  window.addEventListener('keydown',e=>{if(e.key==='Escape'){active=null;pinned=false;info.hidden=true;}});
+ $('#refresh').addEventListener('click',()=>{if(state.page==='backbone'&&!config)start();});
  window.addEventListener('monitor-page',start);window.addEventListener('monitor-data',refresh);setInterval(refresh,1500);
 })();
