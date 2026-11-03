@@ -20,7 +20,7 @@
       "id": "limao",
       "name": "Limão",
       "host": "10.10.0.18",
-      "x": 230,
+      "x": 290,
       "y": 260,
       "kind": "datacom"
     },
@@ -28,7 +28,7 @@
       "id": "manacapuru",
       "name": "Manacapuru",
       "host": "10.200.3.1",
-      "x": 380,
+      "x": 500,
       "y": 260,
       "kind": "datacom"
     },
@@ -36,7 +36,7 @@
       "id": "km60",
       "name": "KM60",
       "host": "10.10.30.2",
-      "x": 520,
+      "x": 696,
       "y": 440,
       "kind": "datacom"
     },
@@ -44,7 +44,7 @@
       "id": "membeca",
       "name": "Membeca",
       "host": "10.10.30.3",
-      "x": 660,
+      "x": 892,
       "y": 440,
       "kind": "datacom"
     },
@@ -52,7 +52,7 @@
       "id": "caapiranga",
       "name": "Caapiranga",
       "host": "10.200.26.1",
-      "x": 800,
+      "x": 1088,
       "y": 440,
       "kind": "datacom"
     },
@@ -60,7 +60,7 @@
       "id": "nazare",
       "name": "Nazaré",
       "host": "10.200.4.1",
-      "x": 660,
+      "x": 892,
       "y": 150,
       "kind": "datacom"
     },
@@ -68,7 +68,7 @@
       "id": "anama",
       "name": "Anamã",
       "host": "10.200.5.1",
-      "x": 940,
+      "x": 1284,
       "y": 260,
       "kind": "datacom"
     },
@@ -76,7 +76,7 @@
       "id": "anori",
       "name": "Anori",
       "host": "10.200.6.1",
-      "x": 1080,
+      "x": 1480,
       "y": 260,
       "kind": "datacom"
     },
@@ -84,7 +84,7 @@
       "id": "codajas",
       "name": "Codajás",
       "host": "10.200.7.1",
-      "x": 1220,
+      "x": 1676,
       "y": 260,
       "kind": "datacom"
     },
@@ -92,7 +92,7 @@
       "id": "sodre",
       "name": "Sodré",
       "host": "10.200.8.1",
-      "x": 1360,
+      "x": 1872,
       "y": 260,
       "kind": "datacom"
     },
@@ -100,7 +100,7 @@
       "id": "coari",
       "name": "Coari",
       "host": "10.200.9.1",
-      "x": 1500,
+      "x": 2068,
       "y": 260,
       "kind": "datacom"
     },
@@ -108,7 +108,7 @@
       "id": "claro",
       "name": "Tefé CLARO",
       "host": "10.200.19.1",
-      "x": 1660,
+      "x": 2292,
       "y": 440,
       "kind": "datacom"
     },
@@ -116,7 +116,7 @@
       "id": "escritorio",
       "name": "Escritório Tefé",
       "host": "10.200.24.1",
-      "x": 1660,
+      "x": 2292,
       "y": 70,
       "kind": "datacom"
     }
@@ -374,7 +374,10 @@
       "port_b": "ten-gigabit-ethernet:1/1/11",
       "label": "GNEX",
       "bend": 170,
-      "maintenance": false
+      "maintenance": false,
+      "route": "rectangular",
+      "routeOffset": -30,
+      "routeLane": 690
     },
     {
       "id": "manaus-escritorio-1",
@@ -384,7 +387,10 @@
       "port_b": "ten-gigabit-ethernet:1/1/4",
       "label": "INFOVIA",
       "bend": -100,
-      "maintenance": false
+      "maintenance": false,
+      "route": "rectangular",
+      "routeOffset": -30,
+      "routeLane": 45
     },
     {
       "id": "coari-claro-1",

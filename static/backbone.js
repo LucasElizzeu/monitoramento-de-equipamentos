@@ -22,20 +22,41 @@
  }
  const rate=r=>r.port?.rx_bps==null?'—':bandwidth(r.port.rx_bps).replace(/<[^>]*>/g,'');
  const signal=r=>r.port?.rx==null?'—':`${number(r.port.rx,2)} dBm`;
+ function roundedRoute(points,radius=16){
+  let d=`M${points[0].x},${points[0].y}`;
+  for(let i=1;i<points.length-1;i++){
+   const a=points[i-1],b=points[i],c=points[i+1],incoming=Math.hypot(b.x-a.x,b.y-a.y),outgoing=Math.hypot(c.x-b.x,c.y-b.y);
+   if(!incoming||!outgoing)continue;
+   const r=Math.min(radius,incoming/2,outgoing/2);
+   const entry={x:b.x-(b.x-a.x)/incoming*r,y:b.y-(b.y-a.y)/incoming*r};
+   const exit={x:b.x+(c.x-b.x)/outgoing*r,y:b.y+(c.y-b.y)/outgoing*r};
+   d+=` L${entry.x},${entry.y} Q${b.x},${b.y} ${exit.x},${exit.y}`;
+  }
+  const end=points[points.length-1];return d+` L${end.x},${end.y}`;
+ }
  function path(link){
   const a=byId(link.a),b=byId(link.b),dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1;
   if(link.route==='rectangular'){
-   const lane=Math.max(a.y,b.y)+Math.abs(link.bend),offset=link.routeOffset??10;
+   const lane=link.routeLane??Math.max(a.y,b.y)+Math.abs(link.bend),offset=link.routeOffset??10;
    const start=a.x+offset,end=b.x-offset;
-   return {d:`M${a.x},${a.y} H${start} V${lane} H${end} V${b.y} H${b.x}`,x:(start+end)/2,y:lane,labelX:(start+end)/2,anchor:'middle'};
+   const points=[a,{x:start,y:a.y},{x:start,y:lane},{x:end,y:lane},{x:end,y:b.y},b];
+   return {d:roundedRoute(points),x:(start+end)/2,y:lane,labelX:(start+end)/2,anchor:'middle'};
   }
   const cx=(a.x+b.x)/2-dy/len*link.bend*2,cy=(a.y+b.y)/2+dx/len*link.bend*2;
   const x=(a.x+2*cx+b.x)/4,vertical=Math.abs(dx)<80;
   return {d:`M${a.x},${a.y} Q${cx},${cy} ${b.x},${b.y}`,x,y:(a.y+2*cy+b.y)/4,labelX:vertical?(x<885?x+25:x-10):x,anchor:vertical?(x<885?'start':'end'):'middle'};
  }
- function captionOffset(link){return link.route==='rectangular'?18:link.bend===0&&!link.label?-32:link.bend<0?-30:60;}
+ // Keep each caption beside its own fiber, parallel to diagonal spans.
+ function captionLayout(link,p){
+  const a=byId(link.a),b=byId(link.b),vertical=Math.abs(b.x-a.x)<80;
+  const angle=link.route==='rectangular'||vertical?0:Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI;
+  const above=link.bend<=0;
+  return {x:vertical&&link.route!=='rectangular'?p.labelX:p.x,y:p.y,angle,
+   offset:vertical&&link.route!=='rectangular'?-8:above?-27:22,
+   anchor:vertical&&link.route!=='rectangular'?p.anchor:'middle'};
+ }
  function draw(){
-  svg.innerHTML=config.links.map(link=>{const p=path(link);return `<g class="backbone-fiber" data-link="${link.id}" tabindex="0" role="button"><path class="fiber-stroke" d="${p.d}"/><path class="fiber-hit" d="${p.d}"/><text class="fiber-caption" x="${p.labelX}" y="${p.y+captionOffset(link)}" text-anchor="${p.anchor}"></text></g>`;}).join('')+config.nodes.map(n=>`<g class="backbone-node" data-node="${n.id}" transform="translate(${n.x} ${n.y})" tabindex="0" role="button" aria-label="${esc(n.name+' '+n.host)}"><circle r="20"/><image href="/static/icons/datacom.png" x="-18" y="-18" width="36" height="36"/><text y="36" text-anchor="middle">${esc(n.name)}</text><text class="node-ip" y="51" text-anchor="middle">${n.host}${n.kind==='huawei'?' · Huawei':''}</text></g>`).join('');
+  svg.innerHTML=config.links.map(link=>{const p=path(link);return `<g class="backbone-fiber" data-link="${link.id}" tabindex="0" role="button"><path class="fiber-stroke" d="${p.d}"/><path class="fiber-hit" d="${p.d}"/><text class="fiber-caption" x="${p.labelX}" y="0" text-anchor="${p.anchor}"></text></g>`;}).join('')+config.nodes.map(n=>`<g class="backbone-node" data-node="${n.id}" transform="translate(${n.x} ${n.y})" tabindex="0" role="button" aria-label="${esc(n.name+' '+n.host)}"><circle r="20"/><image href="/static/icons/datacom.png" x="-18" y="-18" width="36" height="36"/><text y="36" text-anchor="middle">${esc(n.name)}</text><text class="node-ip" y="51" text-anchor="middle">${n.host}${n.kind==='huawei'?' · Huawei':''}</text></g>`).join('');
   if(!svg.style.width)applyZoom(1,false);refresh();
  }
  function refresh(){
@@ -43,8 +64,10 @@
   for(const link of config.links){
    const v=values(link),g=svg.querySelector(`[data-link="${link.id}"]`),p=path(link);
    g.dataset.status=v.status;g.setAttribute('aria-label',`${byId(link.a).name} para ${byId(link.b).name}, ${link.label||'fibra'}, ${names[v.status]}`);
-   const t=g.querySelector('text'),y=p.y+captionOffset(link);
-   const caption=`<tspan x="${p.labelX}" y="${y}">${esc(link.label||'')} ${esc(rate(v.a))} / ${esc(rate(v.b))}</tspan><tspan x="${p.labelX}" dy="14">RX ${esc(number(v.a.port?.rx,1))} / ${esc(number(v.b.port?.rx,1))} dBm${link.maintenance?' · Em reparo':''}</tspan>`;
+   const t=g.querySelector('text'),layout=captionLayout(link,p),y=layout.offset;
+   t.setAttribute('transform',`translate(${layout.x} ${layout.y}) rotate(${layout.angle})`);
+   t.setAttribute('text-anchor',layout.anchor);
+   const caption=`<tspan x="0" y="${y}">${esc(link.label||'')} ${esc(rate(v.a))} / ${esc(rate(v.b))}</tspan><tspan x="0" dy="14">RX ${esc(number(v.a.port?.rx,1))} / ${esc(number(v.b.port?.rx,1))} dBm</tspan>${link.maintenance?'<tspan x="0" dy="14">Em reparo</tspan>':''}`;
    if(t.innerHTML!==caption)t.innerHTML=caption;
   }
   for(const n of config.nodes){const d=device(n),el=svg.querySelector(`[data-node="${n.id}"]`);el.dataset.status=d?.state||'pending';el.setAttribute('aria-label',`${n.name}, ${n.host}, ${d?labels[d.state]||d.state:'não cadastrado'}`);}
@@ -107,14 +130,14 @@
   hideInfo();
   const oldW=svg.getBoundingClientRect().width||1500,oldH=svg.getBoundingClientRect().height||600;
   const cx=(viewport.scrollLeft+viewport.clientWidth/2)/oldW,cy=(viewport.scrollTop+viewport.clientHeight/2)/oldH;
-  zoom=Math.min(3,Math.max(.1,next));svg.style.minWidth='0';svg.style.width=`${1500*zoom}px`;
+  zoom=Math.min(3,Math.max(.1,next));svg.style.minWidth='0';svg.style.width=`${svg.viewBox.baseVal.width*zoom}px`;
   $('#backbone-zoom-level').value=`${Math.round(zoom*100)}%`;$('#backbone-zoom-in').disabled=zoom>=3;$('#backbone-zoom-out').disabled=zoom<=.1;
   if(center){viewport.scrollLeft=cx*svg.getBoundingClientRect().width-viewport.clientWidth/2;viewport.scrollTop=cy*svg.getBoundingClientRect().height-viewport.clientHeight/2;}
   else{viewport.scrollLeft=0;viewport.scrollTop=0;}
  }
  $('#backbone-zoom-in').onclick=()=>applyZoom(zoom+.2);
  $('#backbone-zoom-out').onclick=()=>applyZoom(zoom-.2);
- $('#backbone-fit').onclick=()=>applyZoom(viewport.clientWidth/1500,false);
+ $('#backbone-fit').onclick=()=>applyZoom(viewport.clientWidth/svg.viewBox.baseVal.width,false);
  viewport.addEventListener('pointerdown',e=>{if(e.button!==0||drag)return;didDrag=false;drag={id:e.pointerId,x:e.clientX,y:e.clientY,left:viewport.scrollLeft,top:viewport.scrollTop};});
  viewport.addEventListener('pointermove',e=>{
   if(!drag||e.pointerId!==drag.id)return;
