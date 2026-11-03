@@ -24,6 +24,8 @@ Use somente **um processo/worker** do servidor, para evitar consultas e eventos 
 
 A aba **Mapa do circuito** mostra o backbone informado, com 15 equipamentos e 28 fibras independentes. Manaus fica à esquerda; as rotas via Nazaré e via KM60/Membeca/Caapiranga se encontram em Anamã. TELEBRÁS, GNEX, INFOVIA, SMART e a fibra local entre os Datacoms de Tefé aparecem separadamente. Esta etapa cobre fibra; os enlaces de rádio serão desenhados depois.
 
+As duas fibras TELEBRÁS entre Anori e Coari usam trajetos retangulares com cantos de 90°, em faixas separadas, preservando as cores de status e os detalhes de cada interface.
+
 Cada equipamento é associado ao cadastro pelo IP. Clique no ponto para abrir seus detalhes ou iniciar o cadastro: não são criados equipamentos nem credenciais automaticamente. O Huawei inicia como cadastro de ping; o coletor SSH Datacom não é apresentado como compatível com Huawei.
 
 As linhas exibem consumo RX e sinal RX de ambas as pontas, na ordem origem/destino. Verde exige leitura atual e porta ativa nas duas pontas; vermelho indica porta caída; amarelo indica erro de coleta; cinza tracejado indica manutenção, porta pendente, equipamento ausente ou falta de leitura atual. Leituras com mais de 90 segundos não são usadas como atuais. O estado informado durante o levantamento não substitui a coleta real.

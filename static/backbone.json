@@ -340,7 +340,9 @@
       "port_b": "gigabit-ethernet:1/1/21",
       "label": "TELEBRÁS 1",
       "bend": 170,
-      "maintenance": false
+      "maintenance": false,
+      "route": "rectangular",
+      "routeOffset": 10
     },
     {
       "id": "anori-coari-2",
@@ -350,7 +352,9 @@
       "port_b": "gigabit-ethernet:1/1/22",
       "label": "TELEBRÁS 2",
       "bend": 220,
-      "maintenance": false
+      "maintenance": false,
+      "route": "rectangular",
+      "routeOffset": -10
     },
     {
       "id": "manaus-manaus2-1",

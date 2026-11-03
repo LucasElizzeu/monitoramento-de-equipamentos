@@ -24,11 +24,16 @@
  const signal=r=>r.port?.rx==null?'—':`${number(r.port.rx,2)} dBm`;
  function path(link){
   const a=byId(link.a),b=byId(link.b),dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1;
+  if(link.route==='rectangular'){
+   const lane=Math.max(a.y,b.y)+Math.abs(link.bend),offset=link.routeOffset??10;
+   const start=a.x+offset,end=b.x-offset;
+   return {d:`M${a.x},${a.y} H${start} V${lane} H${end} V${b.y} H${b.x}`,x:(start+end)/2,y:lane,labelX:(start+end)/2,anchor:'middle'};
+  }
   const cx=(a.x+b.x)/2-dy/len*link.bend*2,cy=(a.y+b.y)/2+dx/len*link.bend*2;
   const x=(a.x+2*cx+b.x)/4,vertical=Math.abs(dx)<80;
   return {d:`M${a.x},${a.y} Q${cx},${cy} ${b.x},${b.y}`,x,y:(a.y+2*cy+b.y)/4,labelX:vertical?(x<885?x+25:x-10):x,anchor:vertical?(x<885?'start':'end'):'middle'};
  }
- function captionOffset(link){return link.bend===0&&!link.label?-32:link.bend<0?-30:60;}
+ function captionOffset(link){return link.route==='rectangular'?18:link.bend===0&&!link.label?-32:link.bend<0?-30:60;}
  function draw(){
   svg.innerHTML=config.links.map(link=>{const p=path(link);return `<g class="backbone-fiber" data-link="${link.id}" tabindex="0" role="button"><path class="fiber-stroke" d="${p.d}"/><path class="fiber-hit" d="${p.d}"/><text class="fiber-caption" x="${p.labelX}" y="${p.y+captionOffset(link)}" text-anchor="${p.anchor}"></text></g>`;}).join('')+config.nodes.map(n=>`<g class="backbone-node" data-node="${n.id}" transform="translate(${n.x} ${n.y})" tabindex="0" role="button" aria-label="${esc(n.name+' '+n.host)}"><circle r="20"/><image href="/static/icons/datacom.png" x="-18" y="-18" width="36" height="36"/><text y="36" text-anchor="middle">${esc(n.name)}</text><text class="node-ip" y="51" text-anchor="middle">${n.host}${n.kind==='huawei'?' · Huawei':''}</text></g>`).join('');
   if(!svg.style.width)applyZoom(1,false);refresh();
