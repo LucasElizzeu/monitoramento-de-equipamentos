@@ -129,6 +129,10 @@ Os circuitos ficam no mesmo SQLite, na pasta `.data`. A tabela é criada automat
 
 ## Organização da interface
 
+A tipografia principal é **Manrope**, com pesos variáveis e fonte incluída no próprio projeto em `static/fonts/`. Cartões brancos usam cantos de 12 px e sombras suaves sobre fundo cinza muito claro. A fonte funciona sem acesso a serviços externos; sua licença SIL Open Font License acompanha o arquivo. Saídas de comandos e endereços em código preservam fonte monoespaçada.
+
+[Ver captura real do estilo Manrope com dados simulados](docs/visual-manrope.png).
+
 ### Ajustes do menu e navegação por teclado
 
 No computador ou tablet, o botão **☰** recolhe o menu para uma faixa de 72 px e o expande novamente. O botão **Ajustar menu** (engrenagem) permite escolher uma largura de 180 a 300 px. As preferências ficam salvas neste navegador; **Restaurar padrão** volta a 232 px.

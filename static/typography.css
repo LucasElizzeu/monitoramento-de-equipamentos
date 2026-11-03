@@ -1,0 +1,24 @@
+/* Manrope is bundled locally under the SIL Open Font License. */
+@font-face{font-family:Manrope;src:url('/static/fonts/Manrope-Variable.ttf') format('truetype');font-style:normal;font-weight:200 800;font-display:swap}
+:root{--font:'Manrope',system-ui,-apple-system,'Segoe UI',sans-serif;--bg:#f5f7fa;--card-shadow:0 2px 4px #1b314a08,0 8px 24px #1b314a14;--card-shadow-hover:0 3px 7px #1b314a0c,0 12px 28px #1b314a1a}
+body,input,select,textarea,button,h1,h2,h3,h4,summary,.footer-logo,.device-row td[data-label]::before,.fiber-caption,.backbone-node text,.chart-container svg text,.traffic-plot text{font-family:var(--font)}
+body{background:var(--bg);-webkit-font-smoothing:antialiased}
+body[data-layout] h1{font-weight:750;letter-spacing:-.7px}
+body[data-layout] h2,body[data-layout] h3{font-weight:700;letter-spacing:-.2px}
+body[data-layout][data-view] .panel,body[data-layout][data-view] .metric-card,body[data-layout][data-view] .port-card{background:var(--surface);border-radius:12px;box-shadow:var(--card-shadow)}
+body[data-layout][data-view] .port-card:hover{box-shadow:var(--card-shadow-hover)}
+body[data-layout][data-view] .port-cards{gap:14px}
+body[data-layout][data-view] .metrics{gap:12px}
+body[data-layout][data-view] .metric-title{font-weight:600}
+body[data-layout][data-view] .metric-value{font-weight:750;letter-spacing:-.6px;font-variant-numeric:tabular-nums}
+body[data-layout][data-view] .port-card-header strong{font-size:13px;font-weight:750}
+body[data-layout][data-view] .port-display-name{font-size:13px;font-weight:650;line-height:1.5}
+body[data-layout][data-view] .optical strong,body[data-layout][data-view] .traffic-values strong{font-weight:750;letter-spacing:-.3px;font-variant-numeric:tabular-nums}
+body[data-layout][data-view] .port-ping[data-state]{border-radius:8px}
+body[data-layout][data-view] .port-ping-heading>strong{font-weight:700}
+body[data-view=datacoms] #ports-section{background:transparent;box-shadow:none}
+body[data-layout] .nav-item{font-weight:550}
+button,input,select{font-variant-numeric:tabular-nums}
+/* The topology drawing and raw command output keep their own geometry. */
+pre,code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+@media(forced-colors:active){body[data-layout][data-view] .panel,body[data-layout][data-view] .metric-card,body[data-layout][data-view] .port-card{border:1px solid CanvasText;box-shadow:none}}
