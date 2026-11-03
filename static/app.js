@@ -36,7 +36,7 @@ function formatTime(date){return date?new Date(date).toLocaleTimeString('pt-BR',
 function ago(date){if(!date)return 'Aguardando';const seconds=Math.max(0,Math.floor((Date.now()-new Date(date))/1000));return seconds<10?'Agora':seconds<60?`há ${seconds}s`:seconds<3600?`há ${Math.floor(seconds/60)}min`:`há ${Math.floor(seconds/3600)}h`;}
 function toast(message){$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('#toast').hidden=true,4500);}
 async function api(path,options){if(designPreview&&options?.method&&!['GET','HEAD'].includes(options.method.toUpperCase()))throw new Error('Esta prévia usa dados de demonstração. Volte ao monitoramento para alterar sua rede.');const response=await fetch(path,options);if(!response.ok){let message='Não foi possível concluir a solicitação.';try{const result=await response.json();message=Array.isArray(result.detail)?result.detail.map(e=>e.msg.replace('Value error, ','')).join(' '):result.detail||message;}catch{}throw new Error(message);}if(options?.method&&!['GET','HEAD'].includes(options.method.toUpperCase()))state.dataRevision++;return response.status===204?null:response.json();}
-async function load(){if(state.loading)return;state.loading=true;const revision=state.dataRevision;try{const data=await api(`/api/dashboard?demo=${state.demo}`);if(revision!==state.dataRevision)return;state.data=data;$('#connection-error').hidden=true;render();}catch(error){$('#connection-error').textContent='Conexão com o monitor interrompida. Os dados podem estar desatualizados. Tentaremos novamente automaticamente.';$('#connection-error').hidden=false;}finally{state.loading=false;}}
+async function load(){if(state.loading)return;state.loading=true;const revision=state.dataRevision;try{const data=await api(`/api/dashboard?demo=${state.demo}`);if(revision!==state.dataRevision)return;state.data=data;window.dispatchEvent(new Event('monitor-data'));$('#connection-error').hidden=true;render();}catch(error){$('#connection-error').textContent='Conexão com o monitor interrompida. Os dados podem estar desatualizados. Tentaremos novamente automaticamente.';$('#connection-error').hidden=false;}finally{state.loading=false;}}
 function orderedDatacoms(devices=state.data.devices){
  return devices.filter(d=>d.kind==='datacom').sort((a,b)=>(a.circuit_position??Infinity)-(b.circuit_position??Infinity)||a.id-b.id);
 }
@@ -296,7 +296,7 @@ function render(){
  $('#ports-content').querySelectorAll('details').forEach(e=>e.open=openPorts.has(e.dataset.portKey));
  if(state.selected&&$('#detail-dialog').open){if(state.demo){state.detailSamples=samples.filter(s=>s.device_id===state.selected);renderDetail();}else{const selected=state.selected;api(`/api/devices/${selected}/history`).then(history=>{if(state.selected===selected){state.detailSamples=history;renderDetail();}}).catch(()=>{});}}
 }
-const pages={notifications:['Notificações','Receba avisos de queda e recuperação pelo Telegram.'],availability:['Disponibilidade','Acompanhe o tempo com resposta, as perdas de ping e a cobertura da coleta.'],backups:['Backups','Guarde uma cópia dos seus dados e recupere quando precisar.'],overview:['Visão geral','Disponibilidade, sinais e eventos da sua rede.'],bbus:["BBU's","Monitore o ping, a latência e as perdas das suas BBU's."],datacoms:['Datacoms','Portas, sinais e circuitos em uma só tela.'],siae:['Rádios SIAE','Disponibilidade por ping e consumo real de banda do rádio.'],alerts:['Eventos','Cada mudança na rede, registrada em um só lugar.']};
+const pages={backbone:['Mapa do circuito','Backbone de fibra · Manaus, Coari e Tefé.'],notifications:['Notificações','Receba avisos de queda e recuperação pelo Telegram.'],availability:['Disponibilidade','Acompanhe o tempo com resposta, as perdas de ping e a cobertura da coleta.'],backups:['Backups','Guarde uma cópia dos seus dados e recupere quando precisar.'],overview:['Visão geral','Disponibilidade, sinais e eventos da sua rede.'],bbus:["BBU's","Monitore o ping, a latência e as perdas das suas BBU's."],datacoms:['Datacoms','Portas, sinais e circuitos em uma só tela.'],siae:['Rádios SIAE','Disponibilidade por ping e consumo real de banda do rádio.'],alerts:['Eventos','Cada mudança na rede, registrada em um só lugar.']};
 function navigate(page){
  window.getSelection()?.removeAllRanges();state.page=page;document.body.dataset.view=page;
  const datacom=page==='datacoms';$('#datacom-toolbar').hidden=!datacom;
@@ -310,13 +310,14 @@ function navigate(page){
  $('#add-device-label').textContent=page==='bbus'?'Adicionar BBU':page==='datacoms'?'Adicionar Datacom':page==='siae'?'Adicionar rádio SIAE':'Adicionar equipamento';
  $('#overview-charts').hidden=page!=='overview';
  $('#devices-section').hidden=!['overview','bbus','siae'].includes(page);
+ $('#backbone-section').hidden=page!=='backbone';
  $('#ports-section').hidden=page!=='datacoms';$('#siae-section').hidden=page!=='siae';$('#alerts-section').hidden=page!=='alerts';
  $('#search').value='';$('#state-filter').value='all';
- $('#metrics').hidden=['availability','backups','notifications'].includes(page);
+ $('#metrics').hidden=['availability','backups','notifications','backbone'].includes(page);
  $('#availability-section')?.toggleAttribute('hidden',page!=='availability');
  $('#backups-section')?.toggleAttribute('hidden',page!=='backups');
  $('#notifications-section')?.toggleAttribute('hidden',page!=='notifications');
- $('#add-device').hidden=Boolean(designPreview)||['backups','notifications'].includes(page);
+ $('#add-device').hidden=Boolean(designPreview)||['backups','notifications','backbone'].includes(page);
  render();
  window.dispatchEvent(new CustomEvent('monitor-page',{detail:{page,demo:state.demo}}));
 }

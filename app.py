@@ -1256,6 +1256,42 @@ def index():
     return FileResponse(ROOT / 'static' / 'index.html')
 
 
+class BackbonePortsInput(BaseModel):
+    maintenance: bool = False
+    port_a: str | None = Field(default=None, max_length=80)
+    port_b: str | None = Field(default=None, max_length=80)
+
+
+def backbone_config():
+    config = json.loads((ROOT / 'static' / 'backbone.json').read_text())
+    with LOCK, connect() as db:
+        db.execute('CREATE TABLE IF NOT EXISTS backbone_ports (link_id TEXT PRIMARY KEY, port_a TEXT, port_b TEXT, maintenance INTEGER)')
+        overrides = {row['link_id']: dict(row) for row in db.execute('SELECT * FROM backbone_ports')}
+    for link in config['links']:
+        if link['id'] in overrides:
+            link.update({key: overrides[link['id']][key] for key in ('port_a', 'port_b', 'maintenance')})
+    return config
+
+
+@app.get('/api/backbone')
+def get_backbone():
+    return backbone_config()
+
+
+@app.patch('/api/backbone/links/{link_id}')
+def update_backbone_ports(link_id: str, data: BackbonePortsInput):
+    config = backbone_config()
+    link = next((link for link in config['links'] if link['id'] == link_id), None)
+    if link is None:
+        raise HTTPException(404, 'Fibra não encontrada.')
+    values = {key: getattr(data, key) if key in data.model_fields_set else link[key]
+              for key in ('port_a', 'port_b', 'maintenance')}
+    with LOCK, connect() as db:
+        db.execute('INSERT INTO backbone_ports (link_id,port_a,port_b,maintenance) VALUES (?,?,?,?) ON CONFLICT(link_id) DO UPDATE SET port_a=excluded.port_a,port_b=excluded.port_b,maintenance=excluded.maintenance',
+                   (link_id, (values['port_a'] or '').strip() or None, (values['port_b'] or '').strip() or None, int(values['maintenance'])))
+    return backbone_config()
+
+
 @app.get('/api/health')
 def health():
     running = getattr(app.state, 'monitor_thread', None)

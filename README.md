@@ -20,6 +20,20 @@ Use somente **um processo/worker** do servidor, para evitar consultas e eventos 
 
 ## Abas do painel
 
+### Mapa do circuito — backbone de fibra
+
+A aba **Mapa do circuito** mostra o backbone informado, com 15 equipamentos e 28 fibras independentes. Manaus fica à esquerda; as rotas via Nazaré e via KM60/Membeca/Caapiranga se encontram em Anamã. TELEBRÁS, GNEX, INFOVIA, SMART e a fibra local entre os Datacoms de Tefé aparecem separadamente. Esta etapa cobre fibra; os enlaces de rádio serão desenhados depois.
+
+Cada equipamento é associado ao cadastro pelo IP. Clique no ponto para abrir seus detalhes ou iniciar o cadastro: não são criados equipamentos nem credenciais automaticamente. O Huawei inicia como cadastro de ping; o coletor SSH Datacom não é apresentado como compatível com Huawei.
+
+As linhas exibem consumo RX e sinal RX de ambas as pontas, na ordem origem/destino. Verde exige leitura atual e porta ativa nas duas pontas; vermelho indica porta caída; amarelo indica erro de coleta; cinza tracejado indica manutenção, porta pendente, equipamento ausente ou falta de leitura atual. Leituras com mais de 90 segundos não são usadas como atuais. O estado informado durante o levantamento não substitui a coleta real.
+
+Passe o mouse, use Tab ou toque na fibra para consultar as portas. Clique/toque para fixar os detalhes e escolher **Editar portas / manutenção**. Alterações ficam no SQLite e acompanham os backups. A porta do Huawei que alimenta o Datacom 2 de Manaus começa pendente. A fibra Manaus XGE0/0/11 ↔ Limão Ten 1/1/2 começa em manutenção, que pode ser desmarcada após o reparo. Use identificadores completos, como `ten-gigabit-ethernet:1/1/3` ou `gigabit-ethernet:1/1/21`, para separar Ten e Giga.
+
+Em telas menores, o desenho permite rolagem horizontal; **Ajustar à tela** alterna a visão completa. O desenho inicial está em `static/backbone.json`; as edições de porta não alteram esse arquivo.
+
+[Ver captura do mapa com leituras simuladas de validação](docs/mapa-backbone.png).
+
 O painel principal usa o **visual Compacto**, com cartões menores, menos espaçamento e letras proporcionais. A largura dos cartões é padronizada entre os Datacoms na mesma tela: equipamentos com poucas portas mantêm o mesmo tamanho compacto dos que têm muitas portas, sem esticar os cartões para ocupar a linha inteira. No celular, a grade usa uma coluna. Sinais, consumo e pings permanecem juntos; os detalhes continuam disponíveis ao expandir cada saída.
 
 - **BBU's:** equipamentos cadastrados como ping, com disponibilidade, latência e perdas consecutivas.
