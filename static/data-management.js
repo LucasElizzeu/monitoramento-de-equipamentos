@@ -14,7 +14,7 @@
  function dailyBar(day) {
   const total = day.up + day.down + day.error + day.unmonitored;
   let edge = 0;
-  const colors = ['#65deb3', '#fda4af', '#fcd58b', '#304259'];
+  const colors = ['var(--success)', 'var(--red)', 'var(--amber)', 'var(--neutral)'];
   const gradient = ['up','down','error','unmonitored'].map((key,index) => {
    const start = edge;
    edge += total ? day[key] / total * 100 : index === 3 ? 100 : 0;

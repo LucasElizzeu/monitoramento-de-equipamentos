@@ -127,7 +127,7 @@ body[data-layout] .siae-note.pending{color:var(--amber)}
 .type-picker .siae-type>span>span{grid-row:1/3;align-self:center}
 #siae-setup-note{color:var(--muted);line-height:1.8}
 .siae-enable{display:flex;align-items:center;gap:9px;font-size:13px;margin:16px 0;cursor:pointer}
-.siae-enable input{width:17px;height:17px;accent-color:#85c4ff}
+.siae-enable input{width:17px;height:17px;accent-color:var(--accent)}
 body[data-layout] .siae-source{font-size:10px;line-height:1.7;color:var(--muted);margin:12px 0 0}
 body[data-layout] .siae-note.error{color:var(--red)}
 body[data-layout] .siae-configure{font-size:11px;min-height:30px;padding:7px 9px;gap:7px;margin-top:12px;max-width:100%}

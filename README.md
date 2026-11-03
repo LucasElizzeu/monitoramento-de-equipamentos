@@ -1,6 +1,6 @@
 # VELOSONET MONITORAMENTO
 
-Primeira versão de um painel local para monitorar ping e interfaces de equipamentos Datacom por SSH. Interface em português, responsiva, com identidade VELOSONET e tema azul-marinho. Textos claros e indicadores em verde, vermelho e âmbar destacam os estados dos equipamentos. Não requer etapa de compilação ou serviços de fontes externos. Python 3.12+, FastAPI, SQLite e JavaScript.
+Painel local para monitorar ping e interfaces de equipamentos Datacom por SSH. Interface em português, responsiva, com a logo VELOSONET NOC e tema branco compacto. Textos escuros e indicadores em verde, vermelho e âmbar destacam os estados dos equipamentos. Não requer etapa de compilação ou serviços de fontes externos. Python 3.12+, FastAPI, SQLite e JavaScript.
 
 ## Executar
 
@@ -113,7 +113,11 @@ Os circuitos ficam no mesmo SQLite, na pasta `.data`. A tabela é criada automat
 
 ## Organização da interface
 
-O tema azul-marinho e a marca **VELOSONET MONITORAMENTO** foram mantidos. As informações de equipamentos, eventos, sinais e consumo usam letras maiores. Em telas menores, a lista de equipamentos vira cartões com status, IP, latência, perdas e última checagem visíveis juntos, além dos botões **Editar**, **Detalhes** e **Remover**. Nos Datacoms, pings e portas compartilham a mesma grade; pings vinculados aparecem dentro do cartão da porta. O cabeçalho resume portas ativas e inativas. Os nomes das portas ganham destaque, com sinal óptico e consumo separados.
+O tema **branco compacto** usa a logo **VELOSONET NOC**, fundo branco, textos escuros e detalhes azuis na navegação e nas ações. Em telas menores, a lista de equipamentos vira cartões com status, IP, latência, perdas e última checagem visíveis juntos, além dos botões **Editar**, **Detalhes** e **Remover**. Nos Datacoms, pings e portas compartilham a mesma grade; pings vinculados aparecem dentro do cartão da porta. O cabeçalho resume portas ativas e inativas. Os nomes das portas ganham destaque, com sinal óptico e consumo separados.
+
+O bloco de ping do circuito mostra **verde quando online**, **amarelo em instabilidade ou erro de coleta**, **vermelho quando sem ping** e **cinza enquanto aguarda leitura**. O texto do estado continua visível, sem depender apenas da cor. O estado do circuito é independente do estado da porta física; uma porta ativa pode conter um circuito sem ping. As cores não alteram os critérios do monitoramento nem o alerta na 21ª perda consecutiva.
+
+[Ver captura do tema branco compacto com dados fictícios](docs/visual-branco-compacto.png).
 
 ## Ping
 
