@@ -24,7 +24,7 @@ Use somente **um processo/worker** do servidor, para evitar consultas e eventos 
 
 A aba **Mapa do circuito** mostra o backbone informado, com 15 equipamentos e 28 fibras independentes. Manaus fica à esquerda; as rotas via Nazaré e via KM60/Membeca/Caapiranga se encontram em Anamã. TELEBRÁS, GNEX, INFOVIA, SMART e a fibra local entre os Datacoms de Tefé aparecem separadamente. Esta etapa cobre fibra; os enlaces de rádio serão desenhados depois.
 
-As duas fibras TELEBRÁS entre Anori e Coari usam trajetos retangulares com cantos arredondados, em faixas separadas. A INFOVIA segue o mesmo estilo pela parte superior do desenho, e a GNEX pela parte inferior, preservando as cores de status e os detalhes de cada interface. Os equipamentos têm mais espaço entre si, e as leituras acompanham a direção de cada fibra, junto à linha correspondente.
+As duas fibras TELEBRÁS entre Anori e Coari usam trajetos retangulares com cantos arredondados, em faixas separadas. A INFOVIA liga o Datacom 2 de Manaus (`10.200.1.3`, Ten 1/1/4) ao Escritório de Tefé (`10.200.24.1`, Ten 1/1/4) e segue o mesmo estilo pela parte superior do desenho, e a GNEX pela parte inferior, preservando as cores de status e os detalhes de cada interface. Os equipamentos têm mais espaço entre si, e as leituras acompanham a direção de cada fibra, junto à linha correspondente.
 
 Cada equipamento é associado ao cadastro pelo IP. Clique no ponto para abrir seus detalhes ou iniciar o cadastro: não são criados equipamentos nem credenciais automaticamente. O Huawei inicia como cadastro de ping; o coletor SSH Datacom não é apresentado como compatível com Huawei.
 

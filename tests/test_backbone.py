@@ -68,6 +68,7 @@ class BackboneTests(unittest.TestCase):
         self.assertEqual(len(ports), len(set(ports)))
         special = {link['label']: link for link in config['links'] if link['label']}
         self.assertEqual((special['GNEX']['a'], special['GNEX']['port_a'], special['GNEX']['b']), ('manaus2', 'ten-gigabit-ethernet:1/1/9', 'coari'))
-        self.assertEqual((special['INFOVIA']['a'], special['INFOVIA']['b']), ('manaus', 'escritorio'))
+        self.assertEqual((special['INFOVIA']['id'], special['INFOVIA']['a'], special['INFOVIA']['port_a'], special['INFOVIA']['b'], special['INFOVIA']['port_b']),
+                         ('manaus2-escritorio-1', 'manaus2', 'ten-gigabit-ethernet:1/1/4', 'escritorio', 'ten-gigabit-ethernet:1/1/4'))
         self.assertEqual((special['SMART']['a'], special['SMART']['b']), ('coari', 'claro'))
         self.assertEqual(sum(link['maintenance'] for link in config['links']), 1)
