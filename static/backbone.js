@@ -2,6 +2,10 @@
 (() => {
  let config=null, active=null, pinned=false, editing=null, pointer={x:20,y:100}, modality='mouse', dismissTimer, suppressFocus=false;
  const svg=$('#backbone-map'), info=$('#backbone-info');
+ const display=$('#backbone-display');
+ try{const saved=localStorage.getItem('alwaysup-map-display');if(['traffic','full','clean'].includes(saved))display.value=saved;}catch{}
+ svg.dataset.display=display.value;
+ display.onchange=()=>{svg.dataset.display=display.value;hideInfo();refresh();try{localStorage.setItem('alwaysup-map-display',display.value);}catch{}};
  const byId=id=>config.nodes.find(n=>n.id===id);
  const device=n=>state.data.devices.find(d=>d.host===n.host&&d.kind==='datacom')||state.data.devices.find(d=>d.host===n.host);
  const names={up:'Ativa',down:'Caída',error:'Erro de coleta',missing:'Sem leitura',maintenance:'Em reparo'};
@@ -52,25 +56,28 @@
   const angle=link.route==='rectangular'||vertical?0:Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI;
   const above=link.bend<=0;
   return {x:vertical&&link.route!=='rectangular'?p.labelX:p.x,y:p.y,angle,
-   offset:vertical&&link.route!=='rectangular'?-8:above?-27:22,
+   offset:vertical&&link.route!=='rectangular'?-8:above?(display.value==='full'?-27:-13):22,
    anchor:vertical&&link.route!=='rectangular'?p.anchor:'middle'};
  }
  function draw(){
   svg.innerHTML=config.links.map(link=>{const p=path(link);return `<g class="backbone-fiber" data-link="${link.id}" tabindex="0" role="button"><path class="fiber-stroke" d="${p.d}"/><path class="fiber-hit" d="${p.d}"/><text class="fiber-caption" x="${p.labelX}" y="0" text-anchor="${p.anchor}"></text></g>`;}).join('')+config.nodes.map(n=>`<g class="backbone-node" data-node="${n.id}" transform="translate(${n.x} ${n.y})" tabindex="0" role="button" aria-label="${esc(n.name+' '+n.host)}"><circle r="20"/><image href="/static/icons/datacom.png" x="-18" y="-18" width="36" height="36"/><text y="36" text-anchor="middle">${esc(n.name)}</text><text class="node-ip" y="51" text-anchor="middle">${n.host}${n.kind==='huawei'?' · Huawei':''}</text></g>`).join('');
-  if(!svg.style.width)applyZoom(1,false);refresh();
+  if(!svg.style.width)fitMap();refresh();
  }
  function refresh(){
   if(!config||state.page!=='backbone')return;
+  const counts={up:0,down:0,error:0,missing:0,maintenance:0};
   for(const link of config.links){
    const v=values(link),g=svg.querySelector(`[data-link="${link.id}"]`),p=path(link);
-   g.dataset.status=v.status;g.setAttribute('aria-label',`${byId(link.a).name} para ${byId(link.b).name}, ${link.label||'fibra'}, ${names[v.status]}`);
+   counts[v.status]++;g.dataset.status=v.status;g.setAttribute('aria-label',`${byId(link.a).name} para ${byId(link.b).name}, ${link.label||'fibra'}, ${names[v.status]}`);
    const t=g.querySelector('text'),layout=captionLayout(link,p),y=layout.offset;
    t.setAttribute('transform',`translate(${layout.x} ${layout.y}) rotate(${layout.angle})`);
    t.setAttribute('text-anchor',layout.anchor);
-   const caption=`<tspan x="0" y="${y}">${esc(link.label||'')} ${esc(rate(v.a))} / ${esc(rate(v.b))}</tspan><tspan x="0" dy="14">RX ${esc(number(v.a.port?.rx,1))} / ${esc(number(v.b.port?.rx,1))} dBm</tspan>${link.maintenance?'<tspan x="0" dy="14">Em reparo</tspan>':''}`;
+   const caption=`<tspan x="0" y="${y}">${esc(link.label||'')} ${esc(rate(v.a))} / ${esc(rate(v.b))}</tspan><tspan class="fiber-optics" x="0" dy="14">RX ${esc(number(v.a.port?.rx,1))} / ${esc(number(v.b.port?.rx,1))} dBm</tspan>${link.maintenance?'<tspan class="fiber-maintenance" x="0" dy="14">Em reparo</tspan>':''}`;
    if(t.innerHTML!==caption)t.innerHTML=caption;
   }
   for(const n of config.nodes){const d=device(n),el=svg.querySelector(`[data-node="${n.id}"]`);el.dataset.status=d?.state||'pending';el.setAttribute('aria-label',`${n.name}, ${n.host}, ${d?labels[d.state]||d.state:'não cadastrado'}`);}
+  const summary=`${config.links.length} fibras · ${counts.up} ativas${counts.down?` · ${counts.down} com queda`:''}${counts.error?' · erro de coleta':''}${counts.missing?' · leituras pendentes':''}${counts.maintenance?' · em manutenção':''}`;
+  if($('#backbone-summary').textContent!==summary)$('#backbone-summary').textContent=summary;
   if(active)details(active);
  }
  function details(id){
@@ -125,9 +132,9 @@
  $('#backbone-port-dialog').addEventListener('close',()=>{const target=editing&&svg.querySelector(`[data-link="${editing.id}"]`);if(target&&state.page==='backbone')target.focus();});
  $('#backbone-port-close').onclick=()=>$('#backbone-port-dialog').close();
  $('#backbone-port-form').onsubmit=async e=>{e.preventDefault();const f=e.target,button=f.querySelector('[type="submit"]');button.disabled=true;try{config=await api(`/api/backbone/links/${editing.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({port_a:f.elements.port_a.value,port_b:f.elements.port_b.value,maintenance:f.elements.maintenance.checked})});$('#backbone-port-dialog').close();draw();}catch(error){$('#backbone-port-error').textContent=error.message;$('#backbone-port-error').hidden=false;}finally{button.disabled=false;}};
- const viewport=$('.backbone-scroll');let zoom=1,drag=null,didDrag=false;
+ const viewport=$('.backbone-scroll');let zoom=1,drag=null,didDrag=false,autoFit=true;
  function applyZoom(next,center=true){
-  hideInfo();
+  autoFit=false;hideInfo();
   const oldW=svg.getBoundingClientRect().width||1500,oldH=svg.getBoundingClientRect().height||600;
   const cx=(viewport.scrollLeft+viewport.clientWidth/2)/oldW,cy=(viewport.scrollTop+viewport.clientHeight/2)/oldH;
   zoom=Math.min(3,Math.max(.1,next));svg.style.minWidth='0';svg.style.width=`${svg.viewBox.baseVal.width*zoom}px`;
@@ -137,7 +144,11 @@
  }
  $('#backbone-zoom-in').onclick=()=>applyZoom(zoom+.2);
  $('#backbone-zoom-out').onclick=()=>applyZoom(zoom-.2);
- $('#backbone-fit').onclick=()=>applyZoom(viewport.clientWidth/svg.viewBox.baseVal.width,false);
+ function fitMap(){
+  applyZoom(Math.min(viewport.clientWidth/svg.viewBox.baseVal.width,viewport.clientHeight/svg.viewBox.baseVal.height),false);autoFit=true;
+ }
+ $('#backbone-fit').onclick=fitMap;
+ new ResizeObserver(()=>{if(autoFit&&config&&state.page==='backbone')fitMap();}).observe(viewport);
  viewport.addEventListener('pointerdown',e=>{if(e.button!==0||drag)return;didDrag=false;drag={id:e.pointerId,x:e.clientX,y:e.clientY,left:viewport.scrollLeft,top:viewport.scrollTop};});
  viewport.addEventListener('pointermove',e=>{
   if(!drag||e.pointerId!==drag.id)return;

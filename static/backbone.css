@@ -1,2 +1,30 @@
 .backbone-toolbar,.backbone-legend{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:12px 0;color:var(--muted);font-size:12px}.backbone-legend{justify-content:flex-start}.backbone-legend .up{color:var(--success)}.backbone-legend .down{color:var(--red)}.backbone-legend .error{color:var(--amber)}.backbone-scroll{overflow:auto;border:1px solid var(--line);border-radius:8px;background:white}#backbone-map{display:block;width:100%;min-width:1500px;height:auto}#backbone-map.fit-map{min-width:0}.fiber-stroke{fill:none;stroke:#8996a6;stroke-width:3;stroke-dasharray:7 5}.fiber-hit{fill:none;stroke:transparent;stroke-width:15;cursor:pointer}.backbone-fiber[data-status=up] .fiber-stroke{stroke:#32b64e;stroke-dasharray:none}.backbone-fiber[data-status=down] .fiber-stroke{stroke:var(--red);stroke-dasharray:none}.backbone-fiber[data-status=error] .fiber-stroke{stroke:var(--amber);stroke-dasharray:none}.backbone-fiber:focus{outline:none}.backbone-fiber:focus .fiber-stroke,.backbone-fiber:hover .fiber-stroke{stroke-width:5}.fiber-caption{font:11px system-ui;fill:var(--muted);paint-order:stroke;stroke:white;stroke-width:4px;stroke-linejoin:round;pointer-events:none}.backbone-node{cursor:pointer}.backbone-node circle{fill:white;stroke:#94a1b0;stroke-width:2}.backbone-node[data-status=online] circle{stroke:var(--success)}.backbone-node[data-status=offline] circle{stroke:var(--red)}.backbone-node text{fill:var(--ink);font:12px system-ui;paint-order:stroke;stroke:white;stroke-width:3px}.backbone-node .node-ip{font-size:10px;fill:var(--muted)}.backbone-note{color:var(--muted);font-size:12px;line-height:1.7}.backbone-info{position:fixed;z-index:30;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px;box-shadow:0 8px 30px #1b293e24;width:min(350px,calc(100vw - 16px));max-height:85vh;overflow:auto;font-size:12px}.backbone-info>div{border-top:1px solid var(--line);padding-top:10px;margin-top:10px}.backbone-info small{display:block;overflow-wrap:anywhere;color:var(--muted);margin-top:5px}.backbone-dismiss{float:right}.backbone-info p{color:var(--muted);line-height:1.6}.backbone-info>.button{margin-top:8px}#backbone-port-form>p{font-size:12px;line-height:1.7}#backbone-port-form>label:has(input[type=checkbox]){display:flex;align-items:center;gap:8px;font-size:12px;margin:18px 0}
 @media(max-width:640px){body[data-layout] .sidebar nav{justify-content:flex-start}.backbone-toolbar{font-size:11px}}
+
+/* A compact workspace for the circuit, with optional technical readings. */
+body[data-layout][data-view=backbone] main{padding-top:18px}
+body[data-layout][data-view=backbone] .page-heading{border:0;padding-bottom:0;margin-bottom:12px}
+body[data-layout][data-view=backbone] .page-heading h1{margin:0;font-size:22px}
+body[data-view=backbone] .page-heading .eyebrow,body[data-view=backbone] #page-description,body[data-view=backbone] .status-strip{display:none}
+#backbone-section .backbone-toolbar{margin:0 0 12px;gap:12px}
+.backbone-overview{display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0}
+.backbone-overview>strong{color:var(--ink);font-size:13px;font-weight:600}
+#backbone-summary{font-size:11px}
+.backbone-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.backbone-view-label{display:flex;align-items:center;gap:8px;font-size:12px}
+.backbone-view-label select{width:auto;min-height:36px;padding:6px 28px 6px 10px;font-size:12px}
+#backbone-section .map-view-controls{gap:6px}
+#backbone-section .map-view-controls .button{min-width:36px;min-height:36px;padding:6px 10px;font-size:12px}
+body[data-view=backbone] .backbone-scroll{height:calc(100dvh - 225px);min-height:360px;max-height:680px}
+#backbone-map[data-display=traffic] .fiber-optics,#backbone-map[data-display=traffic] .node-ip{display:none}
+#backbone-map[data-display=clean] .fiber-caption,#backbone-map[data-display=clean] .node-ip{display:none}
+.backbone-footer{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-top:10px}
+#backbone-section .backbone-legend{margin:0;gap:14px;font-size:11px}
+.backbone-help{font-size:11px;color:var(--muted);max-width:560px}
+.backbone-help summary{cursor:pointer;min-height:28px;text-align:right}
+.backbone-help p{font-size:12px;line-height:1.7;margin:8px 0}
+@media(max-width:900px){body[data-view=backbone] .backbone-scroll{height:calc(100dvh - 285px)}.backbone-actions{gap:10px}.backbone-overview{gap:8px}}
+@media(max-width:640px){body[data-layout][data-view=backbone] main{padding-top:12px}.backbone-actions{width:100%;justify-content:space-between;gap:8px}.backbone-view-label{gap:5px}.backbone-view-label select{max-width:150px}.backbone-help summary{text-align:left}body[data-view=backbone] .backbone-scroll{height:55dvh;min-height:320px}}
+
+#backbone-map[data-display=traffic] .fiber-caption{font-size:13px}
+#backbone-map[data-display=traffic] .backbone-node text:not(.node-ip){font-size:14px}
