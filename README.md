@@ -374,3 +374,11 @@ Na Visão geral, o seletor **Equipamento** do cartão **Latência média** alter
 A tela inicial segue o protótipo compacto aprovado: Manrope local, fundo claro, cartões brancos com sombra suave, indicadores em uma faixa única, tabela à esquerda e atenção/latência à direita. Busca, filtros, ordenação pelas colunas e menu **···** permitem consultar e gerenciar os equipamentos. A tabela mostra localidade pelo IP cadastrado no mapa do circuito e portas ativas/consultadas; informações ausentes aparecem como **—**. Consultas SSH com erro não exibem contagens antigas de portas como atuais. O painel **Atenção agora** prioriza problemas presentes, com mensagens curtas, e abre os detalhes do equipamento.
 
 O menu inicia recolhido para novos navegadores e preserva a preferência já salva. Em telas menores os painéis se empilham e a tabela vira cartões. O seletor de latência continua separando BBU, Rádio SIAE e Datacom. A [captura da tela compacta](docs/visao-geral-compacta.png) usa dados ilustrativos de validação.
+
+### Rádios por trecho e rede
+
+A aba **Rádios SIAE** organiza os cadastros em **Tefé → Tabatinga**, **Coari → Tefé · Rede 1** e **Coari → Tefé · Rede 2**. Na primeira inicialização após a atualização, os rádios existentes ficam em Tefé → Tabatinga. IDs, credenciais, históricos e telemetria são preservados. Cadastros novos de Coari → Tefé exigem escolher a rede. Os botões de cada grupo já preenchem trecho e rede no formulário; a edição permite mover um rádio entre os grupos.
+
+Os cartões usam azul quando há resposta até **200 ms**, amarelo quando a latência é **maior que 200 ms**, vermelho quando o monitor declara **sem ping** e cinza sem leitura ou com erro de coleta. O estado sem ping continua respeitando a regra existente da 21ª perda consecutiva. Uma falha de coleta não é tratada como queda confirmada. Trecho/rede ficam no banco e acompanham os backups; a API também fornece `radio_status` para a futura integração ao mapa. Esta atualização organiza os rádios; o traçado dos enlaces será definido em uma próxima etapa com a sequência dos pontos.
+
+Reinicie o programa após atualizar para aplicar a migração do banco, mantendo `MONITOR_DATA_DIR` na pasta de dados que você já utiliza. A [captura dos rádios por trecho](docs/radios-por-trecho.png) usa dados ilustrativos de validação.

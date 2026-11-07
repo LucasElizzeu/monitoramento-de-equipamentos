@@ -198,12 +198,18 @@ function siaeCardHTML(device){
  const consumption=device.siae_consumption||{};
  const pair=consumption.status==='demo'||device.siae_interfaces?.length===2;
  const note=consumption.status==='demo'?'Dados simulados · TRX A + TRX B':consumption.error||consumption.note||(consumption.total_bps==null?'Ative a leitura em Configurar banda.':pair?'RX total = TRX A + TRX B':'RX da interface TRX selecionada.');
- return `<article class="port-card siae-card" data-siae="${device.id}"><div class="port-card-header"><h3 class="equipment-title">${equipmentIcon(device.kind)}<span>${esc(device.name)}</span></h3>${badge(device.state)}</div><p class="siae-address ip">${deviceAddressHTML(device)}</p><div class="port-ping-values siae-ping"><span>Latência<strong>${number(device.latency,2)} <small>ms</small></strong></span><span>Perdas<strong>${device.failures} <small>/ 21</small></strong></span></div><small>Ping ${ago(device.last_check)}</small><div class="port-traffic"><div class="traffic-heading">Consumo total · RX</div><div class="traffic-values"><strong>${bandwidth(consumption.total_bps)}</strong></div></div>${pair?`<div class="siae-trx"><span>TRX A<strong>${bandwidth(consumption.trx_a_bps)}</strong></span><span>TRX B<strong>${bandwidth(consumption.trx_b_bps)}</strong></span></div>`:`<p class="siae-source">Interface TRX · índice ${esc((device.siae_interfaces||[3])[0])}</p>`}${consumption.checked_at?`<small>Banda ${ago(consumption.checked_at)}</small>`:''}<p class="siae-note ${consumption.total_bps==null?'pending':''} ${consumption.status==='error'?'error':''}">${esc(note)}</p>${siaeDiagnosticHTML(device)}${device.siae_enabled?`<button type="button" class="button secondary siae-configure" data-check-siae="${device.id}" ${state.siaeChecking?.has(device.id)?'disabled':''}>${icon('refresh')}Consultar banda agora</button>`:''}<button type="button" class="button secondary siae-configure" data-configure-siae="${device.id}">${icon('edit')}${device.siae_enabled?'Editar banda':'Configurar banda'}</button></article>`;
+ return `<article class="port-card siae-card" data-siae="${device.id}" data-radio-status="${radioHealth(device)}"><div class="port-card-header"><h3 class="equipment-title">${equipmentIcon(device.kind)}<span>${esc(device.name)}</span></h3>${radioBadge(device)}</div><p class="siae-address ip">${deviceAddressHTML(device)}</p><div class="port-ping-values siae-ping"><span>Latência<strong>${number(device.latency,2)} <small>ms</small></strong></span><span>Perdas<strong>${device.failures} <small>/ 21</small></strong></span></div><small>Ping ${ago(device.last_check)}</small><div class="port-traffic"><div class="traffic-heading">Consumo total · RX</div><div class="traffic-values"><strong>${bandwidth(consumption.total_bps)}</strong></div></div>${pair?`<div class="siae-trx"><span>TRX A<strong>${bandwidth(consumption.trx_a_bps)}</strong></span><span>TRX B<strong>${bandwidth(consumption.trx_b_bps)}</strong></span></div>`:`<p class="siae-source">Interface TRX · índice ${esc((device.siae_interfaces||[3])[0])}</p>`}${consumption.checked_at?`<small>Banda ${ago(consumption.checked_at)}</small>`:''}<p class="siae-note ${consumption.total_bps==null?'pending':''} ${consumption.status==='error'?'error':''}">${esc(note)}</p>${siaeDiagnosticHTML(device)}${device.siae_enabled?`<button type="button" class="button secondary siae-configure" data-check-siae="${device.id}" ${state.siaeChecking?.has(device.id)?'disabled':''}>${icon('refresh')}Consultar banda agora</button>`:''}<button type="button" class="button secondary siae-configure" data-configure-siae="${device.id}">${icon('edit')}${device.siae_enabled?'Editar banda':'Configurar banda'}</button></article>`;
 }
+function radioHealth(d){return d.radio_status||(d.state==='offline'?'down':['online','unstable'].includes(d.state)&&d.latency!=null?(d.latency>200?'high':'up'):'unknown');}
+function radioBadge(d){const health=radioHealth(d),names={up:'Respondendo',high:'Ping alto',down:'Sem ping',unknown:'Sem leitura'};return `<span class="radio-status radio-${health}"><i></i>${names[health]}</span>`;}
 function renderSiae(){
  const radios=pageDevices('siae'),q=$('#search').value.toLowerCase(),filter=$('#state-filter').value;
- const visible=radios.filter(d=>(d.name.toLowerCase().includes(q)||d.host.includes(q))&&(filter==='all'||d.state===filter));
- $('#siae-content').innerHTML=visible.length?visible.map(siaeCardHTML).join(''):empty(radios.length?'Nenhum rádio neste filtro':'Cadastre seu primeiro rádio SIAE',radios.length?'Tente outro nome, IP ou status.':'Adicione um rádio para acompanhar ping e banda pela consulta web do ALFOplus2.',!radios.length);
+ const groups=[['tefe-tabatinga',null,'Tefé → Tabatinga'],['coari-tefe',1,'Coari → Tefé · Rede 1'],['coari-tefe',2,'Coari → Tefé · Rede 2']];
+ $('#siae-content').innerHTML=groups.map(([route,network,title])=>{
+  const all=radios.filter(d=>(d.radio_route||'tefe-tabatinga')===route&&(network==null||d.radio_network===network));
+  const visible=all.filter(d=>(d.name.toLowerCase().includes(q)||d.host.includes(q))&&(filter==='all'||d.state===filter));
+  return `<section class="radio-route" data-radio-route="${route}" data-radio-network="${network||''}"><header><div><h3>${title}</h3><small>${all.length} ${all.length===1?'rádio cadastrado':'rádios cadastrados'}</small></div><button type="button" class="button secondary" data-add-radio-route="${route}" data-add-radio-network="${network||''}">${icon('plus')}Adicionar rádio</button></header><div class="radio-route-cards">${visible.length?visible.map(siaeCardHTML).join(''):`<p class="radio-empty">${all.length?'Nenhum rádio corresponde ao filtro.':'Nenhum rádio cadastrado neste trecho.'}</p>`}</div></section>`;
+ }).join('');
 }
 function utilizationHTML(p){
  if(p.utilization_enabled===false)return '';
@@ -385,7 +391,9 @@ function syncDeviceKind(){
 }
 function syncSiaeFields(){
  const radio=$('[name="kind"]:checked').value==='siae',enabled=$('[name="siae_enabled"]').checked;
- $('#siae-fields').querySelectorAll('input,select').forEach(input=>input.disabled=!radio||(input.name!=='siae_enabled'&&!enabled));
+ $('#siae-fields').querySelectorAll('input,select').forEach(input=>input.disabled=!radio||(!['siae_enabled','radio_route','radio_network'].includes(input.name)&&!enabled));
+ const coari=radio&&$('[name="radio_route"]').value==='coari-tefe';
+ $('#radio-network-field').hidden=!coari;$('[name="radio_network"]').disabled=!coari;$('[name="radio_network"]').required=coari;
  const pair=$('[name="siae_mode"]').value==='pair';
  $('#siae-interface-b-field').hidden=!pair;
  $('[name="siae_interface_b"]').disabled=!radio||!enabled||!pair;
@@ -419,6 +427,7 @@ function openEdit(id){
   $(`[name="${name}"]`).value=device[name]??(name==='ping_timeout'?4:name==='interface_type'?'auto':'');
  }
  $(`[name="kind"][value="${device.kind}"]`).checked=true;
+ $('[name="radio_route"]').value=device.radio_route||'tefe-tabatinga';$('[name="radio_network"]').value=device.radio_network??'';
  $('[name="siae_enabled"]').checked=Boolean(device.siae_enabled);$('#siae-config').open=Boolean(device.siae_enabled);
  $('[name="siae_auth_mode"]').value=device.siae_auth_mode||'session';$('[name="siae_username"]').value=device.siae_username||'';
  $('[name="siae_scheme"]').value=device.siae_scheme||'http';$('[name="siae_port"]').value=device.siae_port||80;$('[name="siae_poll_interval"]').value=device.siae_poll_interval||2;
@@ -439,6 +448,7 @@ $('#device-form').addEventListener('submit',async event=>{
  event.preventDefault();const form=new FormData(event.target);const d=Object.fromEntries(form);
  d.circuit_position=d.circuit_position===''?null:Number(d.circuit_position.trim().replace(',','.'));d.interval=Number(d.interval);d.ping_timeout=Number(d.ping_timeout);d.ssh_port=Number(d.ssh_port);d.ports=d.interface_type==='mixed'?[...normalizedPorts(d.ten_ports).map(port=>'ten:'+port),...normalizedPorts(d.giga_ports).map(port=>'giga:'+port)]:d.ports.split(',').map(p=>p.trim()).filter(Boolean);delete d.ten_ports;delete d.giga_ports;
  if(d.kind==='siae'){
+  d.radio_network=d.radio_route==='coari-tefe'?Number(d.radio_network):null;
   d.siae_enabled=$('[name="siae_enabled"]').checked;d.siae_scheme=$('[name="siae_scheme"]').value;d.siae_auth_mode=$('[name="siae_auth_mode"]').value;
   if(d.siae_auth_mode==='session')d.siae_session=$('[name="siae_session"]').value;
   for(const name of ['siae_port','siae_poll_interval'])d[name]=Number($(`[name="${name}"]`).value);
@@ -455,7 +465,7 @@ $('#device-form').addEventListener('submit',async event=>{
 });
  $('[name="interface_type"]').addEventListener('change',()=>syncInterfaceMode(true));
 document.querySelectorAll('[name="kind"]').forEach(el=>el.addEventListener('change',syncDeviceKind));
-for(const name of ['siae_enabled','siae_mode','siae_auth_mode'])$(`[name="${name}"]`).addEventListener('change',syncSiaeFields);
+for(const name of ['siae_enabled','siae_mode','siae_auth_mode','radio_route'])$(`[name="${name}"]`).addEventListener('change',syncSiaeFields);
 $('[name="siae_scheme"]').addEventListener('change',()=>{const port=$('[name="siae_port"]');if(['80','443'].includes(port.value))port.value=$('[name="siae_scheme"]').value==='https'?'443':'80';});
 $('#device-dialog').addEventListener('close',()=>{for(const name of ['siae_session','siae_password'])$(`[name="${name}"]`).value='';});
 document.addEventListener('click',async event=>{
@@ -470,6 +480,7 @@ document.addEventListener('click',event=>{const button=event.target.closest('[da
 document.querySelectorAll('[data-page]').forEach(e=>e.addEventListener('click',()=>navigate(e.dataset.page)));
 $('#all-events').addEventListener('click',()=>navigate('alerts'));
 $('#add-device').addEventListener('click',openAdd);
+document.addEventListener('click',e=>{const button=e.target.closest('[data-add-radio-route]');if(!button)return;openAdd();$('[name="kind"][value="siae"]').checked=true;$('[name="radio_route"]').value=button.dataset.addRadioRoute;$('[name="radio_network"]').value=button.dataset.addRadioNetwork;syncDeviceKind();});
 $('#refresh').addEventListener('click',()=>load());
 $('#search').addEventListener('input',render);$('#state-filter').addEventListener('change',render);
 document.querySelectorAll('.close-dialog').forEach(e=>e.addEventListener('click',()=>$('#device-dialog').close()));

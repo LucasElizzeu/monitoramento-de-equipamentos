@@ -108,6 +108,8 @@ def init_db():
         notifications.init_schema(db)
         columns = {row['name'] for row in db.execute('PRAGMA table_info(devices)')}
         for name, definition in (
+                ('radio_route', "TEXT NOT NULL DEFAULT 'tefe-tabatinga'"),
+                ('radio_network', 'INTEGER'),
                 ('siae_enabled', 'INTEGER NOT NULL DEFAULT 0'),
                 ('siae_scheme', "TEXT NOT NULL DEFAULT 'http'"),
                 ('siae_port', 'INTEGER NOT NULL DEFAULT 80'),
@@ -177,6 +179,8 @@ class DeviceInput(BaseModel):
     utilization_command: str = 'show interface utilization'
     circuits: list['CircuitConfigInput'] | None = Field(default=None, max_length=20)
     circuits_snapshot: dict[int, int] | None = None
+    radio_route: str = 'tefe-tabatinga'
+    radio_network: int | None = Field(default=None, ge=1, le=2)
     siae_enabled: bool = False
     siae_scheme: str = 'http'
     siae_port: int = Field(default=80, ge=1, le=65535)
@@ -186,6 +190,13 @@ class DeviceInput(BaseModel):
     siae_auth_mode: str = 'session'
     siae_username: str = Field(default='', max_length=100)
     siae_password: str = Field(default='', max_length=500)
+
+    @field_validator('radio_route')
+    @classmethod
+    def valid_radio_route(cls, value):
+        if value not in ('tefe-tabatinga', 'coari-tefe'):
+            raise ValueError('Selecione um trecho de rádio válido.')
+        return value
 
     @field_validator('siae_auth_mode')
     @classmethod
@@ -370,6 +381,14 @@ def siae_consumption(trx_a_bps=None, trx_b_bps=None):
     return dict(trx_a_bps=trx_a_bps, trx_b_bps=trx_b_bps, total_bps=total)
 
 
+def radio_status(device):
+    if device['state'] == 'offline':
+        return 'down'
+    if device['state'] in ('online', 'unstable') and device['latency'] is not None:
+        return 'high' if device['latency'] > 200 else 'up'
+    return 'unknown'
+
+
 def public_device(row, db=None):
     value = dict(row)
     value['has_password'] = bool(value.pop('password'))
@@ -387,6 +406,7 @@ def public_device(row, db=None):
         port['display_name'] = port['custom_name'] or port.get('description', '')
     value['ssh_diagnostic'] = json.loads(value['ssh_diagnostic'] or '{}')
     if value['kind'] == 'siae':
+        value['radio_status'] = radio_status(value)
         value['siae_consumption'] = telemetry or dict(siae_consumption(),
             status='warming_up' if value['siae_enabled'] else 'unconfigured')
     def read_circuits(connection):
@@ -1546,6 +1566,17 @@ def device_values(device, previous=None):
     values = device.model_dump(exclude={'circuits', 'circuits_snapshot'})
     if device.kind != 'datacom' and device.circuits:
         raise HTTPException(422, 'IPs de circuitos devem ser configurados em um Datacom.')
+    if device.kind == 'siae':
+        if previous is not None and previous['kind'] == 'siae':
+            for key in ('radio_route', 'radio_network'):
+                if key not in device.model_fields_set:
+                    values[key] = previous[key]
+        if values['radio_route'] == 'tefe-tabatinga':
+            values['radio_network'] = None
+        elif values['radio_network'] not in (1, 2):
+            raise HTTPException(422, 'Selecione Rede 1 ou Rede 2 para o trecho Coari → Tefé.')
+    else:
+        values.update(radio_route='tefe-tabatinga', radio_network=None)
     password = device.password
     saved_password = previous['password'] if previous and previous['kind'] == 'datacom' else ''
     if device.kind == 'datacom' and (not device.username or not (password or saved_password)

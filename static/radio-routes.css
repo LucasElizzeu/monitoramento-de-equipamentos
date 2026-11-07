@@ -1,0 +1,21 @@
+/* Radio routes are separate from the fiber backbone. */
+body[data-layout] #siae-content.siae-cards{display:block;padding:0 16px 16px}
+.radio-legend{display:flex;flex-wrap:wrap;gap:10px 18px;padding:0 16px 16px;color:var(--muted);font-size:12px}
+.radio-route{border-top:1px solid var(--line);padding-top:18px;margin-top:6px}
+.radio-route>header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.radio-route h3{font-size:16px;margin:0 0 5px;color:var(--ink)}
+.radio-route header small{font-size:12px;color:var(--muted)}
+.radio-route header .button{display:flex;gap:8px;font-size:12px}
+.radio-route-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));gap:14px;margin-bottom:20px}
+.radio-empty{grid-column:1/-1;font-size:12px;padding:20px;border:1px dashed var(--line);border-radius:9px;text-align:center;background:#f8fafc;color:var(--muted)}
+body[data-layout] .siae-card[data-radio-status]{border-top:3px solid #8592a3}
+body[data-layout] .siae-card[data-radio-status=up]{border-top-color:#2878ef}
+body[data-layout] .siae-card[data-radio-status=high]{border-top-color:#e3ae16}
+body[data-layout] .siae-card[data-radio-status=down]{border-top-color:#cf293e}
+.radio-status{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:6px;font-size:11px;font-weight:650;white-space:nowrap;background:#f1f4f7;color:#596b80}
+.radio-status i{width:6px;height:6px;border-radius:50%;background:currentColor}
+.radio-up{color:#1a62c4}.radio-high{color:#8a6200}.radio-down{color:#bd1e36}
+.radio-status.radio-up{background:#edf4ff}.radio-status.radio-high{background:#fff7d9}.radio-status.radio-down{background:#fff0f2}
+.siae-card .port-card-header{gap:8px;flex-wrap:wrap}
+.radio-route-fields{padding-bottom:16px;border-bottom:1px solid var(--line);margin-bottom:16px}
+@media(max-width:640px){.radio-route>header{align-items:flex-start;flex-wrap:wrap}.radio-route header .button{min-height:40px}.radio-route-cards{grid-template-columns:1fr}body[data-layout] #siae-content.siae-cards{padding:0 12px 12px}.radio-legend{padding:0 12px 12px;font-size:11px}}

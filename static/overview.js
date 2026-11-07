@@ -32,7 +32,7 @@
  window.setupOverview=page=>{
   workspace.hidden=page!=='overview';
   if(page==='overview'){workspace.append(table,aside);}
-  else{$('#devices-home').after(table);table.querySelector('thead').innerHTML=originalHead;}
+  else{$('#devices-home').after(table);table.querySelector('thead').innerHTML=originalHead;$('.status-strip .live-dot').innerHTML='';$('#network-status').removeAttribute('title');}
  };
  window.renderOverview=()=>{
   if(state.page!=='overview')return;
