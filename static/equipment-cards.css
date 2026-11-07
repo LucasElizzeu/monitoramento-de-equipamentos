@@ -22,7 +22,7 @@ body[data-view=datacoms] #ports-content{display:grid;gap:14px}
 body[data-layout][data-view=datacoms] .datacom-device-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--card-shadow);padding:14px;min-width:0}
 @media(max-width:640px){.equipment-card-toolbar{justify-content:stretch}.equipment-card-toolbar #device-filters{width:100%;display:grid;grid-template-columns:minmax(0,1fr) minmax(110px,.8fr);gap:8px}.equipment-card-toolbar .search{min-width:0}.equipment-card-toolbar .search input{width:100%;min-width:0}.equipment-card-toolbar select{max-width:100%;min-width:0;font-size:11px}.bbu-card-grid{grid-template-columns:1fr}.card-equipment-actions .icon-button{width:36px;height:36px}}
 /* One compact visual standard shared by BBU, radio and Datacom panels. */
-:root{--equipment-card-width:248px;--equipment-gap:12px;--equipment-pad:12px;--equipment-control-height:36px}
+:root{--equipment-card-width:220px;--equipment-gap:12px;--equipment-pad:12px;--equipment-control-height:36px}
 body[data-layout][data-view] :is(#bbu-section,#siae-section,#ports-section).equipment-panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--card-shadow);margin-top:0;min-width:0}
 body[data-layout][data-view] .equipment-panel>.equipment-panel-heading{display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap;padding:14px 16px;margin:0;border-bottom:1px solid var(--line)}
 body[data-layout][data-view] .equipment-panel-heading h2{font-size:15px;line-height:1.4;margin:0;font-weight:700}
@@ -35,7 +35,7 @@ body[data-layout][data-view] .equipment-panel-heading .search input{width:100%;m
 body[data-layout][data-view] .equipment-panel-heading select,body[data-layout][data-view] .equipment-panel-heading .button{height:var(--equipment-control-height);min-height:var(--equipment-control-height);font-size:12px;border-radius:7px;padding:6px 10px;box-sizing:border-box}
 body[data-layout][data-view] .equipment-panel-heading select{width:145px;max-width:100%}
 body[data-view=datacoms] #ports-section>.equipment-panel-heading .traffic-panel-actions{display:none}
-body[data-layout][data-view=bbus] #bbu-content,body[data-layout][data-view=siae] .radio-route-cards,body[data-layout][data-view=datacoms] .port-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--equipment-card-width)),var(--equipment-card-width)));gap:var(--equipment-gap);justify-content:start;align-items:stretch}
+body[data-layout][data-view=bbus] #bbu-content,body[data-layout][data-view=siae] .radio-route-cards,body[data-layout][data-view=datacoms] .port-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--equipment-card-width)),1fr));gap:var(--equipment-gap);justify-content:start;align-items:stretch}
 body[data-layout][data-view=bbus] #bbu-content{padding:14px 16px}
 body[data-layout][data-view=datacoms] #ports-content{padding:14px 16px;gap:14px}
 body[data-layout][data-view=siae] #siae-content{padding:0 16px 14px}
