@@ -72,3 +72,22 @@ class BackboneTests(unittest.TestCase):
                          ('manaus2-escritorio-1', 'manaus2', 'ten-gigabit-ethernet:1/1/4', 'escritorio', 'ten-gigabit-ethernet:1/1/4'))
         self.assertEqual((special['SMART']['a'], special['SMART']['b']), ('coari', 'claro'))
         self.assertEqual(sum(link['maintenance'] for link in config['links']), 1)
+
+    def test_radio_topology_has_both_independent_networks_and_exact_endpoint_pairs(self):
+        config = app.get_backbone()
+        self.assertEqual(len(config['links']), 28)
+        radios = config['radio_links']
+        self.assertEqual(len(radios), 8)
+        self.assertEqual(len({l['id'] for l in radios}), 8)
+        hosts = []
+        sites = ['Coari', 'Betânia', 'Aracati', 'Prainha', 'Tefé']
+        names = ['COARI', 'BETANIA', 'ARACATI', 'PRAINHA', 'TEFE']
+        for network, ap, st in [(1, 20, 30), (2, 40, 50)]:
+            links = sorted([l for l in radios if l['network'] == network], key=lambda l: l['order'])
+            self.assertEqual([l['order'] for l in links], [1, 2, 3, 4])
+            for i, link in enumerate(links):
+                suffix = ' 2' if network == 2 else ''
+                self.assertEqual(link['a'], dict(name=f'AP_{names[i]}/{names[i+1]}{suffix}', host=f'192.168.{ap}.{i*2+1}', site=sites[i]))
+                self.assertEqual(link['b'], dict(name=f'ST_{names[i]}/{names[i+1]}{suffix}', host=f'192.168.{st}.{i*2+2}', site=sites[i+1]))
+                hosts.extend([link['a']['host'], link['b']['host']])
+        self.assertEqual(len(set(hosts)), 16)

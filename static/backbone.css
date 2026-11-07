@@ -28,3 +28,22 @@ body[data-view=backbone] .backbone-scroll{height:calc(100dvh - 225px);min-height
 
 #backbone-map[data-display=traffic] .fiber-caption{font-size:13px}
 #backbone-map[data-display=traffic] .backbone-node text:not(.node-ip){font-size:14px}
+/* AP/ST radio hops are monitored independently from the fibers above. */
+.radio-divider{stroke:var(--line);stroke-width:1;fill:none}
+.radio-map-heading{fill:var(--ink);font:700 18px var(--font)}
+.radio-network-label{fill:var(--muted);font:600 14px var(--font)}
+.radio-site{fill:var(--ink);font:650 15px var(--font)}
+.radio-stroke{fill:none;stroke:#8b98ab;stroke-width:4;stroke-dasharray:7 5}
+.backbone-radio[data-status=up] .radio-stroke{stroke:#2878ef;stroke-dasharray:none}
+.backbone-radio[data-status=high] .radio-stroke{stroke:#e0ad12;stroke-dasharray:none}
+.backbone-radio[data-status=down] .radio-stroke{stroke:#cf293e;stroke-dasharray:none}
+.backbone-radio{cursor:pointer}.backbone-radio:focus .radio-stroke,.backbone-radio:hover .radio-stroke{stroke-width:6}
+.radio-caption{font:12px var(--font);fill:var(--muted);paint-order:stroke;stroke:white;stroke-width:4px;pointer-events:none}
+.radio-map-point{cursor:pointer}
+.radio-map-point circle{fill:white;stroke:#8b98ab;stroke-width:2}
+.radio-map-point[data-status=up] circle{stroke:#2878ef}.radio-map-point[data-status=high] circle{stroke:#e0ad12}.radio-map-point[data-status=down] circle{stroke:#cf293e}
+.radio-map-point text{font:11px var(--font);fill:var(--muted);paint-order:stroke;stroke:white;stroke-width:3px}
+#backbone-map:not([data-display=full]) :is(.radio-ip,.radio-band){display:none}
+#backbone-map[data-display=clean] .radio-caption{display:none}
+.map-radio-up{color:#1b62c7}.map-radio-high{color:#896000}
+.backbone-radio:focus-visible,.radio-map-point:focus-visible{outline:3px solid #155d89;outline-offset:3px}

@@ -1,4 +1,4 @@
-/* Physical fibers are independent; no readings are inferred from topology. */
+/* Physical fibers and radio hops are independent; topology never implies a live reading. */
 (() => {
  let config=null, active=null, pinned=false, editing=null, pointer={x:20,y:100}, modality='mouse', dismissTimer, suppressFocus=false;
  const svg=$('#backbone-map'), info=$('#backbone-info');
@@ -59,8 +59,45 @@
    offset:vertical&&link.route!=='rectangular'?-8:above?(display.value==='full'?-27:-13):22,
    anchor:vertical&&link.route!=='rectangular'?p.anchor:'middle'};
  }
+ const radioLinks=()=>config.radio_links||[];
+ const radioReading=link=>radioMapState.link(link,state.data.devices,Date.now(),$('#connection-error').hidden);
+ const radioStateNames={up:'Rádio ativo',high:'Ping acima de 200 ms',down:'Sem ping',unknown:'Sem leitura'};
+ function radioGeometry(link){const y=link.network===1?900:1080;return {y,x1:190+(link.order-1)*490+35,x2:190+link.order*490-35};}
+ function drawRadios(){
+  if(!radioLinks().length)return '';
+  let html='<g id="radio-map-layer"><path class="radio-divider" d="M40,775 H2320"/><text class="radio-map-heading" x="45" y="817">Rádio · Coari → Tefé</text>';
+  for(const network of [1,2]){
+   const links=radioLinks().filter(l=>l.network===network).sort((a,b)=>a.order-b.order);if(!links.length)continue;
+   const y=network===1?900:1080,sites=[links[0].a.site,...links.map(l=>l.b.site)];
+   html+=`<text class="radio-network-label" x="45" y="${y+5}">Rede ${network}</text>`;
+   sites.forEach((site,i)=>{const x=190+i*490;html+=`<text class="radio-site" x="${x}" y="${y-56}" text-anchor="middle">${esc(site)}</text>`;});
+   for(const l of links){const g=radioGeometry(l);
+    html+=`<g class="backbone-radio" data-link="${l.id}" tabindex="0" role="button"><path class="radio-stroke" d="M${g.x1},${y} H${g.x2}"/><path class="fiber-hit" d="M${g.x1},${y} H${g.x2}"/><text class="radio-caption" x="${(g.x1+g.x2)/2}" y="${y-20}" text-anchor="middle"></text></g>`;
+    for(const [side,x]of [['a',g.x1],['b',g.x2]]){const n=l[side],label=side==='a'?'AP':'ST';html+=`<g class="radio-map-point" data-radio-host="${n.host}" data-radio-link="${l.id}" data-radio-side="${side}" transform="translate(${x} ${y})" tabindex="0" role="button" aria-label="${esc(n.name+' '+n.host)}"><title>${esc(n.name+' · '+n.host)}</title><circle r="16"/><image href="/static/icons/siae.png" x="-13" y="-13" width="26" height="26"/><text y="32" text-anchor="middle">${label}</text><text class="radio-ip" y="${side==='a'?65:49}" text-anchor="middle">${n.host}</text></g>`;}
+   }
+  }
+  return html+'</g>';
+ }
+ function refreshRadios(){
+  for(const l of radioLinks()){
+   const v=radioReading(l),g=svg.querySelector(`[data-link="${l.id}"]`),p=radioGeometry(l);
+   g.dataset.status=v.status;g.setAttribute('aria-label',`Rede ${l.network}, ${l.a.site} para ${l.b.site}, ${radioStateNames[v.status]}`);
+   g.querySelector('text').innerHTML=`<tspan x="${(p.x1+p.x2)/2}">Ping ${number(v.a.latency)} / ${number(v.b.latency)} ms</tspan><tspan class="radio-band" x="${(p.x1+p.x2)/2}" dy="14">RX ${bandwidth(v.a.bps).replace(/<[^>]*>/g,'')} / ${bandwidth(v.b.bps).replace(/<[^>]*>/g,'')}</tspan>`;
+   for(const side of ['a','b'])svg.querySelector(`[data-radio-link="${l.id}"][data-radio-side="${side}"]`).dataset.status=v[side].status;
+  }
+ }
+ function openRadio(link,side){
+  hideInfo();const n=link[side],d=state.data.devices.find(d=>d.kind==='siae'&&d.host===n.host);if(d){openDetail(d.id);return;}
+  openAdd();$('[name="kind"][value="siae"]').checked=true;$('#device-form [name="name"]').value=n.name;$('#device-form [name="host"]').value=n.host;
+  $('[name="radio_route"]').value='coari-tefe';$('[name="radio_network"]').value=String(link.network);syncDeviceKind();
+ }
+ function radioDetails(link){
+  const v=radioReading(link),side=(key)=>{const n=link[key],r=v[key];return `<div><strong>${key==='a'?'AP':'ST'} · ${esc(n.site)}</strong><small>${esc(n.name)} · ${n.host}</small><p>${esc(r.label)} · Ping ${number(r.latency)} ms · RX ${bandwidth(r.bps)}</p><button type="button" class="button secondary" data-radio-endpoint="${link.id}:${key}">${r.device?'Ver rádio':'Cadastrar rádio'}</button></div>`;};
+  renderInfo(`<button class="icon-button backbone-dismiss" aria-label="Fechar detalhes">×</button><strong>Rádio · Rede ${link.network} · ${radioStateNames[v.status]}</strong>${side('a')}${side('b')}`);
+ }
  function draw(){
   svg.innerHTML=config.links.map(link=>{const p=path(link);return `<g class="backbone-fiber" data-link="${link.id}" tabindex="0" role="button"><path class="fiber-stroke" d="${p.d}"/><path class="fiber-hit" d="${p.d}"/><text class="fiber-caption" x="${p.labelX}" y="0" text-anchor="${p.anchor}"></text></g>`;}).join('')+config.nodes.map(n=>`<g class="backbone-node" data-node="${n.id}" transform="translate(${n.x} ${n.y})" tabindex="0" role="button" aria-label="${esc(n.name+' '+n.host)}"><circle r="20"/><image href="/static/icons/datacom.png" x="-18" y="-18" width="36" height="36"/><text y="36" text-anchor="middle">${esc(n.name)}</text><text class="node-ip" y="51" text-anchor="middle">${n.host}${n.kind==='huawei'?' · Huawei':''}</text></g>`).join('');
+  svg.insertAdjacentHTML('beforeend',drawRadios());
   if(!svg.style.width)fitMap();refresh();
  }
  function refresh(){
@@ -76,15 +113,20 @@
    if(t.innerHTML!==caption)t.innerHTML=caption;
   }
   for(const n of config.nodes){const d=device(n),el=svg.querySelector(`[data-node="${n.id}"]`);el.dataset.status=d?.state||'pending';el.setAttribute('aria-label',`${n.name}, ${n.host}, ${d?labels[d.state]||d.state:'não cadastrado'}`);}
-  const summary=`${config.links.length} fibras · ${counts.up} ativas${counts.down?` · ${counts.down} com queda`:''}${counts.error?' · erro de coleta':''}${counts.missing?' · leituras pendentes':''}${counts.maintenance?' · em manutenção':''}`;
+  refreshRadios();
+  const summary=`${config.links.length} fibras · ${counts.up} ativas${counts.down?` · ${counts.down} com queda`:''}${counts.error?' · erro de coleta':''}${counts.missing?' · leituras pendentes':''}${counts.maintenance?' · em manutenção':''}${radioLinks().length?' · '+radioLinks().length+' enlaces de rádio':''}`;
   if($('#backbone-summary').textContent!==summary)$('#backbone-summary').textContent=summary;
   if(active)details(active);
  }
  function details(id){
+  const radio=radioLinks().find(l=>l.id===id);if(radio){radioDetails(radio);return;}
   const link=config.links.find(l=>l.id===id);if(!link)return;
   const v=values(link);
   const side=(n,port,r)=>`<div><strong>${esc(n.name)}</strong><small>${esc(n.host)} · ${esc(port||'Porta pendente')}</small><p>${esc(r.label)} · RX ${esc(rate(r))} · ${esc(signal(r))}</p></div>`;
   const html=`<button class="icon-button backbone-dismiss" aria-label="Fechar detalhes">×</button><strong>${esc(link.label||'Fibra óptica')} · ${names[v.status]}</strong>${side(byId(link.a),link.port_a,v.a)}${side(byId(link.b),link.port_b,v.b)}<button class="button secondary" data-edit-fiber="${link.id}">Editar portas / manutenção</button>`;
+  renderInfo(html);
+ }
+ function renderInfo(html){
   if(info.innerHTML!==html)info.innerHTML=html;
   info.hidden=false;info.style.left=Math.max(8,Math.min(innerWidth-info.offsetWidth-8,pointer.x+12))+'px';info.style.top=Math.max(8,Math.min(innerHeight-info.offsetHeight-8,pointer.y+12))+'px';
  }
@@ -116,6 +158,7 @@
  svg.addEventListener('focusout',focusLeaves);info.addEventListener('focusout',focusLeaves);
  function activate(e){
   const fiber=e.target.closest('[data-link]');if(fiber){show(fiber,e,modality!=='mouse');return;}
+  const radioPoint=e.target.closest('[data-radio-host]');if(radioPoint){openRadio(radioLinks().find(l=>l.id===radioPoint.dataset.radioLink),radioPoint.dataset.radioSide);return;}
   const target=e.target.closest('[data-node]');if(!target)return;
   const n=byId(target.dataset.node),d=device(n);if(d){openDetail(d.id);return;}
   openAdd();$('#device-form [name="name"]').value=n.name;$('#device-form [name="host"]').value=n.host;
@@ -125,6 +168,7 @@
  svg.addEventListener('keydown',e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();activate(e);}if(e.key==='Escape')dismissInfo();});
  info.addEventListener('click',e=>{
   if(e.target.closest('.backbone-dismiss')){dismissInfo();return;}
+  const radioButton=e.target.closest('[data-radio-endpoint]');if(radioButton){const [id,side]=radioButton.dataset.radioEndpoint.split(':');openRadio(radioLinks().find(l=>l.id===id),side);return;}
   const button=e.target.closest('[data-edit-fiber]');if(!button)return;
   editing=config.links.find(l=>l.id===button.dataset.editFiber);const f=$('#backbone-port-form');f.elements.port_a.value=editing.port_a||'';f.elements.port_b.value=editing.port_b||'';f.elements.maintenance.checked=editing.maintenance;
   $('#backbone-port-context').textContent=`${byId(editing.a).name} ↔ ${byId(editing.b).name}`;$('#backbone-port-error').hidden=true;hideInfo();$('#backbone-port-dialog').showModal();

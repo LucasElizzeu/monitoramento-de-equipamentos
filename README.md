@@ -382,3 +382,11 @@ A aba **Rádios SIAE** organiza os cadastros em **Tefé → Tabatinga**, **Coari
 Os cartões usam azul quando há resposta até **200 ms**, amarelo quando a latência é **maior que 200 ms**, vermelho quando o monitor declara **sem ping** e cinza sem leitura ou com erro de coleta. O estado sem ping continua respeitando a regra existente da 21ª perda consecutiva. Uma falha de coleta não é tratada como queda confirmada. Trecho/rede ficam no banco e acompanham os backups; a API também fornece `radio_status` para a futura integração ao mapa. Esta atualização organiza os rádios; o traçado dos enlaces será definido em uma próxima etapa com a sequência dos pontos.
 
 Reinicie o programa após atualizar para aplicar a migração do banco, mantendo `MONITOR_DATA_DIR` na pasta de dados que você já utiliza. A [captura dos rádios por trecho](docs/radios-por-trecho.png) usa dados ilustrativos de validação.
+
+### Rádios Coari → Tefé no mapa
+
+O mapa inclui duas redes independentes no trajeto **Coari → Betânia → Aracati → Prainha → Tefé**, com quatro enlaces AP/ST em cada rede. Os nomes e os 16 IPs informados ficam em `static/backbone.json`, separados dos 28 enlaces de fibra. Cada ponta é associada ao cadastro SIAE pelo IP. Clique no ícone para abrir o rádio cadastrado ou iniciar um cadastro preenchido com nome, IP, trecho e rede; nenhuma credencial é criada automaticamente.
+
+Uma linha de rádio fica azul com respostas atuais de ambas as pontas até 200 ms; amarela se alguma ultrapassar 200 ms; vermelha se alguma estiver sem ping. Sem cadastro, sem resposta válida, com dados antigos ou com conexão ao monitor interrompida, a linha fica cinza. O vermelho continua seguindo a regra existente do estado sem ping, após 21 perdas consecutivas. Os detalhes mostram AP e ST, latência e banda disponível; banda antiga ou com erro não aparece como atual. Essas cores são exclusivas dos enlaces de rádio; as fibras continuam usando sua própria legenda.
+
+A aba de rádios usa cartões menores e o selo **Respondendo** verde. Informações de banda não configurada ficam resumidas com acesso a **Configurar banda**; equipamentos com banda habilitada continuam mostrando as leituras. A [captura do mapa com as duas redes](docs/mapa-com-radios.png) usa dados ilustrativos de validação.

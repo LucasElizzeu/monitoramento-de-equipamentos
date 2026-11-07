@@ -19,3 +19,20 @@ body[data-layout] .siae-card[data-radio-status=down]{border-top-color:#cf293e}
 .siae-card .port-card-header{gap:8px;flex-wrap:wrap}
 .radio-route-fields{padding-bottom:16px;border-bottom:1px solid var(--line);margin-bottom:16px}
 @media(max-width:640px){.radio-route>header{align-items:flex-start;flex-wrap:wrap}.radio-route header .button{min-height:40px}.radio-route-cards{grid-template-columns:1fr}body[data-layout] #siae-content.siae-cards{padding:0 12px 12px}.radio-legend{padding:0 12px 12px;font-size:11px}}
+/* Compact radio cards; online badges are green independently of blue map links. */
+.radio-up{color:#16824b}.radio-status.radio-up{color:#16824b;background:#edf9f1}
+body[data-layout] .siae-card[data-radio-status=up]{border-top-color:#16824b}
+body[data-view=siae] .radio-route{padding-top:12px;margin-top:0}
+body[data-view=siae] .radio-route>header{margin-bottom:10px}
+body[data-view=siae] .radio-route-cards{grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr));gap:10px;margin-bottom:12px}
+body[data-layout][data-view=siae] .siae-card{padding:10px 12px}
+body[data-view=siae] .siae-card .equipment-title{font-size:12px}
+body[data-view=siae] .siae-card .equipment-icon{width:23px;height:23px}
+body[data-view=siae] .siae-card .siae-address{margin:6px 0;font-size:11px}
+body[data-view=siae] .siae-card .siae-ping{padding-top:6px;margin-top:6px;gap:8px}
+body[data-view=siae] .siae-card .port-ping-values strong{font-size:14px;margin-top:2px}
+body[data-view=siae] .siae-card .port-traffic{padding-top:6px;margin-top:6px}
+body[data-view=siae] .siae-card .traffic-values strong{font-size:17px}
+body[data-view=siae] .siae-card .siae-configure{margin-top:6px;padding:5px 8px;min-height:32px;font-size:11px}
+body[data-view=siae] .siae-card[data-band-enabled=false] :is(.port-traffic,.siae-source,.siae-note,.siae-trx){display:none}
+@media(max-width:640px){body[data-view=siae] .radio-route-cards{grid-template-columns:1fr}}
