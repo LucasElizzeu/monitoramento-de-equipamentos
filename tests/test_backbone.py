@@ -91,3 +91,15 @@ class BackboneTests(unittest.TestCase):
                 self.assertEqual(link['b'], dict(name=f'ST_{names[i]}/{names[i+1]}{suffix}', host=f'192.168.{st}.{i*2+2}', site=sites[i+1]))
                 hosts.extend([link['a']['host'], link['b']['host']])
         self.assertEqual(len(set(hosts)), 16)
+
+    def test_radio_datacom_bindings_preserve_confirmed_source_and_pending_destination(self):
+        config = app.get_backbone()
+        nodes = {n['id']: n for n in config['nodes']}
+        for network in config['radio_networks']:
+            self.assertIn(network['network'], (1, 2))
+            self.assertEqual(network['source'], dict(node='coari', port=f"ten-gigabit-ethernet:1/1/{7+network['network']}"))
+            self.assertEqual(nodes[network['source']['node']]['host'], '10.200.9.1')
+            self.assertEqual(nodes[network['target']['node']]['host'], '10.200.19.1')
+            self.assertIsNone(network['target']['port'])
+            self.assertEqual(network['target']['candidate_ports'], [f'gigabit-ethernet:1/1/{p}' for p in (5, 6, 7, 8)])
+        self.assertEqual(len(config['radio_networks']), 2)

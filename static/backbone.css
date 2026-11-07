@@ -47,3 +47,13 @@ body[data-view=backbone] .backbone-scroll{height:calc(100dvh - 225px);min-height
 #backbone-map[data-display=clean] .radio-caption{display:none}
 .map-radio-up{color:#1b62c7}.map-radio-high{color:#896000}
 .backbone-radio:focus-visible,.radio-map-point:focus-visible{outline:3px solid #155d89;outline-offset:3px}
+/* Access paths tie each radio network to the confirmed Datacom endpoint. */
+.radio-access{cursor:pointer}
+.radio-access-underlay{fill:none;stroke:white;stroke-width:7;stroke-linejoin:round;pointer-events:none}
+.radio-access-stroke{fill:none;stroke:#8b98ab;stroke-width:2;stroke-dasharray:5 5;pointer-events:none}
+.radio-access[data-status=up] .radio-access-stroke{stroke:#2878ef;stroke-dasharray:none}
+.radio-access[data-status=high] .radio-access-stroke{stroke:#e0ad12;stroke-dasharray:none}
+.radio-access[data-status=down] .radio-access-stroke{stroke:#cf293e;stroke-dasharray:none}
+.radio-access:hover .radio-access-stroke,.radio-access:focus .radio-access-stroke{stroke-width:4}
+.radio-access-caption{font:11px var(--font);fill:var(--muted);paint-order:stroke;stroke:white;stroke-width:4px;pointer-events:none}
+.radio-access:focus-visible{outline:3px solid #155d89;outline-offset:3px}

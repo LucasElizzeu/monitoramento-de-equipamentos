@@ -542,5 +542,41 @@
         "site": "Tefé"
       }
     }
+  ],
+  "radio_networks": [
+    {
+      "network": 1,
+      "source": {
+        "node": "coari",
+        "port": "ten-gigabit-ethernet:1/1/8"
+      },
+      "target": {
+        "node": "claro",
+        "port": null,
+        "candidate_ports": [
+          "gigabit-ethernet:1/1/5",
+          "gigabit-ethernet:1/1/6",
+          "gigabit-ethernet:1/1/7",
+          "gigabit-ethernet:1/1/8"
+        ]
+      }
+    },
+    {
+      "network": 2,
+      "source": {
+        "node": "coari",
+        "port": "ten-gigabit-ethernet:1/1/9"
+      },
+      "target": {
+        "node": "claro",
+        "port": null,
+        "candidate_ports": [
+          "gigabit-ethernet:1/1/5",
+          "gigabit-ethernet:1/1/6",
+          "gigabit-ethernet:1/1/7",
+          "gigabit-ethernet:1/1/8"
+        ]
+      }
+    }
   ]
 }

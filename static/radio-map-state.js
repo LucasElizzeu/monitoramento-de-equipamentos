@@ -17,5 +17,10 @@
   const a=endpoint(link.a,devices,at,connected),b=endpoint(link.b,devices,at,connected),states=[a.status,b.status];
   return {a,b,status:states.includes('down')?'down':states.includes('unknown')?'unknown':states.includes('high')?'high':'up'};
  }
- const api={endpoint,link};if(typeof module==='object'&&module.exports)module.exports=api;else root.radioMapState=api;
+ function access(port,radio){
+  if(port.port?.state==='down'||radio.status==='down')return 'down';
+  if(port.port?.state!=='up'||radio.status==='unknown')return 'unknown';
+  return radio.status;
+ }
+ const api={endpoint,link,access};if(typeof module==='object'&&module.exports)module.exports=api;else root.radioMapState=api;
 })(globalThis);

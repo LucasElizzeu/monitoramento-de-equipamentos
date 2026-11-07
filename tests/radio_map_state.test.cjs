@@ -20,3 +20,11 @@ test('bandwidth is displayed only while fresh and successful, including real zer
  d.siae_consumption={...telemetry,status:'error',total_bps:100};assert.equal(endpoint(hop.a,[d],at).bps,null);
  d.siae_consumption={...telemetry,checked_at:new Date(at-91000).toISOString()};assert.equal(endpoint(hop.a,[d],at).bps,null);
 });
+const {access}=require('../static/radio-map-state.js');
+test('Datacom access ports retain independent state instead of inheriting an entire network',()=>{
+ assert.equal(access({port:{state:'up'}},{status:'up'}),'up');
+ assert.equal(access({port:{state:'up'}},{status:'high'}),'high');
+ assert.equal(access({port:{state:'down'}},{status:'up'}),'down');
+ assert.equal(access({port:null},{status:'up'}),'unknown');
+ assert.equal(access({port:{state:'up'}},{status:'unknown'}),'unknown');
+});

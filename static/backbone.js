@@ -63,9 +63,36 @@
  const radioReading=link=>radioMapState.link(link,state.data.devices,Date.now(),$('#connection-error').hidden);
  const radioStateNames={up:'Rádio ativo',high:'Ping acima de 200 ms',down:'Sem ping',unknown:'Sem leitura'};
  function radioGeometry(link){const y=link.network===1?900:1080;return {y,x1:190+(link.order-1)*490+35,x2:190+link.order*490-35};}
+ const radioNetworks=()=>config.radio_networks||[];
+ function accessId(network,side){return `radio-access-${network}-${side}`;}
+ function findAccess(id){for(const network of radioNetworks())for(const side of ['source','target'])if(accessId(network.network,side)===id)return {network,side,binding:network[side]};}
+ function accessReading(network,side){
+  const links=radioLinks().filter(l=>l.network===network.network).sort((a,b)=>a.order-b.order),end=side==='source'?links[0]?.a:links.at(-1)?.b;
+  const binding=network[side],node=byId(binding.node),port=reading(node,binding.port),radio=radioMapState.endpoint(end,state.data.devices,Date.now(),$('#connection-error').hidden);
+  return {node,port,radio,status:binding.port?radioMapState.access(port,radio):'unknown'};
+ }
+ function drawRadioAccess(){
+  let html='';
+  for(const network of radioNetworks()){
+   const links=radioLinks().filter(l=>l.network===network.network).sort((a,b)=>a.order-b.order);if(!links.length)continue;
+   const first=radioGeometry(links[0]),last=radioGeometry(links.at(-1)),offset=network.network===1?-8:8;
+   for(const side of ['source','target']){
+    const node=byId(network[side].node),isSource=side==='source';
+    const points=isSource?[{x:node.x+20,y:node.y+offset},{x:2140+(network.network-1)*20,y:node.y+offset},{x:2140+(network.network-1)*20,y:738+(network.network-1)*28},{x:145-(network.network-1)*30,y:738+(network.network-1)*28},{x:145-(network.network-1)*30,y:first.y},{x:first.x1,y:first.y}]:[{x:last.x2,y:last.y},{x:2340+(network.network-1)*20,y:last.y},{x:2340+(network.network-1)*20,y:node.y+offset},{x:node.x+20,y:node.y+offset}];
+    const d=roundedRoute(points,14),id=accessId(network.network,side),label=isSource?`Coari · Ten 1/1/${7+network.network}`:'Tefé CLARO · Giga 5–8 a confirmar';
+    html+=`<g class="radio-access" data-link="${id}" data-network="${network.network}" data-end="${side}" tabindex="0" role="button" aria-label="${esc(label+' · Rede '+network.network)}"><path class="radio-access-underlay" d="${d}"/><path class="radio-access-stroke" d="${d}"/><path class="fiber-hit" d="${d}"/><text class="radio-access-caption" x="${isSource?first.x1:2160}" y="${first.y+88}" text-anchor="middle">${label}</text></g>`;
+   }
+  }
+  return html;
+ }
+ function accessDetails(access){
+  const {network,side,binding}=access,v=accessReading(network,side),isSource=side==='source';
+  const port=binding.port?esc(binding.port):'Porta a confirmar · Giga 1/1/5, 1/1/6, 1/1/7 ou 1/1/8';
+  renderInfo(`<button class="icon-button backbone-dismiss" aria-label="Fechar detalhes">×</button><strong>Rede ${network.network} · ${isSource?'Saída de Coari':'Chegada no CLARO'}</strong><div><strong>${esc(v.node.name)}</strong><small>${v.node.host} · ${port}</small><p>${esc(v.port.label)}${v.port.port?' · RX '+esc(rate(v.port)):''}</p></div><div><strong>${esc(v.radio.device?.name||'Rádio '+(isSource?'AP de Coari':'ST de Tefé'))}</strong><p>${esc(v.radio.label)} · Ping ${number(v.radio.latency)} ms</p></div><button type="button" class="button secondary" data-access-node="${v.node.id}">Ver Datacom</button>`);
+ }
  function drawRadios(){
   if(!radioLinks().length)return '';
-  let html='<g id="radio-map-layer"><path class="radio-divider" d="M40,775 H2320"/><text class="radio-map-heading" x="45" y="817">Rádio · Coari → Tefé</text>';
+  let html='<g id="radio-map-layer"><text class="radio-map-heading" x="45" y="817">Rádio · Coari → Tefé</text>';
   for(const network of [1,2]){
    const links=radioLinks().filter(l=>l.network===network).sort((a,b)=>a.order-b.order);if(!links.length)continue;
    const y=network===1?900:1080,sites=[links[0].a.site,...links.map(l=>l.b.site)];
@@ -85,6 +112,7 @@
    g.querySelector('text').innerHTML=`<tspan x="${(p.x1+p.x2)/2}">Ping ${number(v.a.latency)} / ${number(v.b.latency)} ms</tspan><tspan class="radio-band" x="${(p.x1+p.x2)/2}" dy="14">RX ${bandwidth(v.a.bps).replace(/<[^>]*>/g,'')} / ${bandwidth(v.b.bps).replace(/<[^>]*>/g,'')}</tspan>`;
    for(const side of ['a','b'])svg.querySelector(`[data-radio-link="${l.id}"][data-radio-side="${side}"]`).dataset.status=v[side].status;
   }
+  for(const network of radioNetworks())for(const side of ['source','target']){const g=svg.querySelector(`[data-link="${accessId(network.network,side)}"]`);if(g)g.dataset.status=accessReading(network,side).status;}
  }
  function openRadio(link,side){
   hideInfo();const n=link[side],d=state.data.devices.find(d=>d.kind==='siae'&&d.host===n.host);if(d){openDetail(d.id);return;}
@@ -97,7 +125,7 @@
  }
  function draw(){
   svg.innerHTML=config.links.map(link=>{const p=path(link);return `<g class="backbone-fiber" data-link="${link.id}" tabindex="0" role="button"><path class="fiber-stroke" d="${p.d}"/><path class="fiber-hit" d="${p.d}"/><text class="fiber-caption" x="${p.labelX}" y="0" text-anchor="${p.anchor}"></text></g>`;}).join('')+config.nodes.map(n=>`<g class="backbone-node" data-node="${n.id}" transform="translate(${n.x} ${n.y})" tabindex="0" role="button" aria-label="${esc(n.name+' '+n.host)}"><circle r="20"/><image href="/static/icons/datacom.png" x="-18" y="-18" width="36" height="36"/><text y="36" text-anchor="middle">${esc(n.name)}</text><text class="node-ip" y="51" text-anchor="middle">${n.host}${n.kind==='huawei'?' · Huawei':''}</text></g>`).join('');
-  svg.insertAdjacentHTML('beforeend',drawRadios());
+  svg.insertAdjacentHTML('beforeend',drawRadioAccess()+drawRadios());
   if(!svg.style.width)fitMap();refresh();
  }
  function refresh(){
@@ -119,6 +147,7 @@
   if(active)details(active);
  }
  function details(id){
+  const access=findAccess(id);if(access){accessDetails(access);return;}
   const radio=radioLinks().find(l=>l.id===id);if(radio){radioDetails(radio);return;}
   const link=config.links.find(l=>l.id===id);if(!link)return;
   const v=values(link);
@@ -168,6 +197,7 @@
  svg.addEventListener('keydown',e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();activate(e);}if(e.key==='Escape')dismissInfo();});
  info.addEventListener('click',e=>{
   if(e.target.closest('.backbone-dismiss')){dismissInfo();return;}
+  const accessButton=e.target.closest('[data-access-node]');if(accessButton){const n=byId(accessButton.dataset.accessNode),d=device(n);hideInfo();if(d)openDetail(d.id);else{openAdd();$('#device-form [name="name"]').value=n.name;$('#device-form [name="host"]').value=n.host;$('[name="kind"][value="datacom"]').checked=true;syncDeviceKind();}return;}
   const radioButton=e.target.closest('[data-radio-endpoint]');if(radioButton){const [id,side]=radioButton.dataset.radioEndpoint.split(':');openRadio(radioLinks().find(l=>l.id===id),side);return;}
   const button=e.target.closest('[data-edit-fiber]');if(!button)return;
   editing=config.links.find(l=>l.id===button.dataset.editFiber);const f=$('#backbone-port-form');f.elements.port_a.value=editing.port_a||'';f.elements.port_b.value=editing.port_b||'';f.elements.maintenance.checked=editing.maintenance;
