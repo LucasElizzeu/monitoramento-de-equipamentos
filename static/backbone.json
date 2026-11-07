@@ -541,6 +541,246 @@
         "host": "192.168.50.8",
         "site": "Tefé"
       }
+    },
+    {
+      "id": "radio-tefe-tabatinga-1",
+      "route": "tefe-tabatinga",
+      "network": null,
+      "order": 1,
+      "a": {
+        "name": "AP_TEFE/UARINI",
+        "host": "192.168.60.1",
+        "site": "Tefé"
+      },
+      "b": {
+        "name": "ST_UARINI/TEFE",
+        "host": "192.168.60.2",
+        "site": "Uarini"
+      }
+    },
+    {
+      "id": "radio-tefe-tabatinga-2",
+      "route": "tefe-tabatinga",
+      "network": null,
+      "order": 2,
+      "a": {
+        "name": "AP_UARINI/TAMANICUA",
+        "host": "192.168.60.3",
+        "site": "Uarini"
+      },
+      "b": {
+        "name": "ST_TAMANICUA/UARINI",
+        "host": "192.168.60.4",
+        "site": "Tamanicuá"
+      }
+    },
+    {
+      "id": "radio-tefe-tabatinga-3",
+      "route": "tefe-tabatinga",
+      "network": null,
+      "order": 3,
+      "a": {
+        "name": "AP_TAMANICUA/F. BOA",
+        "host": "192.168.60.5",
+        "site": "Tamanicuá"
+      },
+      "b": {
+        "name": "ST_F. BOA/TAMANICUA",
+        "host": "192.168.60.6",
+        "site": "Fonte Boa"
+      }
+    },
+    {
+      "id": "radio-tefe-tabatinga-4",
+      "route": "tefe-tabatinga",
+      "network": null,
+      "order": 4,
+      "a": {
+        "name": "AP_F.BOA/MONTE_SIAO",
+        "host": "192.168.60.7",
+        "site": "Fonte Boa"
+      },
+      "b": {
+        "name": "ST_MONTE_SIAO/F.BOA",
+        "host": "192.168.60.8",
+        "site": "Monte Sião"
+      }
+    },
+    {
+      "id": "radio-tefe-tabatinga-5",
+      "route": "tefe-tabatinga",
+      "network": null,
+      "order": 5,
+      "a": {
+        "name": "AP_MONTE_SIAO/JUTAI",
+        "host": "192.168.60.9",
+        "site": "Monte Sião"
+      },
+      "b": {
+        "name": "ST_JUTAI/MONTE_SIAO",
+        "host": "192.168.60.10",
+        "site": "Jutaí"
+      }
+    },
+    {
+      "id": "radio-tefe-tabatinga-6",
+      "route": "tefe-tabatinga",
+      "network": null,
+      "order": 6,
+      "a": {
+        "name": "AP_JUTAI/N.PROGRESSO",
+        "host": "192.168.60.11",
+        "site": "Jutaí"
+      },
+      "b": {
+        "name": "ST_GUARIBA/JUTAI",
+        "host": "192.168.60.12",
+        "site": "Guariba / N. Progresso"
+      }
+    },
+    {
+      "id": "radio-tefe-tabatinga-7",
+      "route": "tefe-tabatinga",
+      "network": null,
+      "order": 7,
+      "a": {
+        "name": "AP_GUARIBA/PROSPERIDADE",
+        "host": "192.168.60.13",
+        "site": "Guariba / N. Progresso"
+      },
+      "b": {
+        "name": "ST_PROSPERIDADE/N.PROGRESSO",
+        "host": "192.168.60.14",
+        "site": "Prosperidade"
+      }
+    },
+    {
+      "id": "radio-tefe-tabatinga-8",
+      "route": "tefe-tabatinga",
+      "network": null,
+      "order": 8,
+      "a": {
+        "name": "AP_PROSPERIDADE/TONANTINS",
+        "host": "192.168.60.15",
+        "site": "Prosperidade"
+      },
+      "b": {
+        "name": "ST_TONANTINS/PROPERIDADE",
+        "host": "192.168.60.16",
+        "site": "Tonantins"
+      }
+    },
+    {
+      "id": "radio-tefe-tabatinga-9",
+      "route": "tefe-tabatinga",
+      "network": null,
+      "order": 9,
+      "a": {
+        "name": "AP_TONANTINS/SANTO ANTONIO",
+        "host": "192.168.60.17",
+        "site": "Tonantins"
+      },
+      "b": {
+        "name": "ST_SANTO_ANTONIO/TONANTINS",
+        "host": "192.168.60.18",
+        "site": "Santo Antônio"
+      }
+    },
+    {
+      "id": "radio-tefe-tabatinga-10",
+      "route": "tefe-tabatinga",
+      "network": null,
+      "order": 10,
+      "a": {
+        "name": "AP_SANTO_ANTONIO/AMATURA",
+        "host": "192.168.60.19",
+        "site": "Santo Antônio"
+      },
+      "b": {
+        "name": "ST_AMATURA/SANTO_ANTONIO",
+        "host": "192.168.60.20",
+        "site": "Amaturá"
+      }
+    },
+    {
+      "id": "radio-tefe-tabatinga-11",
+      "route": "tefe-tabatinga",
+      "network": null,
+      "order": 11,
+      "a": {
+        "name": "AP AMATURA/CATURIA",
+        "host": "192.168.60.21",
+        "site": "Amaturá"
+      },
+      "b": {
+        "name": "ST_CATURIÁ/AMATURÁ",
+        "host": "192.168.60.22",
+        "site": "Caturiá"
+      }
+    },
+    {
+      "id": "radio-tefe-tabatinga-12",
+      "route": "tefe-tabatinga",
+      "network": null,
+      "order": 12,
+      "a": {
+        "name": "AP_CATURIÁ/SAO PAULO",
+        "host": "192.168.60.23",
+        "site": "Caturiá"
+      },
+      "b": {
+        "name": "ST_SAO_PAULO/CATURIÁ",
+        "host": "192.168.60.24",
+        "site": "São Paulo"
+      }
+    },
+    {
+      "id": "radio-tefe-tabatinga-13",
+      "route": "tefe-tabatinga",
+      "network": null,
+      "order": 13,
+      "a": {
+        "name": "AP_SAO_PAULO/SANTA_RITA",
+        "host": "192.168.60.25",
+        "site": "São Paulo"
+      },
+      "b": {
+        "name": "ST_SANTA_RITA/SAO_PAULO",
+        "host": "192.168.60.26",
+        "site": "Santa Rita"
+      }
+    },
+    {
+      "id": "radio-tefe-tabatinga-14",
+      "route": "tefe-tabatinga",
+      "network": null,
+      "order": 14,
+      "a": {
+        "name": "AP_SANTA_RITA/BELEM_DO_SOLIMOES",
+        "host": "192.168.60.27",
+        "site": "Santa Rita"
+      },
+      "b": {
+        "name": "ST_BELEM_DO_SOLIMOES/SANTA_RITA",
+        "host": "192.168.60.28",
+        "site": "Belém do Solimões"
+      }
+    },
+    {
+      "id": "radio-tefe-tabatinga-15",
+      "route": "tefe-tabatinga",
+      "network": null,
+      "order": 15,
+      "a": {
+        "name": "AP_BELEM_DO_SOLIMOES/TABATINGA",
+        "host": "192.168.60.29",
+        "site": "Belém do Solimões"
+      },
+      "b": {
+        "name": "ST_TABATINGA/BELEM_DO_SOLIMOES",
+        "host": "192.168.60.30",
+        "site": "Tabatinga"
+      }
     }
   ],
   "radio_networks": [

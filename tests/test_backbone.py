@@ -76,7 +76,7 @@ class BackboneTests(unittest.TestCase):
     def test_radio_topology_has_both_independent_networks_and_exact_endpoint_pairs(self):
         config = app.get_backbone()
         self.assertEqual(len(config['links']), 28)
-        radios = config['radio_links']
+        radios = [l for l in config['radio_links'] if l['route'] == 'coari-tefe']
         self.assertEqual(len(radios), 8)
         self.assertEqual(len({l['id'] for l in radios}), 8)
         hosts = []
@@ -103,3 +103,26 @@ class BackboneTests(unittest.TestCase):
             self.assertIsNone(network['target']['port'])
             self.assertEqual(network['target']['candidate_ports'], [f'gigabit-ethernet:1/1/{p}' for p in (5, 6, 7, 8)])
         self.assertEqual(len(config['radio_networks']), 2)
+
+    def test_tefe_tabatinga_pairs_follow_the_thirty_supplied_ips(self):
+        config = app.get_backbone()
+        links = sorted([l for l in config['radio_links'] if l['route'] == 'tefe-tabatinga'], key=lambda l: l['order'])
+        self.assertEqual(len(links), 15)
+        self.assertEqual([l['order'] for l in links], list(range(1, 16)))
+        for i, link in enumerate(links):
+            self.assertIsNone(link['network'])
+            self.assertEqual(link['a']['host'], f'192.168.60.{2*i+1}')
+            self.assertEqual(link['b']['host'], f'192.168.60.{2*i+2}')
+            self.assertTrue(link['a']['name'].startswith('AP'))
+            self.assertTrue(link['b']['name'].startswith('ST'))
+            if i:
+                self.assertEqual(links[i-1]['b']['site'], link['a']['site'])
+        self.assertEqual(links[0]['a']['name'], 'AP_TEFE/UARINI')
+        self.assertEqual(links[11]['b']['name'], 'ST_SAO_PAULO/CATURIÁ')
+        self.assertEqual(links[7]['b']['name'], 'ST_TONANTINS/PROPERIDADE')
+        self.assertEqual(links[5]['b']['site'], 'Guariba / N. Progresso')
+        self.assertEqual(links[-1]['b']['name'], 'ST_TABATINGA/BELEM_DO_SOLIMOES')
+        self.assertEqual(links[-1]['b']['site'], 'Tabatinga')
+        all_ips = [l[side]['host'] for l in config['radio_links'] for side in ('a', 'b')]
+        self.assertEqual(len(set(all_ips)), 46)
+        self.assertEqual(len(config['links']), 28)

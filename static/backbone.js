@@ -62,7 +62,11 @@
  const radioLinks=()=>config.radio_links||[];
  const radioReading=link=>radioMapState.link(link,state.data.devices,Date.now(),$('#connection-error').hidden);
  const radioStateNames={up:'Rádio ativo',high:'Ping acima de 200 ms',down:'Sem ping',unknown:'Sem leitura'};
- function radioGeometry(link){const y=link.network===1?900:1080;return {y,x1:190+(link.order-1)*490+35,x2:190+link.order*490-35};}
+ function radioTitle(link){return link.route==='tefe-tabatinga'?'Tefé → Tabatinga':`Rede ${link.network}`;}
+ function radioGeometry(link){
+  if(link.route==='tefe-tabatinga'){const row=Math.floor((link.order-1)/5),i=(link.order-1)%5,direction=row%2?-1:1,start=direction===1?150:2150;return {y:1320+row*200,x1:start+direction*(i*400+35),x2:start+direction*((i+1)*400-35)};}
+  const y=link.network===1?900:1080;return {y,x1:190+(link.order-1)*490+35,x2:190+link.order*490-35};
+ }
  const radioNetworks=()=>config.radio_networks||[];
  function accessId(network,side){return `radio-access-${network}-${side}`;}
  function findAccess(id){for(const network of radioNetworks())for(const side of ['source','target'])if(accessId(network.network,side)===id)return {network,side,binding:network[side]};}
@@ -90,25 +94,40 @@
   const port=binding.port?esc(binding.port):'Porta a confirmar · Giga 1/1/5, 1/1/6, 1/1/7 ou 1/1/8';
   renderInfo(`<button class="icon-button backbone-dismiss" aria-label="Fechar detalhes">×</button><strong>Rede ${network.network} · ${isSource?'Saída de Coari':'Chegada no CLARO'}</strong><div><strong>${esc(v.node.name)}</strong><small>${v.node.host} · ${port}</small><p>${esc(v.port.label)}${v.port.port?' · RX '+esc(rate(v.port)):''}</p></div><div><strong>${esc(v.radio.device?.name||'Rádio '+(isSource?'AP de Coari':'ST de Tefé'))}</strong><p>${esc(v.radio.label)} · Ping ${number(v.radio.latency)} ms</p></div><button type="button" class="button secondary" data-access-node="${v.node.id}">Ver Datacom</button>`);
  }
+ function drawRadioHop(l){
+  const g=radioGeometry(l),y=g.y;
+  let html=`<g class="backbone-radio" data-link="${l.id}" data-radio-route="${l.route}" tabindex="0" role="button"><path class="radio-stroke" d="M${g.x1},${y} H${g.x2}"/><path class="fiber-hit" d="M${g.x1},${y} H${g.x2}"/><text class="radio-caption" x="${(g.x1+g.x2)/2}" y="${y-20}" text-anchor="middle"></text></g>`;
+  for(const [side,x]of [['a',g.x1],['b',g.x2]]){const n=l[side],label=side==='a'?'AP':'ST';html+=`<g class="radio-map-point" data-radio-host="${n.host}" data-radio-link="${l.id}" data-radio-side="${side}" transform="translate(${x} ${y})" tabindex="0" role="button" aria-label="${esc(n.name+' '+n.host)}"><title>${esc(n.name+' · '+n.host)}</title><circle r="16"/><image href="/static/icons/siae.png" x="-13" y="-13" width="26" height="26"/><text y="32" text-anchor="middle">${label}</text><text class="radio-ip" y="${side==='a'?65:49}" text-anchor="middle">${n.host}</text></g>`;}
+  return html;
+ }
  function drawRadios(){
   if(!radioLinks().length)return '';
   let html='<g id="radio-map-layer"><text class="radio-map-heading" x="45" y="817">Rádio · Coari → Tefé</text>';
   for(const network of [1,2]){
-   const links=radioLinks().filter(l=>l.network===network).sort((a,b)=>a.order-b.order);if(!links.length)continue;
+   const links=radioLinks().filter(l=>l.route==='coari-tefe'&&l.network===network).sort((a,b)=>a.order-b.order);if(!links.length)continue;
    const y=network===1?900:1080,sites=[links[0].a.site,...links.map(l=>l.b.site)];
    html+=`<text class="radio-network-label" x="45" y="${y+5}">Rede ${network}</text>`;
    sites.forEach((site,i)=>{const x=190+i*490;html+=`<text class="radio-site" x="${x}" y="${y-56}" text-anchor="middle">${esc(site)}</text>`;});
-   for(const l of links){const g=radioGeometry(l);
-    html+=`<g class="backbone-radio" data-link="${l.id}" tabindex="0" role="button"><path class="radio-stroke" d="M${g.x1},${y} H${g.x2}"/><path class="fiber-hit" d="M${g.x1},${y} H${g.x2}"/><text class="radio-caption" x="${(g.x1+g.x2)/2}" y="${y-20}" text-anchor="middle"></text></g>`;
-    for(const [side,x]of [['a',g.x1],['b',g.x2]]){const n=l[side],label=side==='a'?'AP':'ST';html+=`<g class="radio-map-point" data-radio-host="${n.host}" data-radio-link="${l.id}" data-radio-side="${side}" transform="translate(${x} ${y})" tabindex="0" role="button" aria-label="${esc(n.name+' '+n.host)}"><title>${esc(n.name+' · '+n.host)}</title><circle r="16"/><image href="/static/icons/siae.png" x="-13" y="-13" width="26" height="26"/><text y="32" text-anchor="middle">${label}</text><text class="radio-ip" y="${side==='a'?65:49}" text-anchor="middle">${n.host}</text></g>`;}
+   html+=links.map(drawRadioHop).join('');
+  }
+  const route=radioLinks().filter(l=>l.route==='tefe-tabatinga').sort((a,b)=>a.order-b.order);
+  if(route.length){
+   html+='<g id="radio-tefe-tabatinga-layer"><text class="radio-map-heading" x="45" y="1228">Rádio · Tefé → Tabatinga</text>';
+   for(let row=0;row<Math.ceil(route.length/5);row++){
+    const links=route.slice(row*5,row*5+5),direction=row%2?-1:1,start=direction===1?150:2150,y=1320+row*200;
+    const sites=[links[0].a.site,...links.map(l=>l.b.site)];
+    sites.forEach((site,i)=>{html+=`<text class="radio-site" x="${start+direction*i*400}" y="${y-56}" text-anchor="middle">${esc(site)}</text>`;});
+    if(row){const previous=radioGeometry(route[row*5-1]),current=radioGeometry(links[0]),side=row%2?2250:50;const d=roundedRoute([{x:previous.x2,y:previous.y+16},{x:side,y:previous.y+16},{x:side,y:current.y-16},{x:current.x1,y:current.y-16}],14);html+=`<path class="radio-route-continuation" d="${d}"><title>Continuação do trecho em ${esc(links[0].a.site)}; não representa leitura de uma porta local.</title></path>`;}
+    html+=links.map(drawRadioHop).join('');
    }
+   html+='</g>';
   }
   return html+'</g>';
  }
  function refreshRadios(){
   for(const l of radioLinks()){
    const v=radioReading(l),g=svg.querySelector(`[data-link="${l.id}"]`),p=radioGeometry(l);
-   g.dataset.status=v.status;g.setAttribute('aria-label',`Rede ${l.network}, ${l.a.site} para ${l.b.site}, ${radioStateNames[v.status]}`);
+   g.dataset.status=v.status;g.setAttribute('aria-label',`${radioTitle(l)}, ${l.a.site} para ${l.b.site}, ${radioStateNames[v.status]}`);
    g.querySelector('text').innerHTML=`<tspan x="${(p.x1+p.x2)/2}">Ping ${number(v.a.latency)} / ${number(v.b.latency)} ms</tspan><tspan class="radio-band" x="${(p.x1+p.x2)/2}" dy="14">RX ${bandwidth(v.a.bps).replace(/<[^>]*>/g,'')} / ${bandwidth(v.b.bps).replace(/<[^>]*>/g,'')}</tspan>`;
    for(const side of ['a','b'])svg.querySelector(`[data-radio-link="${l.id}"][data-radio-side="${side}"]`).dataset.status=v[side].status;
   }
@@ -117,13 +136,14 @@
  function openRadio(link,side){
   hideInfo();const n=link[side],d=state.data.devices.find(d=>d.kind==='siae'&&d.host===n.host);if(d){openDetail(d.id);return;}
   openAdd();$('[name="kind"][value="siae"]').checked=true;$('#device-form [name="name"]').value=n.name;$('#device-form [name="host"]').value=n.host;
-  $('[name="radio_route"]').value='coari-tefe';$('[name="radio_network"]').value=String(link.network);syncDeviceKind();
+  $('[name="radio_route"]').value=link.route;$('[name="radio_network"]').value=link.network==null?'':String(link.network);syncDeviceKind();
  }
  function radioDetails(link){
   const v=radioReading(link),side=(key)=>{const n=link[key],r=v[key];return `<div><strong>${key==='a'?'AP':'ST'} · ${esc(n.site)}</strong><small>${esc(n.name)} · ${n.host}</small><p>${esc(r.label)} · Ping ${number(r.latency)} ms · RX ${bandwidth(r.bps)}</p><button type="button" class="button secondary" data-radio-endpoint="${link.id}:${key}">${r.device?'Ver rádio':'Cadastrar rádio'}</button></div>`;};
-  renderInfo(`<button class="icon-button backbone-dismiss" aria-label="Fechar detalhes">×</button><strong>Rádio · Rede ${link.network} · ${radioStateNames[v.status]}</strong>${side('a')}${side('b')}`);
+  renderInfo(`<button class="icon-button backbone-dismiss" aria-label="Fechar detalhes">×</button><strong>Rádio · ${radioTitle(link)} · ${radioStateNames[v.status]}</strong>${side('a')}${side('b')}`);
  }
  function draw(){
+  applyMapScope();
   svg.innerHTML=config.links.map(link=>{const p=path(link);return `<g class="backbone-fiber" data-link="${link.id}" tabindex="0" role="button"><path class="fiber-stroke" d="${p.d}"/><path class="fiber-hit" d="${p.d}"/><text class="fiber-caption" x="${p.labelX}" y="0" text-anchor="${p.anchor}"></text></g>`;}).join('')+config.nodes.map(n=>`<g class="backbone-node" data-node="${n.id}" transform="translate(${n.x} ${n.y})" tabindex="0" role="button" aria-label="${esc(n.name+' '+n.host)}"><circle r="20"/><image href="/static/icons/datacom.png" x="-18" y="-18" width="36" height="36"/><text y="36" text-anchor="middle">${esc(n.name)}</text><text class="node-ip" y="51" text-anchor="middle">${n.host}${n.kind==='huawei'?' · Huawei':''}</text></g>`).join('');
   svg.insertAdjacentHTML('beforeend',drawRadioAccess()+drawRadios());
   if(!svg.style.width)fitMap();refresh();
@@ -221,6 +241,10 @@
  function fitMap(){
   applyZoom(Math.min(viewport.clientWidth/svg.viewBox.baseVal.width,viewport.clientHeight/svg.viewBox.baseVal.height),false);autoFit=true;
  }
+ const scope=$('#backbone-scope'),mapScopes={all:'0 0 2380 1840',backbone:'0 0 2380 1200','tefe-tabatinga':'0 1200 2380 640'};
+ try{const saved=localStorage.getItem('alwaysup-backbone-scope');if(Object.hasOwn(mapScopes,saved))scope.value=saved;}catch{}
+ function applyMapScope(){svg.setAttribute('viewBox',mapScopes[scope.value]||mapScopes.all);}
+ scope.onchange=()=>{hideInfo();applyMapScope();if(config)fitMap();try{localStorage.setItem('alwaysup-backbone-scope',scope.value);}catch{}};
  $('#backbone-fit').onclick=fitMap;
  new ResizeObserver(()=>{if(autoFit&&config&&state.page==='backbone')fitMap();}).observe(viewport);
  viewport.addEventListener('pointerdown',e=>{if(e.button!==0||drag)return;didDrag=false;drag={id:e.pointerId,x:e.clientX,y:e.clientY,left:viewport.scrollLeft,top:viewport.scrollTop};});
