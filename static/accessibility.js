@@ -1,7 +1,7 @@
 /* Display preferences are local to this browser, not equipment configuration. */
 (() => {
  const key='alwaysup-sidebar',toggle=$('#sidebar-toggle'),slider=$('#sidebar-width'),dialog=$('#menu-settings');
- let width=232,collapsed=matchMedia('(max-width:900px)').matches;
+ let width=232,collapsed=true;
  try{const saved=JSON.parse(localStorage.getItem(key));if(saved&&typeof saved.collapsed==='boolean')collapsed=saved.collapsed;if(saved&&Number.isFinite(saved.width))width=Math.min(300,Math.max(180,saved.width));}catch{}
  function apply(save=false){
   document.body.dataset.sidebar=collapsed?'collapsed':'expanded';

@@ -307,6 +307,7 @@ function render(){
  const paused=readingOutput()||Boolean(window.getSelection()?.toString());
  $('#reading-banner').hidden=!paused;
  if(paused)return;
+ const overviewFocus=state.page==='overview'?document.activeElement?.dataset.overviewActions:null;
  const {devices,alerts,samples}=state.data;$('#last-update').textContent=`${state.demo?'Simulação':'Atualizado'} às ${formatTime(state.data.updated_at)}`;
  renderMetrics();renderDevices();renderSiae();renderLatency();
  $('#recent-events').innerHTML=alerts.length?alerts.slice(0,3).map(eventHTML).join(''):empty('Nenhum evento por aqui','Quedas e recuperações aparecerão neste espaço.');
@@ -314,11 +315,13 @@ function render(){
  const openPorts=new Set([...$('#ports-content').querySelectorAll('details[open]')].map(e=>e.dataset.portKey));
  const allDatacoms=orderedDatacoms(devices),datacoms=state.page==='datacoms'?filteredDevices(allDatacoms):allDatacoms;$('#ports-content').innerHTML=datacoms.length?datacoms.map(datacomHTML).join(''):allDatacoms.length?empty('Nenhum Datacom neste filtro','Tente outro nome, IP ou status.'):empty('Conecte seu primeiro Datacom','Cadastre uma conexão SSH para acompanhar portas, sinais e circuitos.',true);
  $('#ports-content').querySelectorAll('details').forEach(e=>e.open=openPorts.has(e.dataset.portKey));
+ window.renderOverview?.();
+ if(overviewFocus&&!document.querySelector('dialog[open]'))$(`[data-overview-actions="${overviewFocus}"]`)?.focus({preventScroll:true});
  if(state.selected&&$('#detail-dialog').open){if(state.demo){state.detailSamples=samples.filter(s=>s.device_id===state.selected);renderDetail();}else{const selected=state.selected;api(`/api/devices/${selected}/history`).then(history=>{if(state.selected===selected){state.detailSamples=history;renderDetail();}}).catch(()=>{});}}
 }
 const pages={backbone:['Mapa do circuito','Backbone de fibra · Manaus, Coari e Tefé.'],notifications:['Notificações','Receba avisos de queda e recuperação pelo Telegram.'],availability:['Disponibilidade','Acompanhe o tempo com resposta, as perdas de ping e a cobertura da coleta.'],backups:['Backups','Guarde uma cópia dos seus dados e recupere quando precisar.'],overview:['Visão geral','Disponibilidade, sinais e eventos da sua rede.'],bbus:["BBU's","Monitore o ping, a latência e as perdas das suas BBU's."],datacoms:['Datacoms','Portas, sinais e circuitos em uma só tela.'],siae:['Rádios SIAE','Disponibilidade por ping e consumo real de banda do rádio.'],alerts:['Eventos','Cada mudança na rede, registrada em um só lugar.']};
 function navigate(page){
- window.getSelection()?.removeAllRanges();state.page=page;document.body.dataset.view=page;
+ window.getSelection()?.removeAllRanges();state.page=page;document.body.dataset.view=page;window.setupOverview?.(page);
  const datacom=page==='datacoms';$('#datacom-toolbar').hidden=!datacom;
  (datacom?$('#datacom-toolbar'):$('#devices-section .table-heading')).append($('#device-filters'));
  (datacom?$('#datacom-toolbar'):$('#ports-section .traffic-panel-actions')).append($('#open-traffic-dashboard'));
@@ -471,7 +474,7 @@ $('#refresh').addEventListener('click',()=>load());
 $('#search').addEventListener('input',render);$('#state-filter').addEventListener('change',render);
 document.querySelectorAll('.close-dialog').forEach(e=>e.addEventListener('click',()=>$('#device-dialog').close()));
 document.querySelectorAll('.close-confirm').forEach(e=>e.addEventListener('click',()=>$('#confirm-dialog').close()));
-document.addEventListener('click',event=>{const alias=event.target.closest('[data-port-alias]');if(alias)openPortName(Number(alias.dataset.portAlias),alias.dataset.port,alias.dataset.family);const copy=event.target.closest('[data-copy-output]');if(copy)copyOutput(copy);const edit=event.target.closest('[data-edit]'),detail=event.target.closest('[data-detail]'),remove=event.target.closest('[data-remove]');if(edit)openEdit(Number(edit.dataset.edit));if(detail)openDetail(Number(detail.dataset.detail));if(event.target.closest('[data-close-detail]')){$('#detail-dialog').close();state.selected=null;}if(event.target.closest('[data-action="add"]'))openAdd();if(remove){if(state.demo){toast('Os equipamentos de demonstração são exemplos. Saia do modo demonstração para gerenciar sua rede.');return;}state.deleting=Number(remove.dataset.remove);state.removingCircuit=null;$('#confirm-dialog h2').textContent='Remover equipamento?';$('#confirm-note').textContent='O monitoramento e as amostras de ping serão removidos. O histórico de eventos será preservado.';const d=state.data.devices.find(d=>d.id===state.deleting);$('#confirm-description').textContent=`Deseja remover “${d.name}” (${d.host})?`;$('#confirm-dialog').showModal();}});
+document.addEventListener('click',event=>{const alias=event.target.closest('[data-port-alias]');if(alias)openPortName(Number(alias.dataset.portAlias),alias.dataset.port,alias.dataset.family);const copy=event.target.closest('[data-copy-output]');if(copy)copyOutput(copy);const edit=event.target.closest('[data-edit]'),detail=event.target.closest('[data-detail]'),remove=event.target.closest('[data-remove]');if((edit||detail||remove)&&$('#overview-actions').open)$('#overview-actions').close();if(edit)openEdit(Number(edit.dataset.edit));if(detail)openDetail(Number(detail.dataset.detail));if(event.target.closest('[data-close-detail]')){$('#detail-dialog').close();state.selected=null;}if(event.target.closest('[data-action="add"]'))openAdd();if(remove){if(state.demo){toast('Os equipamentos de demonstração são exemplos. Saia do modo demonstração para gerenciar sua rede.');return;}state.deleting=Number(remove.dataset.remove);state.removingCircuit=null;$('#confirm-dialog h2').textContent='Remover equipamento?';$('#confirm-note').textContent='O monitoramento e as amostras de ping serão removidos. O histórico de eventos será preservado.';const d=state.data.devices.find(d=>d.id===state.deleting);$('#confirm-description').textContent=`Deseja remover “${d.name}” (${d.host})?`;$('#confirm-dialog').showModal();}});
 function openPortName(deviceId, port, family){
  if(state.demo){toast('Saia da demonstração para personalizar os nomes da sua rede.');return;}
  const device=state.data.devices.find(d=>d.id===deviceId);

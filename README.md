@@ -368,3 +368,9 @@ O teste de navegador desta implementação verificou demonstração, busca, deta
 ### Latência por tipo de equipamento
 
 Na Visão geral, o seletor **Equipamento** do cartão **Latência média** alterna entre BBU (cadastros de ping), Rádio SIAE e Datacom. A média e o gráfico usam apenas as amostras dos equipamentos do tipo escolhido, sem misturar categorias. A escolha inicial é Datacom e fica salva neste navegador. A média continua sendo calculada por instante; perdas não são tratadas como zero. Se o tipo não tiver equipamentos ou respostas nas últimas amostras recebidas, a média aparece como **—** com uma explicação, sem utilizar dados de outro tipo.
+
+### Visão geral compacta
+
+A tela inicial segue o protótipo compacto aprovado: Manrope local, fundo claro, cartões brancos com sombra suave, indicadores em uma faixa única, tabela à esquerda e atenção/latência à direita. Busca, filtros, ordenação pelas colunas e menu **···** permitem consultar e gerenciar os equipamentos. A tabela mostra localidade pelo IP cadastrado no mapa do circuito e portas ativas/consultadas; informações ausentes aparecem como **—**. Consultas SSH com erro não exibem contagens antigas de portas como atuais. O painel **Atenção agora** prioriza problemas presentes, com mensagens curtas, e abre os detalhes do equipamento.
+
+O menu inicia recolhido para novos navegadores e preserva a preferência já salva. Em telas menores os painéis se empilham e a tabela vira cartões. O seletor de latência continua separando BBU, Rádio SIAE e Datacom. A [captura da tela compacta](docs/visao-geral-compacta.png) usa dados ilustrativos de validação.

@@ -1,0 +1,132 @@
+/* Compact overview approved in prototype 01. Other monitoring pages retain their layouts. */
+.overview-header-brand{display:none}
+body[data-view=overview]{--overview-rail:72px;--accent:#123f69;--ink:#122441;--muted:#596477;--line:#dce3ef;--success:#168332;--success-bg:#eaf8ed;--red:#cf243c;--amber:#a66800;background:#f5f7fb}
+body[data-view=overview][data-sidebar=expanded]{--overview-rail:var(--sidebar-width,232px)}
+body[data-layout][data-view=overview] .sidebar{top:74px;height:calc(100vh - 74px);padding-top:22px}
+body[data-view=overview] .sidebar>.brand,body[data-view=overview] .sidebar>.client-brand,body[data-view=overview] .sidebar>.nav-label{display:none}
+body[data-view=overview] .sidebar nav{margin-top:0}
+body[data-layout][data-view=overview] .topbar{position:relative;z-index:10;height:74px;margin-left:calc(-1 * var(--overview-rail));padding:0 24px;border-bottom:1px solid var(--line)}
+body[data-view=overview] .overview-header-brand{display:flex;align-items:center;width:230px;padding-right:22px;margin-right:12px;border-right:1px solid var(--line);flex-shrink:0}
+.overview-header-brand img{display:block;width:208px;height:64px;object-fit:contain}
+body[data-view=overview] .client-brand-mobile{display:block;width:155px;height:42px;object-fit:contain}
+body[data-layout][data-view=overview] main{max-width:1800px;margin:0 auto;padding:30px 30px 36px}
+body[data-layout][data-view=overview] .page-heading{border:0;margin:0 0 12px;padding:0;align-items:center;min-height:56px}
+body[data-layout][data-view=overview] h1{font-size:36px;font-weight:800;line-height:1.2;letter-spacing:-1.3px;margin:0}
+body[data-view=overview] .page-heading .eyebrow,body[data-view=overview] #page-description{display:none}
+body[data-view=overview] #add-device{background:#123f69;border:1px solid #123f69;border-radius:10px;min-height:46px;padding:10px 18px;font-size:15px;font-weight:700;gap:10px}
+body[data-layout][data-view=overview] .status-strip{justify-content:flex-start;margin:0 0 24px;min-height:38px;padding:0;gap:0}
+body[data-view=overview] .status-strip>span:first-child{display:inline-flex;align-items:center;gap:10px;background:#fff6e3;border:1px solid #f0ce82;border-radius:8px;padding:8px 14px;color:#7e4900}
+body[data-view=overview] .status-strip[data-tone=success]>span:first-child{background:#edf8f0;border-color:#c4e8ce;color:#186c35}
+body[data-view=overview] .status-strip .live-dot{display:inline-flex;width:20px;height:20px;flex-shrink:0;background:none;border-radius:0;box-shadow:none}
+body[data-view=overview] .status-strip .live-dot svg{width:20px;height:20px}
+body[data-view=overview] #network-status{font-size:14px;font-weight:650}
+body[data-view=overview] #network-subtitle,body[data-view=overview] #last-update{display:none}
+body[data-layout][data-view=overview] #metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;padding:18px 0;margin:0 0 24px;min-height:84px;background:white;border:1px solid var(--line);border-radius:12px;box-shadow:0 3px 7px #18345404,0 8px 25px #18345409}
+.overview-metric{display:flex;align-items:center;justify-content:center;gap:12px;border:0;border-right:1px solid var(--line);background:none;color:var(--ink);padding:3px 14px;min-width:0;cursor:pointer;text-align:left}
+.overview-metric:last-child{border-right:0}
+.overview-metric strong{font-size:34px;line-height:1.2;font-weight:800;letter-spacing:-1px;font-variant-numeric:tabular-nums}
+.overview-metric span{font-size:16px;color:var(--muted);font-weight:500}
+.overview-metric.green strong{color:#168332}.overview-metric.red strong{color:#cf243c}.overview-metric.amber strong{color:#ae7309}
+.overview-metric:hover{background:#f7f9fc}
+.overview-workspace{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(340px,1fr);align-items:start;gap:18px}
+.overview-workspace[hidden]{display:none}
+body[data-layout][data-view=overview] .panel{border:1px solid var(--line);border-radius:12px;box-shadow:0 3px 7px #18345405,0 9px 25px #1834540b}
+body[data-view=overview] #devices-section{margin:0;min-width:0;padding:0 18px}
+body[data-view=overview] #overview-charts{display:flex;flex-direction:column;gap:18px;margin:0;min-width:0}
+body[data-view=overview] #overview-charts .event-panel{order:0}
+body[data-view=overview] #overview-charts .chart-panel{order:1}
+body[data-layout][data-view=overview] h2{font-size:22px;font-weight:800;letter-spacing:-.6px;line-height:1.3}
+body[data-layout][data-view=overview] #devices-section .table-heading{padding:18px 0 16px;margin:0;display:flex;align-items:center;justify-content:space-between;gap:16px}
+body[data-view=overview] #table-description,body[data-view=overview] #table-count{display:none}
+body[data-view=overview] .table-controls{display:flex;flex-direction:row;gap:8px;min-width:0}
+body[data-view=overview] .search{height:40px;border:1px solid #bcc9db;border-radius:8px;padding:0 10px;gap:8px;min-width:0}
+body[data-view=overview] .search input{width:172px;padding:0;font-size:12px;min-width:0}
+body[data-view=overview] #state-filter{height:40px;max-width:150px;min-width:0;padding:6px 26px 6px 10px;font-size:12px;border-radius:8px}
+body[data-view=overview] .table-scroll{max-height:560px;overflow:auto;border-radius:7px;scrollbar-width:thin}
+body[data-view=overview] #devices-section table{width:100%;min-width:0;table-layout:auto}
+body[data-view=overview] #devices-section thead{position:sticky;top:0;z-index:1}
+body[data-layout][data-view=overview] #devices-section th{padding:9px 9px;background:#eef2f7;color:var(--ink);white-space:nowrap}
+body[data-view=overview] th button{display:flex;align-items:center;gap:9px;padding:0;border:0;background:none;cursor:pointer;font-weight:700;font-size:12px;color:inherit}
+body[data-view=overview] th button span{color:#5a6b84;font-size:13px;font-weight:500}
+body[data-layout][data-view=overview] #devices-section td{padding:13px 9px;font-size:13px;line-height:1.4;border-bottom:1px solid var(--line);color:var(--ink)}
+body[data-view=overview] #devices-section tr:last-child td{border-bottom:0}
+.overview-device-name{display:flex;align-items:center;gap:10px;padding:0;border:0;background:none;cursor:pointer;text-align:left;color:var(--ink);font-size:13px;line-height:1.5}
+.overview-device-name strong{font-weight:750;overflow-wrap:anywhere}
+.overview-device-name .equipment-icon{width:25px;height:25px;flex-shrink:0}
+body[data-layout][data-view=overview] .status-pill{display:inline-flex;align-items:center;border:0;border-radius:7px;padding:5px 9px;font-size:12px;font-weight:600;white-space:nowrap}
+body[data-view=overview] .status-pill.online{background:#e9f8ec;color:#13742e}
+body[data-view=overview] .status-pill.offline{background:#fdecee;color:#bf1730}
+body[data-view=overview] .status-pill.unstable{background:#fff4df;color:#9a5c00}
+body[data-view=overview] .overview-ports{white-space:nowrap;font-variant-numeric:tabular-nums}
+body[data-view=overview] .overview-more{font-size:25px;letter-spacing:1px;min-width:32px;min-height:32px}
+body[data-view=overview] #devices-section .table-footer{padding:10px 0;border-top:1px solid var(--line);font-size:10px}
+body[data-view=overview] .table-footer>span:last-child{display:none}
+.overview-table-empty{padding:40px 16px;text-align:center;color:var(--muted);line-height:1.7}
+body[data-layout][data-view=overview] .event-panel .panel-heading{padding:18px 18px 0;margin:0}
+body[data-view=overview] .event-panel .panel-heading p,body[data-view=overview] .event-panel .panel-heading>span{display:none}
+body[data-view=overview] #recent-events{min-height:0;padding:14px 18px 0}
+.overview-attention{display:flex;align-items:center;width:100%;gap:12px;padding:14px 0;border:0;border-top:1px solid var(--line);background:none;cursor:pointer;color:var(--ink);text-align:left}
+.overview-attention-icon{display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9px;flex-shrink:0;background:#fff6e6;color:#aa6a00}
+.overview-attention-icon.critical{background:#fff0f2;color:#cf243c}
+.overview-attention-icon svg{width:24px;height:24px}
+.overview-attention>span:nth-child(2){flex:1;min-width:0}
+.overview-attention strong{display:block;font-size:15px;font-weight:750;overflow-wrap:anywhere}
+.overview-attention small{display:block;font-size:13px;color:var(--muted);margin-top:4px}
+.overview-chevron{font-size:24px;color:var(--ink)}
+.overview-attention:hover strong{text-decoration:underline}
+.overview-healthy{display:flex;align-items:center;gap:10px;padding:20px 0;color:#168332;font-size:13px}
+.overview-healthy svg{width:22px;height:22px}
+body[data-view=overview] #all-events{padding:7px 18px 14px;font-size:11px;color:var(--muted)}
+body[data-layout][data-view=overview] .chart-panel>.panel-heading{padding:18px 18px 0;margin:0;gap:12px;align-items:center}
+body[data-view=overview] #latency-scope{font-size:12px;margin-top:5px}
+body[data-view=overview] .latency-filter{font-size:11px;gap:7px}
+body[data-view=overview] .latency-filter select{min-width:108px;height:36px;font-size:12px;border-radius:8px}
+body[data-view=overview] .chart-summary{padding:14px 18px 0;display:block}
+body[data-view=overview] #chart-average{font-size:40px;line-height:1.2;font-weight:800;letter-spacing:-1px;color:var(--ink)}
+body[data-view=overview] #chart-average small{font-size:21px;font-weight:600;letter-spacing:0;color:var(--ink)}
+body[data-view=overview] #latency-sample-scope,body[data-view=overview] .chart-footer{display:none}
+body[data-view=overview] .chart-container{margin:12px 0 0;height:110px;overflow:hidden}
+body[data-view=overview] #latency-chart svg line,body[data-view=overview] #latency-chart svg text,body[data-view=overview] #latency-chart svg circle{display:none}
+body[data-view=overview] #latency-chart svg path[fill=none]{stroke:#14902c;stroke-width:2}
+body[data-view=overview] #latency-chart svg stop{stop-color:#51be66}
+body[data-view=overview] .chart-empty{padding:10px 18px;font-size:12px;line-height:1.7}
+#overview-actions{width:min(380px,calc(100vw - 24px))}
+#overview-actions-buttons{display:grid;gap:10px;margin-top:18px}
+#overview-actions-buttons .button{justify-content:flex-start;gap:10px}
+@media(min-width:1600px){body[data-view=overview] .overview-workspace{grid-template-columns:minmax(0,1.9fr) minmax(400px,1fr)}body[data-layout][data-view=overview] #devices-section td{padding-top:17px;padding-bottom:17px;font-size:15px}.overview-device-name{font-size:15px}body[data-view=overview] th button{font-size:14px}}
+@media(max-width:1200px){body[data-layout][data-view=overview] main{padding:24px 20px}.overview-workspace{grid-template-columns:minmax(0,1.6fr) minmax(300px,1fr);gap:14px}body[data-view=overview] #devices-section .table-heading{flex-wrap:wrap}.overview-metric span{font-size:13px}.overview-metric strong{font-size:30px}body[data-view=overview] .table-controls{width:100%;justify-content:space-between}body[data-view=overview] .search{flex:1}body[data-view=overview] .search input{width:100%}}
+@media(max-width:960px){.overview-workspace{grid-template-columns:1fr}body[data-view=overview] #overview-charts{display:grid;grid-template-columns:1fr 1fr;align-items:start}body[data-view=overview] .overview-header-brand{width:185px;padding-right:12px;margin-right:4px}.overview-header-brand img{width:170px}.overview-metric{gap:8px;flex-wrap:wrap}.overview-metric span{font-size:12px}}
+@media(max-width:640px){body[data-view=overview]{--overview-rail:0px}body[data-layout][data-view=overview] .sidebar{position:sticky;top:0;height:57px;padding:8px 12px}body[data-layout][data-view=overview] .topbar{height:54px;margin-left:0;padding:0 12px}body[data-view=overview] .overview-header-brand{display:none}body[data-view=overview] .sidebar>.brand{display:flex}body[data-view=overview] .client-brand-mobile{width:84px;height:28px}body[data-layout][data-view=overview] main{padding:20px 12px}body[data-layout][data-view=overview] h1{font-size:28px}body[data-view=overview] #add-device{min-height:38px;font-size:12px;padding:7px 11px}body[data-layout][data-view=overview] .status-strip{margin-bottom:16px}body[data-view=overview] #network-status{font-size:12px}body[data-layout][data-view=overview] #metrics{grid-template-columns:1fr 1fr;padding:8px 0;margin-bottom:16px}.overview-metric{justify-content:flex-start;flex-wrap:nowrap;padding:12px 14px}.overview-metric:nth-child(2){border-right:0}.overview-metric strong{font-size:28px}.overview-metric span{font-size:11px}body[data-view=overview] #overview-charts{display:flex}body[data-layout][data-view=overview] h2{font-size:20px}body[data-view=overview] #devices-section{padding:0 12px}body[data-view=overview] .table-scroll{max-height:520px}body[data-view=overview] #devices-section table{display:table;min-width:0}body[data-view=overview] #devices-section thead{display:none}body[data-view=overview] #devices-section tbody{display:block}body[data-layout][data-view=overview] #devices-section .device-row{display:grid;grid-template-columns:1fr 1fr;gap:0 10px;padding:12px 0;border-bottom:1px solid var(--line);box-shadow:none;margin:0;border-radius:0}body[data-layout][data-view=overview] #devices-section td{display:block;padding:5px 0;border:0;font-size:12px}body[data-view=overview] #devices-section .device-name-cell{grid-column:1/-1;padding-right:36px}body[data-view=overview] #devices-section td[data-label]::before{display:block;content:attr(data-label);font-size:10px;color:var(--muted);margin-bottom:4px;font-weight:500}body[data-view=overview] #devices-section .device-actions-cell{position:absolute;right:0;top:8px;width:32px}.overview-device-name{font-size:13px}body[data-view=overview] .search input{font-size:11px}body[data-view=overview] #state-filter{max-width:130px;font-size:11px}body[data-view=overview] .latency-filter{width:auto}body[data-view=overview] .latency-filter select{min-width:115px}}
+/* Match the prototype's readable desktop scale. */
+@media(min-width:961px){
+ body[data-layout][data-view=overview][data-sidebar] .client-brand-mobile{width:150px;height:42px}
+ body[data-view=overview] .breadcrumb{font-size:13px}
+ body[data-view=overview] .live-label{font-size:12px}
+ body[data-layout][data-view=overview] h2{font-size:24px}
+ .overview-metric strong{font-size:40px}.overview-metric span{font-size:18px}
+ body[data-layout][data-view=overview] #devices-section td{font-size:15px;padding-top:15px;padding-bottom:15px}
+ .overview-device-name{font-size:15px}
+ body[data-view=overview] th button{font-size:14px}
+ body[data-layout][data-view=overview] .status-pill{font-size:13px}
+ .overview-attention strong{font-size:17px}.overview-attention small{font-size:14px}
+ body[data-view=overview] #chart-average{font-size:46px}
+ body[data-view=overview] .chart-panel>.panel-heading{align-items:flex-start}
+ body[data-view=overview] .latency-filter{margin-top:3px}
+ body[data-view=overview] .event-panel .panel-heading{padding-bottom:0}
+ body[data-view=overview] #all-events{display:none}
+}
+@media(min-width:961px) and (max-width:1200px){.overview-metric span{font-size:13px}.overview-metric strong{font-size:32px}body[data-layout][data-view=overview] #devices-section td,.overview-device-name{font-size:13px}body[data-view=overview] th button{font-size:12px}}
+@media(max-width:640px){body[data-view=overview] #devices-section tbody{padding:0}body[data-layout][data-view=overview] #devices-section .device-row{position:relative;border:0;border-bottom:1px solid var(--line);background:transparent}body[data-layout][data-view=overview] .page-heading{flex-direction:row;justify-content:space-between;align-items:center}body[data-view=overview] #devices-section .table-heading{align-items:flex-start}}
+
+.overview-latency-types{display:none}
+body[data-view=overview] .overview-latency-types{display:flex;align-items:center;gap:2px;flex-wrap:nowrap}
+.overview-latency-types button{padding:5px 7px;border:0;border-radius:18px;background:transparent;color:var(--muted);font-size:11px;white-space:nowrap;cursor:pointer}
+.overview-latency-types button[aria-pressed=true]{background:#ddf8e3;color:#106f27;font-weight:750}
+body[data-view=overview] .chart-panel>.panel-heading{display:grid;grid-template-columns:1fr auto;gap:10px 8px;align-items:center}
+body[data-view=overview] .chart-panel>.panel-heading>div:first-child{display:contents}
+body[data-view=overview] .chart-panel h2{grid-column:1;grid-row:1;white-space:nowrap}
+body[data-view=overview] .overview-latency-types{grid-column:2;grid-row:1;justify-content:flex-end}
+body[data-view=overview] #latency-scope{grid-column:1;grid-row:2;margin:0;font-size:11px}
+body[data-view=overview] .latency-filter{grid-column:2;grid-row:2;margin:0;justify-content:flex-end;font-size:10px}
+@media(min-width:961px) and (max-width:1250px){body[data-view=overview] .chart-panel>.panel-heading{grid-template-columns:1fr}body[data-view=overview] .chart-panel h2{grid-row:1}body[data-view=overview] .overview-latency-types{grid-row:2;grid-column:1;justify-content:flex-start}body[data-view=overview] #latency-scope{grid-row:3}body[data-view=overview] .latency-filter{grid-column:1;grid-row:4;justify-content:flex-start}}
+@media(max-width:640px){body[data-view=overview] .chart-panel>.panel-heading{grid-template-columns:1fr}body[data-view=overview] .chart-panel h2{grid-row:1}body[data-view=overview] .overview-latency-types{grid-row:2;grid-column:1;justify-content:flex-start}body[data-view=overview] #latency-scope{grid-row:3}body[data-view=overview] .latency-filter{grid-column:1;grid-row:4;justify-content:space-between}}
