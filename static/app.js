@@ -1,5 +1,6 @@
 const $ = s => document.querySelector(s);
 const icons = {
+ network:'<rect x="8" y="2" width="8" height="6" rx="1.5"/><path d="M12 8v5M4 16v-3h16v3"/><rect x="1" y="16" width="6" height="6" rx="1.5"/><rect x="17" y="16" width="6" height="6" rx="1.5"/>',
  grid:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
  server:'<rect x="3" y="3" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M7 6.5h.01M7 17.5h.01M16 6.5h2M16 17.5h2"/>',
  ports:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9v3h3V9m4 0v3h3V9M7 16h.01M12 16h.01M17 16h.01"/>',
@@ -334,7 +335,7 @@ function render(){
  if(overviewFocus&&!document.querySelector('dialog[open]'))$(`[data-overview-actions="${overviewFocus}"]`)?.focus({preventScroll:true});
  if(state.selected&&$('#detail-dialog').open){if(state.demo){state.detailSamples=samples.filter(s=>s.device_id===state.selected);renderDetail();}else{const selected=state.selected;api(`/api/devices/${selected}/history`).then(history=>{if(state.selected===selected){state.detailSamples=history;renderDetail();}}).catch(()=>{});}}
 }
-const pages={backbone:['Mapa do circuito','Backbone de fibra e rádios · Manaus, Coari e Tefé.'],notifications:['Notificações','Receba avisos de queda e recuperação pelo Telegram.'],availability:['Disponibilidade','Acompanhe o tempo com resposta, as perdas de ping e a cobertura da coleta.'],backups:['Backups','Guarde uma cópia dos seus dados e recupere quando precisar.'],overview:['Visão geral','Disponibilidade, sinais e eventos da sua rede.'],bbus:["BBU's","Monitore o ping, a latência e as perdas das suas BBU's."],datacoms:['Datacoms','Portas, sinais e circuitos em uma só tela.'],siae:['Rádios SIAE','Disponibilidade por ping e consumo real de banda do rádio.'],alerts:['Eventos','Cada mudança na rede, registrada em um só lugar.']};
+const pages={backbone:['Backbone Veloso NOC','Backbone de fibra e rádios · Manaus, Coari e Tefé.'],notifications:['Notificações','Receba avisos de queda e recuperação pelo Telegram.'],availability:['Disponibilidade','Acompanhe o tempo com resposta, as perdas de ping e a cobertura da coleta.'],backups:['Backups','Guarde uma cópia dos seus dados e recupere quando precisar.'],overview:['Visão geral','Disponibilidade, sinais e eventos da sua rede.'],bbus:["BBU's","Monitore o ping, a latência e as perdas das suas BBU's."],datacoms:['Datacoms','Portas, sinais e circuitos em uma só tela.'],siae:['Rádios SIAE','Disponibilidade por ping e consumo real de banda do rádio.'],alerts:['Eventos','Cada mudança na rede, registrada em um só lugar.']};
 function navigate(page){
  window.getSelection()?.removeAllRanges();state.page=page;document.body.dataset.view=page;window.setupOverview?.(page);
  const datacom=page==='datacoms';$('#datacom-toolbar').hidden=!datacom;

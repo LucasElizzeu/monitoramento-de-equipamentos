@@ -20,9 +20,9 @@ Use somente **um processo/worker** do servidor, para evitar consultas e eventos 
 
 ## Abas do painel
 
-### Mapa do circuito — backbone de fibra
+### Backbone Veloso NOC — fibra e rádio
 
-A aba **Mapa do circuito** mostra o backbone informado, com 15 equipamentos e 28 fibras independentes. Manaus fica à esquerda; as rotas via Nazaré e via KM60/Membeca/Caapiranga se encontram em Anamã. TELEBRÁS, GNEX, INFOVIA, SMART e a fibra local entre os Datacoms de Tefé aparecem separadamente. Esta etapa cobre fibra; os enlaces de rádio serão desenhados depois.
+A aba **Backbone Veloso NOC** mostra o backbone informado, com 15 equipamentos e 28 fibras independentes. Manaus fica à esquerda; as rotas via Nazaré e via KM60/Membeca/Caapiranga se encontram em Anamã. TELEBRÁS, GNEX, INFOVIA, SMART e a fibra local entre os Datacoms de Tefé aparecem separadamente. O mapa também inclui as duas redes de rádio de Coari a Tefé.
 
 As duas fibras TELEBRÁS entre Anori e Coari usam trajetos retangulares com cantos arredondados, em faixas separadas. A INFOVIA liga o Datacom 2 de Manaus (`10.200.1.3`, Ten 1/1/4) ao Escritório de Tefé (`10.200.24.1`, Ten 1/1/4) e segue o mesmo estilo pela parte superior do desenho, e a GNEX pela parte inferior, preservando as cores de status e os detalhes de cada interface. Os equipamentos têm mais espaço entre si, e as leituras acompanham a direção de cada fibra, junto à linha correspondente. A tela inicia ajustada à área disponível e mostra apenas nomes e tráfego. O seletor **Exibir** permite mostrar todos os detalhes (IPs e sinal óptico) ou somente os pontos; a preferência fica salva no navegador. Os dados completos continuam disponíveis ao consultar cada fibra. A legenda e a ajuda ficam abaixo do mapa.
 
@@ -396,3 +396,5 @@ As duas redes de rádio têm ligação visual ao Datacom de Coari (`10.200.9.1`)
 ### Abas de equipamentos somente em cartões
 
 As abas **BBUs**, **Rádios SIAE** e **Datacoms** mostram somente cartões, sem repetir a lista de equipamentos acima. Busca por nome/IP e filtro de estado ficam acima dos cartões. BBUs exibem estado, IP, latência, perdas e última checagem; rádios preservam os grupos por trecho/rede e os controles de banda; Datacoms preservam os cartões de portas e circuitos. Cada equipamento mantém acesso a editar, ver detalhes e remover com confirmação. A atualização automática preserva o foco nos botões dos cartões. A tabela compacta da Visão geral continua sendo a visão consolidada da rede. As capturas de [BBUs](docs/bbus-cartoes.png) e [rádios](docs/radios-por-trecho.png) usam dados ilustrativos de validação.
+
+Os painéis de BBUs, rádios e Datacoms seguem o mesmo padrão compacto: busca e filtro dentro do cabeçalho do painel, controles de 36 px, cartões de 248 px no computador e uma coluna em telas pequenas, com fontes e espaçamentos consistentes. A aba **Backbone Veloso NOC** usa um ícone de topologia próprio. A [captura dos Datacoms](docs/datacoms-cartoes.png) mostra esse padrão com dados ilustrativos.
