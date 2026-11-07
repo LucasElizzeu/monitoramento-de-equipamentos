@@ -46,27 +46,26 @@
    const points=[a,{x:start,y:a.y},{x:start,y:lane},{x:end,y:lane},{x:end,y:b.y},b];
    return {d:roundedRoute(points),x:(start+end)/2,y:lane,labelX:(start+end)/2,anchor:'middle'};
   }
-  const cx=(a.x+b.x)/2-dy/len*link.bend*2,cy=(a.y+b.y)/2+dx/len*link.bend*2;
+  const direction=dx<0?-1:1,cx=(a.x+b.x)/2-dy/len*link.bend*2*direction,cy=(a.y+b.y)/2+dx/len*link.bend*2*direction;
   const x=(a.x+2*cx+b.x)/4,vertical=Math.abs(dx)<80;
-  return {d:`M${a.x},${a.y} Q${cx},${cy} ${b.x},${b.y}`,x,y:(a.y+2*cy+b.y)/4,labelX:vertical?(x<885?x+25:x-10):x,anchor:vertical?(x<885?'start':'end'):'middle'};
+  return {d:`M${a.x},${a.y} Q${cx},${cy} ${b.x},${b.y}`,x,y:(a.y+2*cy+b.y)/4,labelX:vertical?(x<960?x+25:x-10):x,anchor:vertical?(x<960?'start':'end'):'middle'};
  }
  // Keep each caption beside its own fiber, parallel to diagonal spans.
  function captionLayout(link,p){
   const a=byId(link.a),b=byId(link.b),vertical=Math.abs(b.x-a.x)<80;
-  const angle=link.route==='rectangular'||vertical?0:Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI;
-  const above=link.bend<=0;
+  let angle=link.route==='rectangular'||vertical?0:Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI;
+  if(angle>90)angle-=180;if(angle< -90)angle+=180;
+  const above=link.route==='rectangular'?(link.routeLane??Infinity)<Math.min(a.y,b.y):link.bend<=0;
   return {x:vertical&&link.route!=='rectangular'?p.labelX:p.x,y:p.y,angle,
-   offset:vertical&&link.route!=='rectangular'?-8:above?(display.value==='full'?-27:-13):22,
+   offset:vertical&&link.route!=='rectangular'?-8:above?(display.value==='full'?-34:-22):link.route==='rectangular'?20:Math.abs(b.y-a.y)<20?45:35,
    anchor:vertical&&link.route!=='rectangular'?p.anchor:'middle'};
  }
  const radioLinks=()=>config.radio_links||[];
  const radioReading=link=>radioMapState.link(link,state.data.devices,Date.now(),$('#connection-error').hidden);
  const radioStateNames={up:'Rádio ativo',high:'Ping acima de 200 ms',down:'Sem ping',unknown:'Sem leitura'};
  function radioTitle(link){return link.route==='tefe-tabatinga'?'Tefé → Tabatinga':`Rede ${link.network}`;}
- function radioGeometry(link){
-  if(link.route==='tefe-tabatinga'){const row=Math.floor((link.order-1)/5),i=(link.order-1)%5,direction=row%2?-1:1,start=direction===1?150:2150;return {y:1320+row*200,x1:start+direction*(i*400+35),x2:start+direction*((i+1)*400-35)};}
-  const y=link.network===1?900:1080;return {y,x1:190+(link.order-1)*490+35,x2:190+link.order*490-35};
- }
+ const radioGeometry=link=>backboneLayout.geometry(link);
+ const radioSites=()=>backboneLayout.sites(config);
  const radioNetworks=()=>config.radio_networks||[];
  function accessId(network,side){return `radio-access-${network}-${side}`;}
  function findAccess(id){for(const network of radioNetworks())for(const side of ['source','target'])if(accessId(network.network,side)===id)return {network,side,binding:network[side]};}
@@ -81,8 +80,8 @@
   let html='';
   for(const [route,binding]of Object.entries(config.radio_route_origins||{})){
    const origin={route,binding},v=originReading(origin),g=radioGeometry(v.link),node=v.node;
-   const points=[{x:node.x,y:node.y+20},{x:node.x,y:1192},{x:90,y:1192},{x:90,y:g.y},{x:g.x1,y:g.y}],d=roundedRoute(points,14);
-   html+=`<g class="radio-access radio-route-origin" data-link="radio-origin-${route}" data-status="${v.status}" tabindex="0" role="button" aria-label="Origem Tefé → Tabatinga no Datacom Tefé CLARO, porta a confirmar"><path class="radio-access-underlay" d="${d}"/><path class="radio-access-stroke" d="${d}"/><path class="fiber-hit" d="${d}"/><text class="radio-access-caption" x="${g.x1}" y="${g.y+88}" text-anchor="middle">Tefé CLARO · porta a confirmar</text></g>`;
+   const points=[{x:node.x+14,y:node.y},{x:1888,y:node.y},{x:1888,y:g.y},{x:g.x1,y:g.y}],d=roundedRoute(points,14);
+   html+=`<g class="radio-access radio-route-origin" data-link="radio-origin-${route}" data-status="${v.status}" tabindex="0" role="button" aria-label="Origem Tefé → Tabatinga no Datacom Tefé CLARO, porta a confirmar"><path class="radio-access-underlay" d="${d}"/><path class="radio-access-stroke" d="${d}"/><path class="fiber-hit" d="${d}"/><text class="radio-access-caption" x="${g.x1}" y="${g.y-50}" text-anchor="end">Tefé CLARO · porta a confirmar</text></g>`;
   }
   return html;
  }
@@ -97,9 +96,9 @@
    const first=radioGeometry(links[0]),last=radioGeometry(links.at(-1)),offset=network.network===1?-8:8;
    for(const side of ['source','target']){
     const node=byId(network[side].node),isSource=side==='source';
-    const points=isSource?[{x:node.x+20,y:node.y+offset},{x:2140+(network.network-1)*20,y:node.y+offset},{x:2140+(network.network-1)*20,y:738+(network.network-1)*28},{x:145-(network.network-1)*30,y:738+(network.network-1)*28},{x:145-(network.network-1)*30,y:first.y},{x:first.x1,y:first.y}]:[{x:last.x2,y:last.y},{x:2340+(network.network-1)*20,y:last.y},{x:2340+(network.network-1)*20,y:node.y+offset},{x:node.x+20,y:node.y+offset}];
+    const points=isSource?[{x:node.x-14,y:node.y+offset},{x:44-(network.network-1)*20,y:node.y+offset},{x:44-(network.network-1)*20,y:first.y},{x:first.x1,y:first.y}]:[{x:last.x2,y:last.y},{x:1860+(network.network-1)*16,y:last.y},{x:1860+(network.network-1)*16,y:node.y+offset},{x:node.x+14,y:node.y+offset}];
     const d=roundedRoute(points,14),id=accessId(network.network,side),label=isSource?`Coari · Ten 1/1/${7+network.network}`:'Tefé CLARO · Giga 5–8 a confirmar';
-    html+=`<g class="radio-access" data-link="${id}" data-network="${network.network}" data-end="${side}" tabindex="0" role="button" aria-label="${esc(label+' · Rede '+network.network)}"><path class="radio-access-underlay" d="${d}"/><path class="radio-access-stroke" d="${d}"/><path class="fiber-hit" d="${d}"/><text class="radio-access-caption" x="${isSource?first.x1:2160}" y="${first.y+88}" text-anchor="middle">${label}</text></g>`;
+    html+=`<g class="radio-access" data-link="${id}" data-network="${network.network}" data-end="${side}" tabindex="0" role="button" aria-label="${esc(label+' · Rede '+network.network)}"><path class="radio-access-underlay" d="${d}"/><path class="radio-access-stroke" d="${d}"/><path class="fiber-hit" d="${d}"/><text class="radio-access-caption" x="${isSource?first.x1:1805}" y="${first.y+80}" text-anchor="middle">${label}</text></g>`;
    }
   }
   return html;
@@ -109,33 +108,24 @@
   const port=binding.port?esc(binding.port):'Porta a confirmar · Giga 1/1/5, 1/1/6, 1/1/7 ou 1/1/8';
   renderInfo(`<button class="icon-button backbone-dismiss" aria-label="Fechar detalhes">×</button><strong>Rede ${network.network} · ${isSource?'Saída de Coari':'Chegada no CLARO'}</strong><div><strong>${esc(v.node.name)}</strong><small>${v.node.host} · ${port}</small><p>${esc(v.port.label)}${v.port.port?' · RX '+esc(rate(v.port)):''}</p></div><div><strong>${esc(v.radio.device?.name||'Rádio '+(isSource?'AP de Coari':'ST de Tefé'))}</strong><p>${esc(v.radio.label)} · Ping ${number(v.radio.latency)} ms</p></div><button type="button" class="button secondary" data-access-node="${v.node.id}">Ver Datacom</button>`);
  }
- function drawRadioHop(l){
-  const g=radioGeometry(l),y=g.y;
-  let html=`<g class="backbone-radio" data-link="${l.id}" data-radio-route="${l.route}" tabindex="0" role="button"><path class="radio-stroke" d="M${g.x1},${y} H${g.x2}"/><path class="fiber-hit" d="M${g.x1},${y} H${g.x2}"/><text class="radio-caption" x="${(g.x1+g.x2)/2}" y="${y-20}" text-anchor="middle"></text></g>`;
-  for(const [side,x]of [['a',g.x1],['b',g.x2]]){const n=l[side],label=side==='a'?'AP':'ST';html+=`<g class="radio-map-point" data-radio-host="${n.host}" data-radio-link="${l.id}" data-radio-side="${side}" transform="translate(${x} ${y})" tabindex="0" role="button" aria-label="${esc(n.name+' '+n.host)}"><title>${esc(n.name+' · '+n.host)}</title><circle r="16"/><image href="/static/icons/siae.png" x="-13" y="-13" width="26" height="26"/><text y="32" text-anchor="middle">${label}</text><text class="radio-ip" y="${side==='a'?65:49}" text-anchor="middle">${n.host}</text></g>`;}
-  return html;
+ function radioSiteReading(site){
+  const readings=site.refs.map(ref=>({ref,...radioReading(ref.link)[ref.side]})),states=readings.map(r=>r.status);
+  return {readings,status:states.includes('down')?'down':states.includes('unknown')?'unknown':states.includes('high')?'high':'up'};
+ }
+ function siteDetails(site){
+  const {readings,status}=radioSiteReading(site);
+  const sides=readings.map(r=>{const endpoint=r.ref.link[r.ref.side];return `<div><strong>${r.ref.side==='a'?'AP':'ST'} · ${esc(endpoint.name)}</strong><small>${endpoint.host}</small><p>${esc(r.label)} · Ping ${number(r.latency)} ms · RX ${bandwidth(r.bps)}</p><button type="button" class="button secondary" data-radio-endpoint="${r.ref.link.id}:${r.ref.side}">${r.device?'Ver rádio':'Cadastrar rádio'}</button></div>`;}).join('');
+  renderInfo(`<button class="icon-button backbone-dismiss" aria-label="Fechar detalhes">×</button><strong>${esc(site.name)} · ${radioStateNames[status]}</strong><small>${esc(site.group.title)}</small>${sides}`);
  }
  function drawRadios(){
-  if(!radioLinks().length)return '';
-  let html='<g id="radio-map-layer"><text class="radio-map-heading" x="45" y="817">Rádio · Coari → Tefé</text>';
-  for(const network of [1,2]){
-   const links=radioLinks().filter(l=>l.route==='coari-tefe'&&l.network===network).sort((a,b)=>a.order-b.order);if(!links.length)continue;
-   const y=network===1?900:1080,sites=[links[0].a.site,...links.map(l=>l.b.site)];
-   html+=`<text class="radio-network-label" x="45" y="${y+5}">Rede ${network}</text>`;
-   sites.forEach((site,i)=>{const x=190+i*490;html+=`<text class="radio-site" x="${x}" y="${y-56}" text-anchor="middle">${esc(site)}</text>`;});
-   html+=links.map(drawRadioHop).join('');
+  let html='<g id="radio-map-layer"><text class="radio-map-heading" x="24" y="424">Rádio · Coari → Tefé</text><text class="radio-map-heading" x="24" y="700">Rádio · Tefé → Tabatinga</text>';
+  for(const group of backboneLayout.groups){
+   if(group.network)html+=`<text class="radio-network-label" x="10" y="${group.y+5}">${group.network}</text>`;
+   for(const l of backboneLayout.linksFor(config,group)){const g=radioGeometry(l);html+=`<g class="backbone-radio" data-link="${l.id}" data-radio-route="${l.route}" tabindex="0" role="button"><path class="radio-stroke" d="M${g.x1},${g.y} H${g.x2}"/><path class="fiber-hit" d="M${g.x1},${g.y} H${g.x2}"/><text class="radio-caption" x="${(g.x1+g.x2)/2}" y="${g.y-18}" text-anchor="middle"></text></g>`;}
   }
-  const route=radioLinks().filter(l=>l.route==='tefe-tabatinga').sort((a,b)=>a.order-b.order);
-  if(route.length){
-   html+='<g id="radio-tefe-tabatinga-layer"><text class="radio-map-heading" x="45" y="1228">Rádio · Tefé → Tabatinga</text>';
-   for(let row=0;row<Math.ceil(route.length/5);row++){
-    const links=route.slice(row*5,row*5+5),direction=row%2?-1:1,start=direction===1?150:2150,y=1320+row*200;
-    const sites=[links[0].a.site,...links.map(l=>l.b.site)];
-    sites.forEach((site,i)=>{html+=`<text class="radio-site" x="${start+direction*i*400}" y="${y-56}" text-anchor="middle">${esc(site)}</text>`;});
-    if(row){const previous=radioGeometry(route[row*5-1]),current=radioGeometry(links[0]),side=row%2?2250:50;const d=roundedRoute([{x:previous.x2,y:previous.y+16},{x:side,y:previous.y+16},{x:side,y:current.y-16},{x:current.x1,y:current.y-16}],14);html+=`<path class="radio-route-continuation" d="${d}"><title>Continuação do trecho em ${esc(links[0].a.site)}; não representa leitura de uma porta local.</title></path>`;}
-    html+=links.map(drawRadioHop).join('');
-   }
-   html+='</g>';
+  for(const site of radioSites()){
+   const ips=site.refs.map((ref,i)=>`<tspan x="0" ${i?'dy="13"':''}>${ref.link[ref.side].host}</tspan>`).join('');
+   html+=`<g class="radio-map-point radio-site-point" data-link="${site.id}" data-radio-site="${site.id}" transform="translate(${site.x} ${site.y})" tabindex="0" role="button" aria-label="${esc(site.name+' · '+site.group.title)}"><title>${esc(site.name+' · '+site.group.title+' · '+site.refs.length+' rádio(s)')}</title><circle r="13"/><image href="/static/icons/siae.png" x="-11" y="-11" width="22" height="22"/><text class="radio-site" y="32" text-anchor="middle">${esc(backboneLayout.shortName(site.name))}</text><text class="radio-ip" y="51" text-anchor="middle">${ips}</text></g>`;
   }
   return html+'</g>';
  }
@@ -143,9 +133,10 @@
   for(const l of radioLinks()){
    const v=radioReading(l),g=svg.querySelector(`[data-link="${l.id}"]`),p=radioGeometry(l);
    g.dataset.status=v.status;g.setAttribute('aria-label',`${radioTitle(l)}, ${l.a.site} para ${l.b.site}, ${radioStateNames[v.status]}`);
-   g.querySelector('text').innerHTML=`<tspan x="${(p.x1+p.x2)/2}">Ping ${number(v.a.latency)} / ${number(v.b.latency)} ms</tspan><tspan class="radio-band" x="${(p.x1+p.x2)/2}" dy="14">RX ${bandwidth(v.a.bps).replace(/<[^>]*>/g,'')} / ${bandwidth(v.b.bps).replace(/<[^>]*>/g,'')}</tspan>`;
-   for(const side of ['a','b'])svg.querySelector(`[data-radio-link="${l.id}"][data-radio-side="${side}"]`).dataset.status=v[side].status;
+   const primary=v.a.bps!=null?bandwidth(v.a.bps).replace(/<[^>]*>/g,''):v.status==='down'?'Sem ping':v.status==='unknown'?'Sem leitura':`Ping ${number(Math.max(v.a.latency,v.b.latency))} ms`;
+   g.querySelector('text').innerHTML=`<tspan x="${(p.x1+p.x2)/2}">${esc(primary)}</tspan><tspan class="radio-endpoint-ping" x="${(p.x1+p.x2)/2}" y="${p.y+(display.value==='full'?88:64)}">AP ${number(v.a.latency)} / ST ${number(v.b.latency)} ms</tspan>`;
   }
+  for(const site of radioSites()){const v=radioSiteReading(site),g=svg.querySelector(`[data-radio-site="${site.id}"]`);g.dataset.status=v.status;g.setAttribute('aria-label',`${site.name}, ${site.group.title}, ${site.refs.length} rádios, ${radioStateNames[v.status]}`);}
   for(const [route,binding]of Object.entries(config.radio_route_origins||{})){const g=svg.querySelector(`[data-link="radio-origin-${route}"]`);if(g)g.dataset.status=originReading({route,binding}).status;}
   for(const network of radioNetworks())for(const side of ['source','target']){const g=svg.querySelector(`[data-link="${accessId(network.network,side)}"]`);if(g)g.dataset.status=accessReading(network,side).status;}
  }
@@ -160,9 +151,9 @@
  }
  function draw(){
   applyMapScope();
-  svg.innerHTML=config.links.map(link=>{const p=path(link);return `<g class="backbone-fiber" data-link="${link.id}" tabindex="0" role="button"><path class="fiber-stroke" d="${p.d}"/><path class="fiber-hit" d="${p.d}"/><text class="fiber-caption" x="${p.labelX}" y="0" text-anchor="${p.anchor}"></text></g>`;}).join('')+config.nodes.map(n=>`<g class="backbone-node" data-node="${n.id}" transform="translate(${n.x} ${n.y})" tabindex="0" role="button" aria-label="${esc(n.name+' '+n.host)}"><circle r="20"/><image href="/static/icons/datacom.png" x="-18" y="-18" width="36" height="36"/><text y="36" text-anchor="middle">${esc(n.name)}</text><text class="node-ip" y="51" text-anchor="middle">${n.host}${n.kind==='huawei'?' · Huawei':''}</text></g>`).join('');
+  svg.innerHTML='<text class="radio-map-heading" x="24" y="16">Backbone · fibra</text>'+config.links.map(link=>{const p=path(link);return `<g class="backbone-fiber" data-link="${link.id}" tabindex="0" role="button"><path class="fiber-stroke" d="${p.d}"/><path class="fiber-hit" d="${p.d}"/><text class="fiber-caption" x="${p.labelX}" y="0" text-anchor="${p.anchor}"></text></g>`;}).join('')+config.nodes.map(n=>`<g class="backbone-node" data-node="${n.id}" transform="translate(${n.x} ${n.y})" tabindex="0" role="button" aria-label="${esc(n.name+' '+n.host)}"><circle r="14"/><image href="/static/icons/datacom.png" x="-12" y="-12" width="24" height="24"/><text y="30" text-anchor="middle">${esc(n.name)}</text><text class="node-ip" y="46" text-anchor="middle">${n.host}${n.kind==='huawei'?' · Huawei':''}</text></g>`).join('');
   svg.insertAdjacentHTML('beforeend',drawRadioAccess()+drawRouteOrigins()+drawRadios());
-  if(!svg.style.width)fitMap();refresh();
+  if(!svg.style.width){if(viewport.clientWidth<640)applyZoom(.8,false);else fitMap();}refresh();
  }
  function refresh(){
   if(!config||state.page!=='backbone')return;
@@ -173,7 +164,8 @@
    const t=g.querySelector('text'),layout=captionLayout(link,p),y=layout.offset;
    t.setAttribute('transform',`translate(${layout.x} ${layout.y}) rotate(${layout.angle})`);
    t.setAttribute('text-anchor',layout.anchor);
-   const caption=`<tspan x="0" y="${y}">${esc(link.label||'')} ${esc(rate(v.a))} / ${esc(rate(v.b))}</tspan><tspan class="fiber-optics" x="0" dy="14">RX ${esc(number(v.a.port?.rx,1))} / ${esc(number(v.b.port?.rx,1))} dBm</tspan>${link.maintenance?'<tspan class="fiber-maintenance" x="0" dy="14">Em reparo</tspan>':''}`;
+   const compact=display.value!=='full',primary=compact?(link.maintenance?'Em reparo':v.a.port?.rx_bps==null?'Sem leitura':rate(v.a)):`${rate(v.a)} / ${rate(v.b)}`;
+   const caption=`<tspan x="0" y="${y}">${esc(link.label||'')} ${esc(primary)}</tspan><tspan class="fiber-optics" x="0" dy="14">RX ${esc(number(v.a.port?.rx,1))} / ${esc(number(v.b.port?.rx,1))} dBm</tspan>${link.maintenance&&!compact?'<tspan class="fiber-maintenance" x="0" dy="14">Em reparo</tspan>':''}`;
    if(t.innerHTML!==caption)t.innerHTML=caption;
   }
   for(const n of config.nodes){const d=device(n),el=svg.querySelector(`[data-node="${n.id}"]`);el.dataset.status=d?.state||'pending';el.setAttribute('aria-label',`${n.name}, ${n.host}, ${d?labels[d.state]||d.state:'não cadastrado'}`);}
@@ -183,6 +175,7 @@
   if(active)details(active);
  }
  function details(id){
+  const site=radioSites().find(s=>s.id===id);if(site){siteDetails(site);return;}
   const origin=routeOrigin(id);if(origin){originDetails(origin);return;}
   const access=findAccess(id);if(access){accessDetails(access);return;}
   const radio=radioLinks().find(l=>l.id===id);if(radio){radioDetails(radio);return;}
@@ -224,7 +217,6 @@
  svg.addEventListener('focusout',focusLeaves);info.addEventListener('focusout',focusLeaves);
  function activate(e){
   const fiber=e.target.closest('[data-link]');if(fiber){show(fiber,e,modality!=='mouse');return;}
-  const radioPoint=e.target.closest('[data-radio-host]');if(radioPoint){openRadio(radioLinks().find(l=>l.id===radioPoint.dataset.radioLink),radioPoint.dataset.radioSide);return;}
   const target=e.target.closest('[data-node]');if(!target)return;
   const n=byId(target.dataset.node),d=device(n);if(d){openDetail(d.id);return;}
   openAdd();$('#device-form [name="name"]').value=n.name;$('#device-form [name="host"]').value=n.host;
@@ -256,14 +248,17 @@
  $('#backbone-zoom-in').onclick=()=>applyZoom(zoom+.2);
  $('#backbone-zoom-out').onclick=()=>applyZoom(zoom-.2);
  function fitMap(){
-  applyZoom(Math.min(viewport.clientWidth/svg.viewBox.baseVal.width,viewport.clientHeight/svg.viewBox.baseVal.height),false);autoFit=true;
+  applyZoom(viewport.clientWidth/svg.viewBox.baseVal.width,false);autoFit=true;
  }
- const scope=$('#backbone-scope'),mapScopes={all:'0 0 2380 1840',backbone:'0 0 2380 1200','tefe-tabatinga':'0 1200 2380 640'};
+ const scope=$('#backbone-scope'),mapScopes=backboneLayout.bounds;
  try{const saved=localStorage.getItem('alwaysup-backbone-scope');if(Object.hasOwn(mapScopes,saved))scope.value=saved;}catch{}
  function applyMapScope(){svg.setAttribute('viewBox',mapScopes[scope.value]||mapScopes.all);}
- scope.onchange=()=>{hideInfo();applyMapScope();if(config)fitMap();try{localStorage.setItem('alwaysup-backbone-scope',scope.value);}catch{}};
+ scope.onchange=()=>{hideInfo();applyMapScope();if(config){if(viewport.clientWidth<640&&!autoFit)applyZoom(zoom,false);else fitMap();}try{localStorage.setItem('alwaysup-backbone-scope',scope.value);}catch{}};
  $('#backbone-fit').onclick=fitMap;
- new ResizeObserver(()=>{if(autoFit&&config&&state.page==='backbone')fitMap();}).observe(viewport);
+ const fullscreen=$('#backbone-fullscreen');
+ fullscreen.onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();}catch{toast('O navegador não permitiu abrir a tela cheia.');}};
+ document.addEventListener('fullscreenchange',()=>{const active=document.fullscreenElement===document.documentElement;document.body.dataset.mapFullscreen=String(active);fullscreen.textContent=active?'Sair da tela cheia':'Tela cheia';fullscreen.setAttribute('aria-pressed',String(active));});
+ new ResizeObserver(()=>{if(autoFit&&config&&state.page==='backbone'){if(viewport.clientWidth<640)applyZoom(Math.max(zoom,.8),false);else fitMap();}}).observe(viewport);
  viewport.addEventListener('pointerdown',e=>{if(e.button!==0||drag)return;didDrag=false;drag={id:e.pointerId,x:e.clientX,y:e.clientY,left:viewport.scrollLeft,top:viewport.scrollTop};});
  viewport.addEventListener('pointermove',e=>{
   if(!drag||e.pointerId!==drag.id)return;
@@ -282,7 +277,7 @@
   else if(['+','=','-','−'].includes(e.key)){e.preventDefault();applyZoom(zoom+(['-','−'].includes(e.key)?-.2:.2));}
  });
 
- async function start(){if(state.page!=='backbone'){hideInfo();return;}if(config){refresh();return;}try{config=await api('/api/backbone');draw();$('#backbone-error').hidden=true;}catch(error){$('#backbone-error').hidden=false;$('#backbone-error').textContent=error.message;}}
+ async function start(){if(state.page!=='backbone'){hideInfo();if(document.body.dataset.mapFullscreen==='true'&&document.fullscreenElement)document.exitFullscreen().catch(()=>{});return;}if(config){refresh();return;}try{config=await api('/api/backbone');draw();$('#backbone-error').hidden=true;}catch(error){$('#backbone-error').hidden=false;$('#backbone-error').textContent=error.message;}}
  window.addEventListener('keydown',e=>{if(e.key==='Escape')dismissInfo();});
  $('#refresh').addEventListener('click',()=>{if(state.page==='backbone'&&!config)start();});
  window.addEventListener('monitor-page',start);window.addEventListener('monitor-data',refresh);setInterval(refresh,1500);

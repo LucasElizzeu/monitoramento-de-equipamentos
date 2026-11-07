@@ -4,120 +4,120 @@
       "id": "manaus",
       "name": "Manaus",
       "host": "10.200.1.1",
-      "x": 80,
-      "y": 260,
+      "x": 1680.0,
+      "y": 153.0,
       "kind": "huawei"
     },
     {
       "id": "manaus2",
       "name": "Manaus · Datacom 2",
       "host": "10.200.1.3",
-      "x": 80,
-      "y": 460,
+      "x": 1680.0,
+      "y": 259.25,
       "kind": "datacom"
     },
     {
       "id": "limao",
       "name": "Limão",
       "host": "10.10.0.18",
-      "x": 290,
-      "y": 260,
+      "x": 1536.0,
+      "y": 153.0,
       "kind": "datacom"
     },
     {
       "id": "manacapuru",
       "name": "Manacapuru",
       "host": "10.200.3.1",
-      "x": 500,
-      "y": 260,
+      "x": 1368.0,
+      "y": 153.0,
       "kind": "datacom"
     },
     {
       "id": "km60",
       "name": "KM60",
       "host": "10.10.30.2",
-      "x": 696,
-      "y": 440,
+      "x": 1264.0,
+      "y": 250.75,
       "kind": "datacom"
     },
     {
       "id": "membeca",
       "name": "Membeca",
       "host": "10.10.30.3",
-      "x": 892,
-      "y": 440,
+      "x": 1112.0,
+      "y": 250.75,
       "kind": "datacom"
     },
     {
       "id": "caapiranga",
       "name": "Caapiranga",
       "host": "10.200.26.1",
-      "x": 1088,
-      "y": 440,
+      "x": 960.0,
+      "y": 250.75,
       "kind": "datacom"
     },
     {
       "id": "nazare",
       "name": "Nazaré",
       "host": "10.200.4.1",
-      "x": 892,
-      "y": 150,
+      "x": 1160.0,
+      "y": 72.25,
       "kind": "datacom"
     },
     {
       "id": "anama",
       "name": "Anamã",
       "host": "10.200.5.1",
-      "x": 1284,
-      "y": 260,
+      "x": 952.0,
+      "y": 153.0,
       "kind": "datacom"
     },
     {
       "id": "anori",
       "name": "Anori",
       "host": "10.200.6.1",
-      "x": 1480,
-      "y": 260,
+      "x": 792.0,
+      "y": 153.0,
       "kind": "datacom"
     },
     {
       "id": "codajas",
       "name": "Codajás",
       "host": "10.200.7.1",
-      "x": 1676,
-      "y": 260,
+      "x": 632.0,
+      "y": 153.0,
       "kind": "datacom"
     },
     {
       "id": "sodre",
       "name": "Sodré",
       "host": "10.200.8.1",
-      "x": 1872,
-      "y": 260,
+      "x": 472.0,
+      "y": 153.0,
       "kind": "datacom"
     },
     {
       "id": "coari",
       "name": "Coari",
       "host": "10.200.9.1",
-      "x": 2068,
-      "y": 260,
+      "x": 120.0,
+      "y": 153.0,
       "kind": "datacom"
     },
     {
       "id": "claro",
       "name": "Tefé CLARO",
       "host": "10.200.19.1",
-      "x": 2292,
-      "y": 440,
+      "x": 1824.0,
+      "y": 340.0,
       "kind": "datacom"
     },
     {
       "id": "escritorio",
       "name": "Escritório Tefé",
       "host": "10.200.24.1",
-      "x": 2292,
-      "y": 70,
+      "x": 1824.0,
+      "y": 72.25,
       "kind": "datacom"
     }
   ],
@@ -342,7 +342,8 @@
       "bend": 170,
       "maintenance": false,
       "route": "rectangular",
-      "routeOffset": 10
+      "routeOffset": 10,
+      "routeLane": 199.75
     },
     {
       "id": "anori-coari-2",
@@ -354,7 +355,8 @@
       "bend": 220,
       "maintenance": false,
       "route": "rectangular",
-      "routeOffset": -10
+      "routeOffset": -10,
+      "routeLane": 233.75
     },
     {
       "id": "manaus-manaus2-1",
@@ -376,8 +378,8 @@
       "bend": 170,
       "maintenance": false,
       "route": "rectangular",
-      "routeOffset": -30,
-      "routeLane": 690
+      "routeOffset": 24.0,
+      "routeLane": 46.75
     },
     {
       "id": "manaus2-escritorio-1",
@@ -389,8 +391,8 @@
       "bend": -100,
       "maintenance": false,
       "route": "rectangular",
-      "routeOffset": -30,
-      "routeLane": 45
+      "routeOffset": 32.0,
+      "routeLane": 55.25
     },
     {
       "id": "coari-claro-1",
@@ -400,7 +402,10 @@
       "port_b": "ten-gigabit-ethernet:1/1/4",
       "label": "SMART",
       "bend": 15,
-      "maintenance": false
+      "maintenance": false,
+      "route": "rectangular",
+      "routeLane": 352.75,
+      "routeOffset": -48.0
     },
     {
       "id": "claro-escritorio-1",

@@ -60,3 +60,27 @@ body[data-view=backbone] .backbone-scroll{height:calc(100dvh - 225px);min-height
 .radio-route-continuation{fill:none;stroke:#aeb9c7;stroke-width:1.5;stroke-dasharray:4 5;pointer-events:none}
 #backbone-scope{max-width:190px}
 @media(max-width:640px){.backbone-actions .backbone-view-label{flex:1;min-width:0}.backbone-actions select{min-width:0;max-width:100%;flex:1}.backbone-actions .map-view-controls{width:100%;justify-content:flex-end}}
+/* Wide topology: preserve readable scale by fitting width, with vertical scroll as needed. */
+body[data-layout][data-view=backbone] main{max-width:none;width:100%;padding:14px 16px 12px;box-sizing:border-box}
+body[data-view=backbone] .backbone-scroll{height:calc(100dvh - 205px);min-height:420px;max-height:none;border-radius:8px;background:#fff}
+body[data-layout][data-view=backbone] .page-heading{margin-bottom:10px}
+body[data-view=backbone] #backbone-section .backbone-toolbar{margin-bottom:10px}
+body[data-view=backbone] .backbone-actions{gap:10px}
+#backbone-map .backbone-node text:not(.node-ip),#backbone-map[data-display=traffic] .backbone-node text:not(.node-ip){font-size:15px;font-weight:550}
+#backbone-map .node-ip{font-size:10px}
+#backbone-map .fiber-caption,#backbone-map[data-display=traffic] .fiber-caption{font-size:14px}
+#backbone-map .radio-map-heading{font-size:18px;font-weight:650}
+#backbone-map .radio-site-point .radio-site{font-size:13px;font-weight:550;fill:var(--ink)}
+#backbone-map .radio-site-point .radio-ip{font-size:9px}
+#backbone-map .radio-caption{font-size:14px}
+#backbone-map .radio-endpoint-ping{font-size:11px;fill:#6b7789}
+#backbone-map[data-display=clean] .radio-endpoint-ping{display:none}
+#backbone-map .radio-access-caption{font-size:10px}
+#backbone-map .radio-stroke{stroke-width:4}
+body[data-map-fullscreen=true] .sidebar,body[data-map-fullscreen=true] .topbar,body[data-map-fullscreen=true] .page-heading{display:none}
+body[data-map-fullscreen=true] .app-shell{margin-left:0}
+body[data-layout][data-map-fullscreen=true] main{height:100dvh;padding:10px;max-width:none;box-sizing:border-box}
+body[data-map-fullscreen=true] #backbone-section{height:100%;display:flex;flex-direction:column}
+body[data-map-fullscreen=true] #backbone-section .backbone-scroll{height:auto;min-height:0;flex:1}
+body[data-map-fullscreen=true] .backbone-overview>strong::before{content:'Backbone Veloso NOC · '}
+@media(max-width:760px){body[data-view=backbone] .backbone-scroll{height:65dvh;min-height:360px}.backbone-actions .map-view-controls{justify-content:flex-start}body[data-map-fullscreen=true] #backbone-section .backbone-scroll{min-height:0}}
