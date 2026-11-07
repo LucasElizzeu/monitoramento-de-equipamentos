@@ -1,0 +1,23 @@
+/* Dedicated equipment tabs contain cards, with one shared search/filter control. */
+.equipment-card-toolbar{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-bottom:14px}
+.equipment-card-toolbar[hidden]{display:none}
+.equipment-card-toolbar #device-filters{display:flex;align-items:center;flex-direction:row;gap:10px;flex-wrap:wrap}
+.equipment-card-toolbar .search input{width:220px;min-width:0}
+.bbu-card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));gap:14px;align-items:start}
+.bbu-card-grid>.empty-state{grid-column:1/-1}
+.bbu-device-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--card-shadow);padding:14px;min-width:0}
+.bbu-device-card>header{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap}
+body[data-layout] .bbu-device-card h2{font-size:14px;margin:0;line-height:1.5}
+.bbu-device-card .equipment-icon{width:26px;height:26px}
+.bbu-device-card .ip{font-size:12px;margin:10px 0;overflow-wrap:anywhere}
+.bbu-card-values{display:grid;grid-template-columns:1fr 1fr;gap:12px;border-top:1px solid var(--line);padding-top:10px;font-size:11px;color:var(--muted)}
+.bbu-card-values strong{display:block;font-size:20px;font-weight:700;color:var(--ink);margin-top:3px}
+.bbu-card-values small{font-size:11px;font-weight:500}
+.bbu-last-check{display:block;color:var(--muted);font-size:10px;margin:10px 0}
+.card-equipment-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:8px}
+.card-equipment-actions .icon-button{display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center;background:var(--raised);color:var(--ink);border-radius:6px}
+.card-equipment-actions [data-remove]{color:var(--red);background:var(--danger-bg)}
+.card-equipment-actions svg{width:16px;height:16px}
+body[data-view=datacoms] #ports-content{display:grid;gap:14px}
+body[data-layout][data-view=datacoms] .datacom-device-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--card-shadow);padding:14px;min-width:0}
+@media(max-width:640px){.equipment-card-toolbar{justify-content:stretch}.equipment-card-toolbar #device-filters{width:100%;display:grid;grid-template-columns:minmax(0,1fr) minmax(110px,.8fr);gap:8px}.equipment-card-toolbar .search{min-width:0}.equipment-card-toolbar .search input{width:100%;min-width:0}.equipment-card-toolbar select{max-width:100%;min-width:0;font-size:11px}.bbu-card-grid{grid-template-columns:1fr}.card-equipment-actions .icon-button{width:36px;height:36px}}

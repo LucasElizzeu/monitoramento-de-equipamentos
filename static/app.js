@@ -167,6 +167,11 @@ function filteredDevices(devices=pageDevices()){
  const q=$('#search').value.trim().toLowerCase(),filter=$('#state-filter').value;
  return devices.filter(d=>(d.name.toLowerCase().includes(q)||d.host.includes(q))&&(filter==='all'||d.state===filter));
 }
+function equipmentCardActions(d){return `<div class="card-equipment-actions"><button type="button" class="icon-button" data-edit="${d.id}" title="Editar equipamento" aria-label="Editar ${esc(d.name)}">${icon('edit')}</button><button type="button" class="icon-button" data-detail="${d.id}" title="Ver detalhes" aria-label="Ver detalhes de ${esc(d.name)}">${icon('arrow')}</button><button type="button" class="icon-button" data-remove="${d.id}" title="Remover equipamento" aria-label="Remover ${esc(d.name)}">${icon('trash')}</button></div>`;}
+function renderBbus(){
+ const all=pageDevices('bbus'),devices=filteredDevices(all);
+ $('#bbu-content').innerHTML=devices.length?devices.map(d=>`<article class="bbu-device-card" data-bbu="${d.id}" aria-label="${esc(d.name)}"><header><h2 class="equipment-title">${equipmentIcon(d.kind)}<span>${esc(d.name)}</span></h2>${badge(d.state)}</header><p class="ip">${deviceAddressHTML(d)}</p><div class="bbu-card-values"><span>Latência<strong>${number(d.latency)} <small>ms</small></strong></span><span>Perdas consecutivas<strong>${d.failures} <small>/ 21</small></strong></span></div><small class="bbu-last-check">Última checagem: ${ago(d.last_check)}</small>${equipmentCardActions(d)}</article>`).join(''):empty(all.length?'Nenhuma BBU neste filtro':'Cadastre sua primeira BBU',all.length?'Tente outro nome, IP ou status.':'Adicione uma BBU para acompanhar ping e latência.',!all.length);
+}
 function renderDevices(){
  const all=pageDevices(),devices=filteredDevices(all);
  $('#table-title').textContent=state.page==='bbus'?"BBU's":state.page==='datacoms'?'Datacoms':state.page==='siae'?'Rádios SIAE':'Equipamentos';
@@ -198,7 +203,7 @@ function siaeCardHTML(device){
  const consumption=device.siae_consumption||{};
  const pair=consumption.status==='demo'||device.siae_interfaces?.length===2;
  const note=consumption.status==='demo'?'Dados simulados · TRX A + TRX B':consumption.error||consumption.note||(consumption.total_bps==null?'Ative a leitura em Configurar banda.':pair?'RX total = TRX A + TRX B':'RX da interface TRX selecionada.');
- return `<article class="port-card siae-card" data-siae="${device.id}" data-radio-status="${radioHealth(device)}" data-band-enabled="${Boolean(device.siae_enabled)}"><div class="port-card-header"><h3 class="equipment-title">${equipmentIcon(device.kind)}<span>${esc(device.name)}</span></h3>${radioBadge(device)}</div><p class="siae-address ip">${deviceAddressHTML(device)}</p><div class="port-ping-values siae-ping"><span>Latência<strong>${number(device.latency,2)} <small>ms</small></strong></span><span>Perdas<strong>${device.failures} <small>/ 21</small></strong></span></div><small>Ping ${ago(device.last_check)}</small><div class="port-traffic"><div class="traffic-heading">Consumo total · RX</div><div class="traffic-values"><strong>${bandwidth(consumption.total_bps)}</strong></div></div>${pair?`<div class="siae-trx"><span>TRX A<strong>${bandwidth(consumption.trx_a_bps)}</strong></span><span>TRX B<strong>${bandwidth(consumption.trx_b_bps)}</strong></span></div>`:`<p class="siae-source">Interface TRX · índice ${esc((device.siae_interfaces||[3])[0])}</p>`}${consumption.checked_at?`<small>Banda ${ago(consumption.checked_at)}</small>`:''}<p class="siae-note ${consumption.total_bps==null?'pending':''} ${consumption.status==='error'?'error':''}">${esc(note)}</p>${siaeDiagnosticHTML(device)}${device.siae_enabled?`<button type="button" class="button secondary siae-configure" data-check-siae="${device.id}" ${state.siaeChecking?.has(device.id)?'disabled':''}>${icon('refresh')}Consultar banda agora</button>`:''}<button type="button" class="button secondary siae-configure" data-configure-siae="${device.id}">${icon('edit')}${device.siae_enabled?'Editar banda':'Configurar banda'}</button></article>`;
+ return `<article class="port-card siae-card" data-siae="${device.id}" data-radio-status="${radioHealth(device)}" data-band-enabled="${Boolean(device.siae_enabled)}"><div class="port-card-header"><h3 class="equipment-title">${equipmentIcon(device.kind)}<span>${esc(device.name)}</span></h3>${radioBadge(device)}</div><p class="siae-address ip">${deviceAddressHTML(device)}</p><div class="port-ping-values siae-ping"><span>Latência<strong>${number(device.latency,2)} <small>ms</small></strong></span><span>Perdas<strong>${device.failures} <small>/ 21</small></strong></span></div><small>Ping ${ago(device.last_check)}</small><div class="port-traffic"><div class="traffic-heading">Consumo total · RX</div><div class="traffic-values"><strong>${bandwidth(consumption.total_bps)}</strong></div></div>${pair?`<div class="siae-trx"><span>TRX A<strong>${bandwidth(consumption.trx_a_bps)}</strong></span><span>TRX B<strong>${bandwidth(consumption.trx_b_bps)}</strong></span></div>`:`<p class="siae-source">Interface TRX · índice ${esc((device.siae_interfaces||[3])[0])}</p>`}${consumption.checked_at?`<small>Banda ${ago(consumption.checked_at)}</small>`:''}<p class="siae-note ${consumption.total_bps==null?'pending':''} ${consumption.status==='error'?'error':''}">${esc(note)}</p>${siaeDiagnosticHTML(device)}${device.siae_enabled?`<button type="button" class="button secondary siae-configure" data-check-siae="${device.id}" ${state.siaeChecking?.has(device.id)?'disabled':''}>${icon('refresh')}Consultar banda agora</button>`:''}<button type="button" class="button secondary siae-configure" data-configure-siae="${device.id}">${icon('edit')}${device.siae_enabled?'Editar banda':'Configurar banda'}</button>${equipmentCardActions(device)}</article>`;
 }
 function radioHealth(d){return d.radio_status||(d.state==='offline'?'down':['online','unstable'].includes(d.state)&&d.latency!=null?(d.latency>200?'high':'up'):'unknown');}
 function radioBadge(d){const health=radioHealth(d),names={up:'Respondendo',high:'Ping alto',down:'Sem ping',unknown:'Sem leitura'};return `<span class="radio-status radio-${health}"><i></i>${names[health]}</span>`;}
@@ -234,7 +239,7 @@ function portPingHTML(c,d){
 }
 function datacomHTML(d){
  const ports=d.ssh_error?[]:(d.port_data||[]);
- return `<div class="port-device" data-datacom="${d.id}"><div class="datacom-heading"><div><div class="port-device-title"><span class="circuit-position" title="Posição no circuito">${d.circuit_position??'—'}</span><h3 class="equipment-title">${equipmentIcon(d.kind)}<span>${esc(d.name)}</span></h3></div><p class="datacom-meta"><span class="ip">${esc(d.host)}</span>${badge(d.state)}<span>Ping ${number(d.latency,2)} ms</span></p></div><div class="datacom-tools"><div class="datacom-port-counts">${d.ssh_error?badge('error'):`<span class="status-pill up">${ports.filter(p=>p.state==='up').length} ativas</span>${ports.some(p=>p.state==='down')?`<span class="status-pill down">${ports.filter(p=>p.state==='down').length} inativas</span>`:''}`}</div><div class="device-actions"><button type="button" class="icon-button" data-edit="${d.id}" title="Editar Datacom" aria-label="Editar ${esc(d.name)}">${icon('edit')}</button><button type="button" class="icon-button" data-detail="${d.id}" title="Ver detalhes" aria-label="Ver detalhes de ${esc(d.name)}">${icon('arrow')}</button><button type="button" class="icon-button" data-remove="${d.id}" title="Remover Datacom" aria-label="Remover ${esc(d.name)}">${icon('trash')}</button></div><button type="button" class="button secondary" data-configure-circuits="${d.id}">Configurar IPs</button></div></div>${portsHTML(d)}</div>`;
+ return `<article class="port-device datacom-device-card" data-datacom="${d.id}"><div class="datacom-heading"><div><div class="port-device-title"><span class="circuit-position" title="Posição no circuito">${d.circuit_position??'—'}</span><h3 class="equipment-title">${equipmentIcon(d.kind)}<span>${esc(d.name)}</span></h3></div><p class="datacom-meta"><span class="ip">${esc(d.host)}</span>${badge(d.state)}<span>Ping ${number(d.latency,2)} ms</span></p></div><div class="datacom-tools"><div class="datacom-port-counts">${d.ssh_error?badge('error'):`<span class="status-pill up">${ports.filter(p=>p.state==='up').length} ativas</span>${ports.some(p=>p.state==='down')?`<span class="status-pill down">${ports.filter(p=>p.state==='down').length} inativas</span>`:''}`}</div><div class="device-actions"><button type="button" class="icon-button" data-edit="${d.id}" title="Editar Datacom" aria-label="Editar ${esc(d.name)}">${icon('edit')}</button><button type="button" class="icon-button" data-detail="${d.id}" title="Ver detalhes" aria-label="Ver detalhes de ${esc(d.name)}">${icon('arrow')}</button><button type="button" class="icon-button" data-remove="${d.id}" title="Remover Datacom" aria-label="Remover ${esc(d.name)}">${icon('trash')}</button></div><button type="button" class="button secondary" data-configure-circuits="${d.id}">Configurar IPs</button></div></div>${portsHTML(d)}</article>`;
 }
 function findCircuit(id){
  for(const device of state.data.devices){const circuit=(device.circuits||[]).find(c=>c.id===id);if(circuit)return{device,circuit};}
@@ -314,14 +319,18 @@ function render(){
  $('#reading-banner').hidden=!paused;
  if(paused)return;
  const overviewFocus=state.page==='overview'?document.activeElement?.dataset.overviewActions:null;
+ const cardElement=document.activeElement,cardContainer=cardElement?.closest('#bbu-content,#siae-content,#ports-content');
+ const cardAction=cardContainer&&['data-edit','data-detail','data-remove','data-configure-siae','data-check-siae','data-configure-circuits'].find(key=>cardElement.hasAttribute(key));
+ const cardFocus=cardAction?{container:cardContainer.id,key:cardAction,value:cardElement.getAttribute(cardAction)}:null;
  const {devices,alerts,samples}=state.data;$('#last-update').textContent=`${state.demo?'Simulação':'Atualizado'} às ${formatTime(state.data.updated_at)}`;
- renderMetrics();renderDevices();renderSiae();renderLatency();
+ renderMetrics();renderDevices();renderBbus();renderSiae();renderLatency();
  $('#recent-events').innerHTML=alerts.length?alerts.slice(0,3).map(eventHTML).join(''):empty('Nenhum evento por aqui','Quedas e recuperações aparecerão neste espaço.');
  $('#alerts-content').innerHTML=alerts.length?alerts.map(eventHTML).join(''):empty('Sua linha do tempo começa aqui','Eventos serão registrados automaticamente quando houver uma mudança na rede.');
  const openPorts=new Set([...$('#ports-content').querySelectorAll('details[open]')].map(e=>e.dataset.portKey));
  const allDatacoms=orderedDatacoms(devices),datacoms=state.page==='datacoms'?filteredDevices(allDatacoms):allDatacoms;$('#ports-content').innerHTML=datacoms.length?datacoms.map(datacomHTML).join(''):allDatacoms.length?empty('Nenhum Datacom neste filtro','Tente outro nome, IP ou status.'):empty('Conecte seu primeiro Datacom','Cadastre uma conexão SSH para acompanhar portas, sinais e circuitos.',true);
  $('#ports-content').querySelectorAll('details').forEach(e=>e.open=openPorts.has(e.dataset.portKey));
  window.renderOverview?.();
+ if(cardFocus&&!document.querySelector('dialog[open]'))document.getElementById(cardFocus.container)?.querySelector(`[${cardFocus.key}="${cardFocus.value}"]`)?.focus({preventScroll:true});
  if(overviewFocus&&!document.querySelector('dialog[open]'))$(`[data-overview-actions="${overviewFocus}"]`)?.focus({preventScroll:true});
  if(state.selected&&$('#detail-dialog').open){if(state.demo){state.detailSamples=samples.filter(s=>s.device_id===state.selected);renderDetail();}else{const selected=state.selected;api(`/api/devices/${selected}/history`).then(history=>{if(state.selected===selected){state.detailSamples=history;renderDetail();}}).catch(()=>{});}}
 }
@@ -329,7 +338,8 @@ const pages={backbone:['Mapa do circuito','Backbone de fibra e rádios · Manaus
 function navigate(page){
  window.getSelection()?.removeAllRanges();state.page=page;document.body.dataset.view=page;window.setupOverview?.(page);
  const datacom=page==='datacoms';$('#datacom-toolbar').hidden=!datacom;
- (datacom?$('#datacom-toolbar'):$('#devices-section .table-heading')).append($('#device-filters'));
+ $('#bbu-section').hidden=page!=='bbus';$('#radio-toolbar').hidden=page!=='siae';
+ (datacom?$('#datacom-toolbar'):page==='bbus'?$('#bbu-toolbar'):page==='siae'?$('#radio-toolbar'):$('#devices-section .table-heading')).append($('#device-filters'));
  (datacom?$('#datacom-toolbar'):$('#ports-section .traffic-panel-actions')).append($('#open-traffic-dashboard'));
  document.querySelectorAll('[data-page]').forEach(e=>{
   e.classList.toggle('active',e.dataset.page===page);
@@ -338,7 +348,7 @@ function navigate(page){
  document.title=`${pages[page][0]} · AlwaysUp`;$('#page-title').textContent=pages[page][0];$('#breadcrumb').textContent=pages[page][0];$('#page-description').textContent=pages[page][1];
  $('#add-device-label').textContent=page==='bbus'?'Adicionar BBU':page==='datacoms'?'Adicionar Datacom':page==='siae'?'Adicionar rádio SIAE':'Adicionar equipamento';
  $('#overview-charts').hidden=page!=='overview';
- $('#devices-section').hidden=!['overview','bbus','siae'].includes(page);
+ $('#devices-section').hidden=page!=='overview';
  $('#backbone-section').hidden=page!=='backbone';
  $('#ports-section').hidden=page!=='datacoms';$('#siae-section').hidden=page!=='siae';$('#alerts-section').hidden=page!=='alerts';
  $('#search').value='';$('#state-filter').value='all';
