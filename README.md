@@ -416,3 +416,5 @@ O desenho usa faixas horizontais como a referência fornecida: fibra na parte su
 O mapa ocupa toda a largura disponível. **Ajustar à largura** preserva essa escala e permite rolagem vertical quando a tela for mais baixa, sem encolher todo o desenho pela altura. **Tela cheia** amplia a área de trabalho, mantendo os detalhes, cadastros e portas pendentes acessíveis. No modo Tráfego, o valor principal é o RX do AP/porta de origem quando disponível; a leitura das duas pontas continua nos detalhes e no modo Todos os detalhes. Sem banda válida nos rádios, o mapa mostra ping ou o estado sem leitura. A [captura do mapa horizontal](docs/mapa-horizontal.png) usa dados ilustrativos de validação.
 
 No celular, o desenho inicia ampliado para navegação por arraste; o botão Ajustar à largura permite escolher uma visão geral menor quando desejado.
+
+A visualização do backbone prioriza o desenho: o título completo fica no caminho de navegação, os controles ocupam uma faixa compacta e o resumo de leituras fica no rodapé junto à legenda. A área do mapa preenche a altura restante da janela. Essa preferência visual não altera a tela inicial do sistema.

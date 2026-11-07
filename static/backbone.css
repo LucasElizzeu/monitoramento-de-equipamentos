@@ -84,3 +84,14 @@ body[data-map-fullscreen=true] #backbone-section{height:100%;display:flex;flex-d
 body[data-map-fullscreen=true] #backbone-section .backbone-scroll{height:auto;min-height:0;flex:1}
 body[data-map-fullscreen=true] .backbone-overview>strong::before{content:'Backbone Veloso NOC · '}
 @media(max-width:760px){body[data-view=backbone] .backbone-scroll{height:65dvh;min-height:360px}.backbone-actions .map-view-controls{justify-content:flex-start}body[data-map-fullscreen=true] #backbone-section .backbone-scroll{min-height:0}}
+/* Reserve the available window for the diagram; the breadcrumb already names the page. */
+body[data-layout][data-view=backbone] main{height:calc(100dvh - 52px);padding:6px 12px 8px;display:flex;flex-direction:column;min-height:0}
+body[data-layout][data-view=backbone] .page-heading{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;padding:0;margin:0;border:0}
+body[data-view=backbone] #backbone-section{display:flex;flex-direction:column;flex:1;min-height:0}
+body[data-view=backbone] #backbone-section .backbone-toolbar{margin:0 0 6px;flex-shrink:0}
+body[data-view=backbone] #backbone-section .backbone-scroll{height:auto;min-height:0;flex:1}
+body[data-view=backbone] .backbone-footer{gap:6px 14px;padding-top:6px;flex-shrink:0;align-items:center}
+body[data-view=backbone] #backbone-summary{font-size:10px;color:var(--muted);margin-left:auto}
+body[data-view=backbone] .backbone-help summary{min-height:20px}
+body[data-layout][data-view=backbone][data-map-fullscreen=true] main{height:100dvh;padding:8px}
+@media(max-width:640px){body[data-layout][data-view=backbone] main{height:calc(100dvh - 103px);padding:6px 8px}body[data-view=backbone] .backbone-overview{display:none}body[data-view=backbone] #backbone-summary{margin-left:0;font-size:9px}body[data-layout][data-view=backbone][data-map-fullscreen=true] main{height:100dvh}}
