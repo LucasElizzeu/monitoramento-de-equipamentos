@@ -818,5 +818,11 @@
         ]
       }
     }
-  ]
+  ],
+  "radio_route_origins": {
+    "tefe-tabatinga": {
+      "node": "claro",
+      "port": null
+    }
+  }
 }

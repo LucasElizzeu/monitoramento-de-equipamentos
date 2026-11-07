@@ -107,6 +107,8 @@ class BackboneTests(unittest.TestCase):
     def test_tefe_tabatinga_pairs_follow_the_thirty_supplied_ips(self):
         config = app.get_backbone()
         links = sorted([l for l in config['radio_links'] if l['route'] == 'tefe-tabatinga'], key=lambda l: l['order'])
+        self.assertEqual(config['radio_route_origins']['tefe-tabatinga'], dict(node='claro', port=None))
+        self.assertEqual(next(n['host'] for n in config['nodes'] if n['id']=='claro'), '10.200.19.1')
         self.assertEqual(len(links), 15)
         self.assertEqual([l['order'] for l in links], list(range(1, 16)))
         for i, link in enumerate(links):

@@ -75,6 +75,21 @@
   const binding=network[side],node=byId(binding.node),port=reading(node,binding.port),radio=radioMapState.endpoint(end,state.data.devices,Date.now(),$('#connection-error').hidden);
   return {node,port,radio,status:binding.port?radioMapState.access(port,radio):'unknown'};
  }
+ function routeOrigin(id){for(const [route,binding] of Object.entries(config.radio_route_origins||{}))if(id===`radio-origin-${route}`)return {route,binding};}
+ function originReading(origin){const node=byId(origin.binding.node),link=radioLinks().filter(l=>l.route===origin.route).sort((a,b)=>a.order-b.order)[0],port=reading(node,origin.binding.port),radio=radioMapState.endpoint(link.a,state.data.devices,Date.now(),$('#connection-error').hidden);return {node,link,port,radio,status:origin.binding.port?radioMapState.access(port,radio):'unknown'};}
+ function drawRouteOrigins(){
+  let html='';
+  for(const [route,binding]of Object.entries(config.radio_route_origins||{})){
+   const origin={route,binding},v=originReading(origin),g=radioGeometry(v.link),node=v.node;
+   const points=[{x:node.x,y:node.y+20},{x:node.x,y:1192},{x:90,y:1192},{x:90,y:g.y},{x:g.x1,y:g.y}],d=roundedRoute(points,14);
+   html+=`<g class="radio-access radio-route-origin" data-link="radio-origin-${route}" data-status="${v.status}" tabindex="0" role="button" aria-label="Origem Tefé → Tabatinga no Datacom Tefé CLARO, porta a confirmar"><path class="radio-access-underlay" d="${d}"/><path class="radio-access-stroke" d="${d}"/><path class="fiber-hit" d="${d}"/><text class="radio-access-caption" x="${g.x1}" y="${g.y+88}" text-anchor="middle">Tefé CLARO · porta a confirmar</text></g>`;
+  }
+  return html;
+ }
+ function originDetails(origin){
+  const v=originReading(origin),port=origin.binding.port?esc(origin.binding.port):'Porta a confirmar';
+  renderInfo(`<button class="icon-button backbone-dismiss" aria-label="Fechar detalhes">×</button><strong>Tefé → Tabatinga · origem no CLARO</strong><div><strong>${esc(v.node.name)}</strong><small>${v.node.host} · ${port}</small><p>${esc(v.port.label)}</p></div><div><strong>${esc(v.link.a.name)}</strong><small>${v.link.a.host}</small><p>${esc(v.radio.label)} · Ping ${number(v.radio.latency)} ms</p></div><button type="button" class="button secondary" data-access-node="${v.node.id}">Ver Datacom</button>`);
+ }
  function drawRadioAccess(){
   let html='';
   for(const network of radioNetworks()){
@@ -131,6 +146,7 @@
    g.querySelector('text').innerHTML=`<tspan x="${(p.x1+p.x2)/2}">Ping ${number(v.a.latency)} / ${number(v.b.latency)} ms</tspan><tspan class="radio-band" x="${(p.x1+p.x2)/2}" dy="14">RX ${bandwidth(v.a.bps).replace(/<[^>]*>/g,'')} / ${bandwidth(v.b.bps).replace(/<[^>]*>/g,'')}</tspan>`;
    for(const side of ['a','b'])svg.querySelector(`[data-radio-link="${l.id}"][data-radio-side="${side}"]`).dataset.status=v[side].status;
   }
+  for(const [route,binding]of Object.entries(config.radio_route_origins||{})){const g=svg.querySelector(`[data-link="radio-origin-${route}"]`);if(g)g.dataset.status=originReading({route,binding}).status;}
   for(const network of radioNetworks())for(const side of ['source','target']){const g=svg.querySelector(`[data-link="${accessId(network.network,side)}"]`);if(g)g.dataset.status=accessReading(network,side).status;}
  }
  function openRadio(link,side){
@@ -145,7 +161,7 @@
  function draw(){
   applyMapScope();
   svg.innerHTML=config.links.map(link=>{const p=path(link);return `<g class="backbone-fiber" data-link="${link.id}" tabindex="0" role="button"><path class="fiber-stroke" d="${p.d}"/><path class="fiber-hit" d="${p.d}"/><text class="fiber-caption" x="${p.labelX}" y="0" text-anchor="${p.anchor}"></text></g>`;}).join('')+config.nodes.map(n=>`<g class="backbone-node" data-node="${n.id}" transform="translate(${n.x} ${n.y})" tabindex="0" role="button" aria-label="${esc(n.name+' '+n.host)}"><circle r="20"/><image href="/static/icons/datacom.png" x="-18" y="-18" width="36" height="36"/><text y="36" text-anchor="middle">${esc(n.name)}</text><text class="node-ip" y="51" text-anchor="middle">${n.host}${n.kind==='huawei'?' · Huawei':''}</text></g>`).join('');
-  svg.insertAdjacentHTML('beforeend',drawRadioAccess()+drawRadios());
+  svg.insertAdjacentHTML('beforeend',drawRadioAccess()+drawRouteOrigins()+drawRadios());
   if(!svg.style.width)fitMap();refresh();
  }
  function refresh(){
@@ -167,6 +183,7 @@
   if(active)details(active);
  }
  function details(id){
+  const origin=routeOrigin(id);if(origin){originDetails(origin);return;}
   const access=findAccess(id);if(access){accessDetails(access);return;}
   const radio=radioLinks().find(l=>l.id===id);if(radio){radioDetails(radio);return;}
   const link=config.links.find(l=>l.id===id);if(!link)return;
