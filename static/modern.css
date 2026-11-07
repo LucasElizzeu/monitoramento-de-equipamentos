@@ -209,3 +209,9 @@ body[data-view=datacoms] .circuit-legend { border-top: 1px solid var(--line); bo
 @media (prefers-reduced-motion:reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* Scope overview latency to one equipment family. */
+.latency-filter{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:11px;flex-shrink:0}
+.latency-filter select{width:auto;min-width:118px;min-height:36px;padding:6px 26px 6px 10px;font-size:12px}
+.chart-panel>.panel-heading{flex-wrap:wrap;gap:12px}
+@media(max-width:640px){.latency-filter{width:100%;justify-content:space-between}.latency-filter select{min-width:145px}}

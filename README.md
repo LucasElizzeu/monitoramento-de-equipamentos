@@ -364,3 +364,7 @@ Os testes cobrem o limiar de 20/21 perdas, recuperação, perdas intercaladas, e
 API de saúde: `GET /api/health`. API e documentação OpenAPI disponíveis no próprio servidor em `/docs`.
 
 O teste de navegador desta implementação verificou demonstração, busca, detalhes, navegação de portas, formulário SSH, cadastro/exclusão real via API e responsividade a 390px. O ICMP real foi bloqueado pelas permissões do ambiente e não é reportado como aprovado.
+
+### Latência por tipo de equipamento
+
+Na Visão geral, o seletor **Equipamento** do cartão **Latência média** alterna entre BBU (cadastros de ping), Rádio SIAE e Datacom. A média e o gráfico usam apenas as amostras dos equipamentos do tipo escolhido, sem misturar categorias. A escolha inicial é Datacom e fica salva neste navegador. A média continua sendo calculada por instante; perdas não são tratadas como zero. Se o tipo não tiver equipamentos ou respostas nas últimas amostras recebidas, a média aparece como **—** com uma explicação, sem utilizar dados de outro tipo.

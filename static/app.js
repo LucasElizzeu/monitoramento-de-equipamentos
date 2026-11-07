@@ -134,6 +134,26 @@ function chart(samples, target){
  target.innerHTML=`<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Gráfico de latência das últimas amostras"><defs><linearGradient id="${unique}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#70d1b3" stop-opacity=".22"/><stop offset="100%" stop-color="#70d1b3" stop-opacity=".01"/></linearGradient></defs>${lines}${pathsSVG}<circle cx="${x(ei)}" cy="${y(end.v)}" r="3" fill="#3aab8c" stroke="white" stroke-width="2"/>${ticks}</svg>`;
  return valid.reduce((s,p)=>s+p.v,0)/valid.length;
 }
+// This selector scopes both the overview chart and its average to one equipment type.
+const latencyKinds={datacom:'Datacom',ping:'BBU',siae:'Rádio SIAE'};
+let latencyKind='datacom';
+try{const saved=localStorage.getItem('alwaysup-latency-kind');if(Object.hasOwn(latencyKinds,saved))latencyKind=saved;}catch{}
+$('#latency-kind').value=latencyKind;
+function renderLatency(){
+ const devices=state.data.devices.filter(d=>d.kind===latencyKind),ids=new Set(devices.map(d=>d.id));
+ const samples=state.data.samples.filter(s=>ids.has(s.device_id)),target=$('#latency-chart');
+ const average=chart(samples,target),name=latencyKinds[latencyKind];
+ $('#chart-average').innerHTML=`${number(average)} <small>ms</small>`;
+ $('#latency-scope').textContent=`Tempo de resposta · ${name}`;
+ $('#latency-sample-scope').textContent=`${devices.length} ${devices.length===1?'equipamento':'equipamentos'} · média por instante`;
+ if(average===null)target.innerHTML=`<div class="chart-empty">${devices.length?'Ainda não há respostas de ping nas amostras deste tipo.':`Nenhum equipamento do tipo ${name} cadastrado.`}</div>`;
+ target.querySelector('svg')?.setAttribute('aria-label',`Gráfico de latência · ${name}`);
+}
+$('#latency-kind').addEventListener('change',e=>{
+ latencyKind=e.target.value;
+ try{localStorage.setItem('alwaysup-latency-kind',latencyKind);}catch{}
+ renderLatency();
+});
 function eventHTML(event){const i=event.level==='success'?'check':'warning';return `<div class="event-item"><span class="event-icon ${esc(event.level)}">${icon(i)}</span><div class="event-body"><strong>${esc(event.message)}</strong><p>${esc(event.device_name)}</p></div><span class="event-time" title="${esc(new Date(event.at).toLocaleString('pt-BR'))}">${ago(event.at)}</span></div>`;}
 function empty(title,description,action=false){return `<div class="empty-state">${icon('activity')}<h3>${title}</h3><p>${description}</p>${action?'<button class="button primary" data-action="add">Adicionar equipamento</button>':''}</div>`;}
 function deviceAddressHTML(device){
@@ -288,7 +308,7 @@ function render(){
  $('#reading-banner').hidden=!paused;
  if(paused)return;
  const {devices,alerts,samples}=state.data;$('#last-update').textContent=`${state.demo?'Simulação':'Atualizado'} às ${formatTime(state.data.updated_at)}`;
- renderMetrics();renderDevices();renderSiae();const average=chart(samples,$('#latency-chart'));$('#chart-average').innerHTML=`${number(average)} <small>ms</small>`;
+ renderMetrics();renderDevices();renderSiae();renderLatency();
  $('#recent-events').innerHTML=alerts.length?alerts.slice(0,3).map(eventHTML).join(''):empty('Nenhum evento por aqui','Quedas e recuperações aparecerão neste espaço.');
  $('#alerts-content').innerHTML=alerts.length?alerts.map(eventHTML).join(''):empty('Sua linha do tempo começa aqui','Eventos serão registrados automaticamente quando houver uma mudança na rede.');
  const openPorts=new Set([...$('#ports-content').querySelectorAll('details[open]')].map(e=>e.dataset.portKey));
