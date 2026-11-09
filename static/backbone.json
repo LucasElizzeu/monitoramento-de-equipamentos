@@ -4,121 +4,131 @@
       "id": "manaus",
       "name": "Manaus",
       "host": "10.200.1.1",
-      "x": 1680.0,
-      "y": 153.0,
+      "x": 1640,
+      "y": 153,
       "kind": "huawei"
     },
     {
       "id": "manaus2",
       "name": "Manaus · Datacom 2",
       "host": "10.200.1.3",
-      "x": 1680.0,
-      "y": 259.25,
+      "x": 1430,
+      "y": 285,
       "kind": "datacom"
     },
     {
       "id": "limao",
       "name": "Limão",
       "host": "10.10.0.18",
-      "x": 1536.0,
-      "y": 153.0,
+      "x": 1510,
+      "y": 153,
       "kind": "datacom"
     },
     {
       "id": "manacapuru",
       "name": "Manacapuru",
       "host": "10.200.3.1",
-      "x": 1368.0,
-      "y": 153.0,
+      "x": 1360,
+      "y": 153,
       "kind": "datacom"
     },
     {
       "id": "km60",
       "name": "KM60",
       "host": "10.10.30.2",
-      "x": 1264.0,
-      "y": 250.75,
+      "x": 1260,
+      "y": 280,
       "kind": "datacom"
     },
     {
       "id": "membeca",
       "name": "Membeca",
       "host": "10.10.30.3",
-      "x": 1112.0,
-      "y": 250.75,
+      "x": 1080,
+      "y": 280,
       "kind": "datacom"
     },
     {
       "id": "caapiranga",
       "name": "Caapiranga",
       "host": "10.200.26.1",
-      "x": 960.0,
-      "y": 250.75,
+      "x": 900,
+      "y": 280,
       "kind": "datacom"
     },
     {
       "id": "nazare",
       "name": "Nazaré",
       "host": "10.200.4.1",
-      "x": 1160.0,
-      "y": 72.25,
+      "x": 1080,
+      "y": 64,
       "kind": "datacom"
     },
     {
       "id": "anama",
       "name": "Anamã",
       "host": "10.200.5.1",
-      "x": 952.0,
-      "y": 153.0,
+      "x": 800,
+      "y": 153,
       "kind": "datacom"
     },
     {
       "id": "anori",
       "name": "Anori",
       "host": "10.200.6.1",
-      "x": 752.0,
-      "y": 153.0,
+      "x": 570,
+      "y": 153,
       "kind": "datacom"
     },
     {
       "id": "codajas",
       "name": "Codajás",
       "host": "10.200.7.1",
-      "x": 562.0,
-      "y": 153.0,
+      "x": 420,
+      "y": 153,
       "kind": "datacom"
     },
     {
       "id": "sodre",
       "name": "Sodré",
       "host": "10.200.8.1",
-      "x": 372.0,
-      "y": 153.0,
+      "x": 270,
+      "y": 153,
       "kind": "datacom"
     },
     {
       "id": "coari",
       "name": "Coari",
       "host": "10.200.9.1",
-      "x": 120.0,
-      "y": 153.0,
+      "x": 120,
+      "y": 153,
       "kind": "datacom"
     },
     {
       "id": "claro",
       "name": "Tefé CLARO",
       "host": "10.200.19.1",
-      "x": 1824.0,
-      "y": 340.0,
-      "kind": "datacom"
+      "x": 1745,
+      "y": 330,
+      "kind": "datacom",
+      "nodeLabel": {
+        "x": 22,
+        "y": 5,
+        "anchor": "start"
+      }
     },
     {
       "id": "escritorio",
       "name": "Escritório Tefé",
       "host": "10.200.24.1",
-      "x": 1824.0,
-      "y": 230.0,
-      "kind": "datacom"
+      "x": 1745,
+      "y": 220,
+      "kind": "datacom",
+      "nodeLabel": {
+        "x": 22,
+        "y": 5,
+        "anchor": "start"
+      }
     }
   ],
   "links": [
@@ -129,7 +139,7 @@
       "port_a": "XGE0/0/11",
       "port_b": "ten-gigabit-ethernet:1/1/1",
       "label": "",
-      "bend": -12,
+      "bend": -20,
       "maintenance": false
     },
     {
@@ -139,7 +149,7 @@
       "port_a": "XGE0/0/12",
       "port_b": "ten-gigabit-ethernet:1/1/2",
       "label": "",
-      "bend": 12,
+      "bend": 20,
       "maintenance": false
     },
     {
@@ -149,7 +159,7 @@
       "port_a": "ten-gigabit-ethernet:1/1/3",
       "port_b": "ten-gigabit-ethernet:1/1/1",
       "label": "",
-      "bend": -12,
+      "bend": -20,
       "maintenance": false
     },
     {
@@ -159,7 +169,7 @@
       "port_a": "ten-gigabit-ethernet:1/1/4",
       "port_b": "ten-gigabit-ethernet:1/1/5",
       "label": "",
-      "bend": 12,
+      "bend": 20,
       "maintenance": false
     },
     {
@@ -169,7 +179,7 @@
       "port_a": "ten-gigabit-ethernet:1/1/7",
       "port_b": "ten-gigabit-ethernet:1/1/1",
       "label": "",
-      "bend": -12,
+      "bend": -20,
       "maintenance": false
     },
     {
@@ -179,7 +189,7 @@
       "port_a": "ten-gigabit-ethernet:1/1/8",
       "port_b": "ten-gigabit-ethernet:1/1/2",
       "label": "",
-      "bend": 12,
+      "bend": 20,
       "maintenance": false
     },
     {
@@ -189,7 +199,7 @@
       "port_a": "ten-gigabit-ethernet:1/1/3",
       "port_b": "ten-gigabit-ethernet:1/1/2",
       "label": "",
-      "bend": -12,
+      "bend": -20,
       "maintenance": false
     },
     {
@@ -199,7 +209,7 @@
       "port_a": "ten-gigabit-ethernet:1/1/4",
       "port_b": "ten-gigabit-ethernet:1/1/3",
       "label": "",
-      "bend": 12,
+      "bend": 20,
       "maintenance": false
     },
     {
@@ -209,7 +219,7 @@
       "port_a": "ten-gigabit-ethernet:1/1/1",
       "port_b": "ten-gigabit-ethernet:1/1/1",
       "label": "",
-      "bend": -12,
+      "bend": -20,
       "maintenance": false
     },
     {
@@ -219,7 +229,7 @@
       "port_a": "ten-gigabit-ethernet:1/1/4",
       "port_b": "ten-gigabit-ethernet:1/1/2",
       "label": "",
-      "bend": 12,
+      "bend": 20,
       "maintenance": false
     },
     {
@@ -229,7 +239,7 @@
       "port_a": "ten-gigabit-ethernet:1/1/3",
       "port_b": "ten-gigabit-ethernet:1/1/7",
       "label": "",
-      "bend": -12,
+      "bend": -20,
       "maintenance": false
     },
     {
@@ -239,7 +249,7 @@
       "port_a": "ten-gigabit-ethernet:1/1/4",
       "port_b": "ten-gigabit-ethernet:1/1/8",
       "label": "",
-      "bend": 12,
+      "bend": 20,
       "maintenance": false
     },
     {
@@ -249,7 +259,7 @@
       "port_a": "ten-gigabit-ethernet:1/1/2",
       "port_b": "ten-gigabit-ethernet:1/1/1",
       "label": "",
-      "bend": -12,
+      "bend": -20,
       "maintenance": false
     },
     {
@@ -259,7 +269,7 @@
       "port_a": "ten-gigabit-ethernet:1/1/4",
       "port_b": "ten-gigabit-ethernet:1/1/3",
       "label": "",
-      "bend": 12,
+      "bend": 20,
       "maintenance": false
     },
     {
@@ -269,7 +279,7 @@
       "port_a": "ten-gigabit-ethernet:1/1/2",
       "port_b": "ten-gigabit-ethernet:1/1/11",
       "label": "",
-      "bend": -12,
+      "bend": -20,
       "maintenance": false
     },
     {
@@ -279,7 +289,7 @@
       "port_a": "ten-gigabit-ethernet:1/1/4",
       "port_b": "ten-gigabit-ethernet:1/1/12",
       "label": "",
-      "bend": 12,
+      "bend": 20,
       "maintenance": false
     },
     {
@@ -289,7 +299,7 @@
       "port_a": "ten-gigabit-ethernet:1/1/9",
       "port_b": "ten-gigabit-ethernet:1/1/10",
       "label": "",
-      "bend": -12,
+      "bend": -20,
       "maintenance": false
     },
     {
@@ -299,7 +309,7 @@
       "port_a": "ten-gigabit-ethernet:1/1/10",
       "port_b": "ten-gigabit-ethernet:1/1/11",
       "label": "",
-      "bend": 12,
+      "bend": 20,
       "maintenance": false
     },
     {
@@ -366,7 +376,14 @@
       "port_b": "ten-gigabit-ethernet:1/1/3",
       "label": "Interligação Manaus",
       "bend": 0,
-      "maintenance": false
+      "maintenance": false,
+      "caption": {
+        "x": 1510,
+        "y": 215,
+        "offset": 0,
+        "anchor": "end",
+        "angle": 0
+      }
     },
     {
       "id": "manaus-escritorio-infovia-1",
@@ -394,7 +411,29 @@
       "route": "rectangular",
       "routeLane": 386,
       "routeOffset": -70,
-      "note": "Chegada espelhada na Ten 1/1/4 do Escritório Tefé. A leitura dessa porta é compartilhada com a outra rota INFOVIA; não representa banda exclusiva deste transporte."
+      "note": "Chegada espelhada na Ten 1/1/4 do Escritório Tefé. A leitura dessa porta é compartilhada com a outra rota INFOVIA; não representa banda exclusiva deste transporte.",
+      "waypoints": [
+        {
+          "x": 50,
+          "y": 153
+        },
+        {
+          "x": 50,
+          "y": 386
+        },
+        {
+          "x": 1705,
+          "y": 386
+        },
+        {
+          "x": 1705,
+          "y": 220
+        }
+      ],
+      "caption": {
+        "x": 900,
+        "y": 386
+      }
     },
     {
       "id": "coari-claro-1",
@@ -407,7 +446,29 @@
       "maintenance": false,
       "route": "rectangular",
       "routeLane": 352.75,
-      "routeOffset": -48.0
+      "routeOffset": -48.0,
+      "waypoints": [
+        {
+          "x": 72,
+          "y": 153
+        },
+        {
+          "x": 72,
+          "y": 352.75
+        },
+        {
+          "x": 1685,
+          "y": 352.75
+        },
+        {
+          "x": 1685,
+          "y": 330
+        }
+      ],
+      "caption": {
+        "x": 900,
+        "y": 352.75
+      }
     },
     {
       "id": "claro-escritorio-1",
@@ -417,7 +478,14 @@
       "port_b": "ten-gigabit-ethernet:1/1/1",
       "label": "Fibra local",
       "bend": 0,
-      "maintenance": false
+      "maintenance": false,
+      "caption": {
+        "x": 1720,
+        "y": 275,
+        "offset": 0,
+        "anchor": "end",
+        "angle": 0
+      }
     }
   ],
   "radio_links": [

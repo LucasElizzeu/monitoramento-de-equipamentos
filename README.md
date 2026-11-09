@@ -432,3 +432,5 @@ A consulta Huawei usa um único terminal SSH interativo por coleta, reconhece o 
 A origem da INFOVIA Manaus → Escritório Tefé foi corrigida para o Huawei 10.200.1.1, XGigabitEthernet0/0/23; a chegada continua Ten 1/1/4. No cadastro existente do Huawei, use **Usar Huawei S6730 · portas 11, 12 e 23** e salve para incluir a Ten 23 na coleta. O vínculo antigo do Datacom 2 foi substituído, evitando aplicar suas portas manuais à nova origem Huawei.
 
 O desenho compacta as faixas de rádio e o espaço até Tabatinga, além de distribuir Sodré, Codajás e Anori mais perto de Coari. A escala dos ícones e das letras é mantida; os filtros de trecho usam os mesmos limites compactos.
+
+As fibras paralelas usam curvas mais afastadas e as rotas via Nazaré e via KM60 ficam em faixas distintas. O segmento Anori → Coari é compacto. Em Tefé, os nomes ficam à direita dos equipamentos, as fibras chegam pela esquerda e as saídas dos rádios partem por baixo; as leituras da fibra local e da interligação Manaus têm posições próprias.

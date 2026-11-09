@@ -43,7 +43,7 @@
   if(link.route==='rectangular'){
    const lane=link.routeLane??Math.max(a.y,b.y)+Math.abs(link.bend),offset=link.routeOffset??10;
    const start=a.x+offset,end=b.x-offset;
-   const points=[a,{x:start,y:a.y},{x:start,y:lane},{x:end,y:lane},{x:end,y:b.y},b];
+   const points=link.waypoints?[a,...link.waypoints,b]:[a,{x:start,y:a.y},{x:start,y:lane},{x:end,y:lane},{x:end,y:b.y},b];
    return {d:roundedRoute(points),x:(start+end)/2,y:lane,labelX:(start+end)/2,anchor:'middle'};
   }
   const direction=dx<0?-1:1,cx=(a.x+b.x)/2-dy/len*link.bend*2*direction,cy=(a.y+b.y)/2+dx/len*link.bend*2*direction;
@@ -58,7 +58,7 @@
   const above=link.route==='rectangular'?(link.routeLane??Infinity)<Math.min(a.y,b.y):link.bend<=0;
   return {x:vertical&&link.route!=='rectangular'?p.labelX:p.x,y:p.y,angle,
    offset:vertical&&link.route!=='rectangular'?-8:above?(display.value==='full'?-34:-22):link.route==='rectangular'?20:Math.abs(b.y-a.y)<20?45:35,
-   anchor:vertical&&link.route!=='rectangular'?p.anchor:'middle'};
+   anchor:vertical&&link.route!=='rectangular'?p.anchor:'middle',...link.caption};
  }
  const radioLinks=()=>config.radio_links||[];
  const radioReading=link=>radioMapState.link(link,state.data.devices,Date.now(),$('#connection-error').hidden);
@@ -80,7 +80,7 @@
   let html='';
   for(const [route,binding]of Object.entries(config.radio_route_origins||{})){
    const origin={route,binding},v=originReading(origin),g=radioGeometry(v.link),node=v.node;
-   const points=[{x:node.x+14,y:node.y},{x:1888,y:node.y},{x:1888,y:g.y},{x:g.x1,y:g.y}],d=roundedRoute(points,14);
+   const points=[{x:node.x,y:node.y+14},{x:node.x,y:node.y+62},{x:1888,y:node.y+62},{x:1888,y:g.y},{x:g.x1,y:g.y}],d=roundedRoute(points,14);
    html+=`<g class="radio-access radio-route-origin" data-link="radio-origin-${route}" data-status="${v.status}" tabindex="0" role="button" aria-label="Origem Tefé → Tabatinga no Datacom Tefé CLARO, porta a confirmar"><path class="radio-access-underlay" d="${d}"/><path class="radio-access-stroke" d="${d}"/><path class="fiber-hit" d="${d}"/><text class="radio-access-caption" x="${g.x1}" y="${g.y-50}" text-anchor="end">Tefé CLARO · porta a confirmar</text></g>`;
   }
   return html;
@@ -96,7 +96,7 @@
    const first=radioGeometry(links[0]),last=radioGeometry(links.at(-1)),offset=network.network===1?-8:8;
    for(const side of ['source','target']){
     const node=byId(network[side].node),isSource=side==='source';
-    const points=isSource?[{x:node.x-14,y:node.y+offset},{x:44-(network.network-1)*20,y:node.y+offset},{x:44-(network.network-1)*20,y:first.y},{x:first.x1,y:first.y}]:[{x:last.x2,y:last.y},{x:1860+(network.network-1)*16,y:last.y},{x:1860+(network.network-1)*16,y:node.y+offset},{x:node.x+14,y:node.y+offset}];
+    const points=isSource?[{x:node.x-14,y:node.y+offset},{x:44-(network.network-1)*20,y:node.y+offset},{x:44-(network.network-1)*20,y:first.y},{x:first.x1,y:first.y}]:[{x:last.x2,y:last.y},{x:1860+(network.network-1)*16,y:last.y},{x:1860+(network.network-1)*16,y:node.y+30+(network.network-1)*16},{x:node.x+offset,y:node.y+30+(network.network-1)*16},{x:node.x+offset,y:node.y+14}];
     const d=roundedRoute(points,14),id=accessId(network.network,side),label=isSource?`Coari · Ten 1/1/${7+network.network}`:'Tefé CLARO · Giga 5–8 a confirmar';
     html+=`<g class="radio-access" data-link="${id}" data-network="${network.network}" data-end="${side}" tabindex="0" role="button" aria-label="${esc(label+' · Rede '+network.network)}"><path class="radio-access-underlay" d="${d}"/><path class="radio-access-stroke" d="${d}"/><path class="fiber-hit" d="${d}"/><text class="radio-access-caption" x="${isSource?first.x1:1805}" y="${first.y+80}" text-anchor="middle">${label}</text></g>`;
    }
@@ -151,7 +151,7 @@
  }
  function draw(){
   applyMapScope();
-  svg.innerHTML='<text class="radio-map-heading" x="24" y="16">Backbone · fibra</text>'+config.links.map(link=>{const p=path(link);return `<g class="backbone-fiber" data-link="${link.id}" tabindex="0" role="button"><path class="fiber-stroke" d="${p.d}"/><path class="fiber-hit" d="${p.d}"/><text class="fiber-caption" x="${p.labelX}" y="0" text-anchor="${p.anchor}"></text></g>`;}).join('')+config.nodes.map(n=>`<g class="backbone-node" data-node="${n.id}" transform="translate(${n.x} ${n.y})" tabindex="0" role="button" aria-label="${esc(n.name+' '+n.host)}"><circle r="14"/><image href="/static/icons/datacom.png" x="-12" y="-12" width="24" height="24"/><text y="30" text-anchor="middle">${esc(n.name)}</text><text class="node-ip" y="46" text-anchor="middle">${n.host}${n.kind==='huawei'?' · Huawei':''}</text></g>`).join('');
+  svg.innerHTML='<text class="radio-map-heading" x="24" y="16">Backbone · fibra</text>'+config.links.map(link=>{const p=path(link);return `<g class="backbone-fiber" data-link="${link.id}" tabindex="0" role="button"><path class="fiber-stroke" d="${p.d}"/><path class="fiber-hit" d="${p.d}"/><text class="fiber-caption" x="${p.labelX}" y="0" text-anchor="${p.anchor}"></text></g>`;}).join('')+config.nodes.map(n=>`<g class="backbone-node" data-node="${n.id}" transform="translate(${n.x} ${n.y})" tabindex="0" role="button" aria-label="${esc(n.name+' '+n.host)}"><circle r="14"/><image href="/static/icons/datacom.png" x="-12" y="-12" width="24" height="24"/><text x="${n.nodeLabel?.x??0}" y="${n.nodeLabel?.y??30}" text-anchor="${n.nodeLabel?.anchor||'middle'}">${esc(n.name)}</text><text class="node-ip" x="${n.nodeLabel?.x??0}" y="${(n.nodeLabel?.y??30)+16}" text-anchor="${n.nodeLabel?.anchor||'middle'}">${n.host}${n.kind==='huawei'?' · Huawei':''}</text></g>`).join('');
   svg.insertAdjacentHTML('beforeend',drawRadioAccess()+drawRouteOrigins()+drawRadios());
   if(!svg.style.width){if(viewport.clientWidth<640)applyZoom(.8,false);else fitMap();}refresh();
  }
