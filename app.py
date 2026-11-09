@@ -29,6 +29,7 @@ from remote_ping import RemotePingError, parse_remote_ping, read_remote_ping
 from siae import SiaeError, SiaeSessionError, login as siae_login, read_counters, calculate_rates
 import traffic_history
 import huawei
+import huawei_ssh
 import availability
 import backups
 import notifications
@@ -828,10 +829,14 @@ def ssh_read(client, command):
     _, stdout, stderr = client.exec_command(command, timeout=7)
     output = stdout.read(65536).decode('utf-8', 'replace')
     error = stderr.read(4096).decode('utf-8', 'replace')
+    return validate_ssh_output(command, output, error, stdout.channel.recv_exit_status())
+
+
+def validate_ssh_output(command, output, error='', exit_status=0):
     rejected = re.search(
         r'^\s*Error:|syntax\s+error\s*:|^\s*%?\s*(?:unknown|invalid|unrecognized|incomplete|ambiguous)\s+(?:command|argument|input)\b',
         clean_cli(output), re.I | re.M)
-    if stdout.channel.recv_exit_status() not in (0, -1) or error.strip() or rejected:
+    if exit_status not in (0, -1) or error.strip() or rejected:
         raise CommandRejected(f'O equipamento rejeitou o comando "{command}". '
                               'Confira a sintaxe em Editar → Comandos do equipamento.')
     return output
@@ -842,18 +847,35 @@ def check_ssh(device):
     client.set_missing_host_key_policy(VerifyFingerprint(device['fingerprint']))
     ports = []
     error = None
+    terminal = None
     diagnostic = {'interface_type': device.get('interface_type', 'auto'), 'stage': 'conexão SSH',
                   'status_command': device['status_command'], 'optics_command': device['optics_command'],
                   'status_output': '', 'optics_output': ''}
+
+    def read_command(command, field):
+        diagnostic['last_command'] = command
+        try:
+            output = (validate_ssh_output(command, terminal.read(command))
+                      if terminal else ssh_read(client, command))
+        except TimeoutError as exc:
+            diagnostic[field] = getattr(exc, 'partial_output', '')
+            raise
+        diagnostic[field] = output
+        return output
+
     try:
         client.connect(device['host'], port=device['ssh_port'], username=device['username'],
                        password=CIPHER.decrypt(device['password'].encode()).decode(),
                        timeout=6, auth_timeout=6, banner_timeout=6, look_for_keys=False, allow_agent=False)
+        if re.match(r'^display interface XGigabitEthernet\b', device['status_command'], re.I):
+            diagnostic['stage'] = 'abertura do terminal Huawei'
+            diagnostic['transport'] = 'terminal interativo VRP'
+            terminal = huawei_ssh.VRPReader(client)
         diagnostic['stage'] = 'consulta de portas'
-        status_bulk = None if '{port}' in device['status_command'] else ssh_read(client, device['status_command'])
+        status_bulk = None if '{port}' in device['status_command'] else read_command(device['status_command'], 'status_output')
         diagnostic['status_output'] = status_bulk or ''
         diagnostic['stage'] = 'consulta de sinais'
-        optics_bulk = None if '{port}' in device['optics_command'] else ssh_read(client, device['optics_command'])
+        optics_bulk = None if '{port}' in device['optics_command'] else read_command(device['optics_command'], 'optics_output')
         diagnostic['optics_output'] = optics_bulk or ''
         diagnostic['stage'] = 'identificação das portas'
         interface_type = device.get('interface_type', 'auto')
@@ -874,14 +896,14 @@ def check_ssh(device):
                 query_port = number.group()
                 query_type = interface_family(port[:number.start()])
             diagnostic['stage'] = f"portas: {query_type} {query_port}" if interface_type == 'mixed' else f"portas: {port}"
-            status_raw = ssh_read(client, device['status_command'].replace('{port}', port)) if status_bulk is None else status_bulk
+            status_raw = read_command(device['status_command'].replace('{port}', port), 'status_output') if status_bulk is None else status_bulk
             diagnostic['status_output'] = status_raw
             status = status_raw if status_bulk is None and not interface_blocks(status_raw) else port_lines(query_port, status_raw, query_type)
             status_rows = matching_interface_blocks(query_port, status_raw, query_type)
             family = status_rows[0]['family'] if status_rows else ''
             family = family or (query_type if query_type != 'auto' else 'auto')
             diagnostic['stage'] = f"sinais: {port}"
-            optics_raw = ssh_read(client, device['optics_command'].replace('{port}', port)) if optics_bulk is None else optics_bulk
+            optics_raw = read_command(device['optics_command'].replace('{port}', port), 'optics_output') if optics_bulk is None else optics_bulk
             diagnostic['optics_output'] = optics_raw
             optics = optics_raw if optics_bulk is None and not interface_blocks(optics_raw) else port_lines(query_port, optics_raw, family)
             result = parse_port(query_port, status, optics, optics_context=optics)

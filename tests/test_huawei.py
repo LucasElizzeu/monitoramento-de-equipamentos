@@ -100,9 +100,23 @@ class HuaweiTests(unittest.TestCase):
                 'display transceiver interface XGigabitEthernet 0/0/11 verbose': OPTICS11,
                 'display transceiver interface XGigabitEthernet 0/0/12 verbose': OPTICS12,
             }
-            with patch.object(app.paramiko, 'SSHClient'), patch.object(app, 'ssh_read', side_effect=lambda c, command: outputs[command]) as read:
+            with patch.object(app.paramiko, 'SSHClient') as client:
+                commands = [
+                    'display interface XGigabitEthernet 0/0/11',
+                    'display transceiver interface XGigabitEthernet 0/0/11 verbose',
+                    'display interface XGigabitEthernet 0/0/12',
+                    'display transceiver interface XGigabitEthernet 0/0/12 verbose',
+                ]
+                channel = client.return_value.invoke_shell.return_value
+                prompt = '<MANAUS-HUAWEI-S6730>'
+                channel.recv.side_effect = [prompt.encode()] + [
+                    (command + '\r\n' + outputs[command] + '\r\n' + prompt).encode()
+                    for command in commands]
                 app.check_ssh(device)
-                self.assertEqual(read.call_count, 4)
+                client.return_value.invoke_shell.assert_called_once()
+                client.return_value.exec_command.assert_not_called()
+                self.assertEqual([call.args[0] for call in channel.sendall.call_args_list],
+                                 [command + '\n' for command in commands])
             with app.connect() as db:
                 row = db.execute('SELECT * FROM devices WHERE id=?', (old['id'],)).fetchone()
                 self.assertIsNone(row['ssh_error'])
@@ -111,3 +125,17 @@ class HuaweiTests(unittest.TestCase):
                 self.assertEqual([p['rx_bps'] for p in ports], [1037701192, 0])
                 self.assertTrue(all(p['utilization_enabled'] for p in ports))
                 self.assertGreater(db.execute('SELECT COUNT(*) FROM port_traffic_series').fetchone()[0], 0)
+
+            # A failed next collection retains only diagnostic text, not new metrics.
+            with patch.object(app.paramiko, 'SSHClient'), patch.object(app.huawei_ssh, 'VRPReader') as terminal:
+                terminal.return_value.read.side_effect = app.huawei_ssh.ReadTimeout('partial response')
+                app.check_ssh(device)
+            with app.connect() as db:
+                failed = db.execute('SELECT * FROM devices WHERE id=?', (old['id'],)).fetchone()
+                diagnostic = json.loads(failed['ssh_diagnostic'])
+                self.assertIsNotNone(failed['ssh_error'])
+                self.assertEqual(diagnostic['stage'], 'portas: 0/0/11')
+                self.assertEqual(diagnostic['last_command'], commands[0])
+                self.assertEqual(diagnostic['status_output'], 'partial response')
+                self.assertEqual(diagnostic['transport'], 'terminal interativo VRP')
+                self.assertEqual(json.loads(failed['port_data']), ports)
