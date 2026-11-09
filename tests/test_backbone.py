@@ -73,7 +73,8 @@ class BackboneTests(unittest.TestCase):
                          ('coari', 'ten-gigabit-ethernet:1/1/7', 'escritorio', 'ten-gigabit-ethernet:1/1/4'))
         self.assertIn('espelhada', infovia['note'])
         special = {link['label']: link for link in config['links'] if link['label']}
-        self.assertEqual((special['GNEX']['a'], special['GNEX']['port_a'], special['GNEX']['b']), ('manaus2', 'ten-gigabit-ethernet:1/1/9', 'coari'))
+        self.assertNotIn('GNEX', special)
+        self.assertNotIn('manaus2-coari-1', {link['id'] for link in config['links']})
         self.assertEqual((special['INFOVIA']['id'], special['INFOVIA']['a'], special['INFOVIA']['port_a'], special['INFOVIA']['b'], special['INFOVIA']['port_b']),
                          ('manaus2-escritorio-1', 'manaus2', 'ten-gigabit-ethernet:1/1/4', 'escritorio', 'ten-gigabit-ethernet:1/1/4'))
         self.assertEqual((special['SMART']['a'], special['SMART']['b']), ('coari', 'claro'))
@@ -81,7 +82,7 @@ class BackboneTests(unittest.TestCase):
 
     def test_radio_topology_has_both_independent_networks_and_exact_endpoint_pairs(self):
         config = app.get_backbone()
-        self.assertEqual(len(config['links']), 29)
+        self.assertEqual(len(config['links']), 28)
         radios = [l for l in config['radio_links'] if l['route'] == 'coari-tefe']
         self.assertEqual(len(radios), 8)
         self.assertEqual(len({l['id'] for l in radios}), 8)
@@ -133,4 +134,4 @@ class BackboneTests(unittest.TestCase):
         self.assertEqual(links[-1]['b']['site'], 'Tabatinga')
         all_ips = [l[side]['host'] for l in config['radio_links'] for side in ('a', 'b')]
         self.assertEqual(len(set(all_ips)), 46)
-        self.assertEqual(len(config['links']), 29)
+        self.assertEqual(len(config['links']), 28)

@@ -369,19 +369,6 @@
       "maintenance": false
     },
     {
-      "id": "manaus2-coari-1",
-      "a": "manaus2",
-      "b": "coari",
-      "port_a": "ten-gigabit-ethernet:1/1/9",
-      "port_b": "ten-gigabit-ethernet:1/1/11",
-      "label": "GNEX",
-      "bend": 170,
-      "maintenance": false,
-      "route": "rectangular",
-      "routeOffset": 24.0,
-      "routeLane": 46.75
-    },
-    {
       "id": "manaus2-escritorio-1",
       "a": "manaus2",
       "b": "escritorio",
