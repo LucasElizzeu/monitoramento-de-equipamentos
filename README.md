@@ -418,3 +418,5 @@ O mapa ocupa toda a largura disponível. **Ajustar à largura** preserva essa es
 No celular, o desenho inicia ampliado para navegação por arraste; o botão Ajustar à largura permite escolher uma visão geral menor quando desejado.
 
 A visualização do backbone prioriza o desenho: o título completo fica no caminho de navegação, os controles ocupam uma faixa compacta e o resumo de leituras fica no rodapé junto à legenda. A área do mapa preenche a altura restante da janela. Essa preferência visual não altera a tela inicial do sistema.
+
+A INFOVIA Coari → Escritório Tefé sai da Ten 1/1/7 de Coari e chega espelhada na Ten 1/1/4 do Escritório. Essa chegada é compartilhada com a INFOVIA de Manaus e está identificada nos detalhes dos dois enlaces. A leitura de chegada não representa banda exclusiva de cada transporte; o modo Tráfego continua exibindo a porta de origem de cada rota.

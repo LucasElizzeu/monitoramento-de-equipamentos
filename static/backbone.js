@@ -182,7 +182,7 @@
   const link=config.links.find(l=>l.id===id);if(!link)return;
   const v=values(link);
   const side=(n,port,r)=>`<div><strong>${esc(n.name)}</strong><small>${esc(n.host)} · ${esc(port||'Porta pendente')}</small><p>${esc(r.label)} · RX ${esc(rate(r))} · ${esc(signal(r))}</p></div>`;
-  const html=`<button class="icon-button backbone-dismiss" aria-label="Fechar detalhes">×</button><strong>${esc(link.label||'Fibra óptica')} · ${names[v.status]}</strong>${side(byId(link.a),link.port_a,v.a)}${side(byId(link.b),link.port_b,v.b)}<button class="button secondary" data-edit-fiber="${link.id}">Editar portas / manutenção</button>`;
+  const html=`<button class="icon-button backbone-dismiss" aria-label="Fechar detalhes">×</button><strong>${esc(link.label||'Fibra óptica')} · ${names[v.status]}</strong>${side(byId(link.a),link.port_a,v.a)}${side(byId(link.b),link.port_b,v.b)}${link.note?`<p>${esc(link.note)}</p>`:''}<button class="button secondary" data-edit-fiber="${link.id}">Editar portas / manutenção</button>`;
   renderInfo(html);
  }
  function renderInfo(html){
