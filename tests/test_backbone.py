@@ -77,7 +77,7 @@ class BackboneTests(unittest.TestCase):
         self.assertEqual((special['INFOVIA']['id'], special['INFOVIA']['a'], special['INFOVIA']['port_a'], special['INFOVIA']['b'], special['INFOVIA']['port_b']),
                          ('manaus2-escritorio-1', 'manaus2', 'ten-gigabit-ethernet:1/1/4', 'escritorio', 'ten-gigabit-ethernet:1/1/4'))
         self.assertEqual((special['SMART']['a'], special['SMART']['b']), ('coari', 'claro'))
-        self.assertEqual(sum(link['maintenance'] for link in config['links']), 1)
+        self.assertEqual(sum(link['maintenance'] for link in config['links']), 0)
 
     def test_radio_topology_has_both_independent_networks_and_exact_endpoint_pairs(self):
         config = app.get_backbone()

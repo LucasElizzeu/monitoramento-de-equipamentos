@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field, field_validator
 from remote_ping import RemotePingError, parse_remote_ping, read_remote_ping
 from siae import SiaeError, SiaeSessionError, login as siae_login, read_counters, calculate_rates
 import traffic_history
+import huawei
 import availability
 import backups
 import notifications
@@ -720,6 +721,9 @@ def optical_powers(output, context=None):
 
 
 def parse_port(port, status_output, optics_output, optics_context=None):
+    if re.search(r'^\s*XGigabitEthernet\s*\d+/\d+/\d+\s+current state\s*:', status_output, re.I | re.M):
+        return dict(name=port, **huawei.interface_reading(port, status_output, optics_output),
+                    checked_at=now(), status_output=status_output, optics_output=optics_output)
     # Conservative extraction: ambiguous or unfamiliar output stays unknown.
     match = re.search(r'(?:line protocol|operational(?: status)?|oper(?:ation)? state|link(?: status)?|physical(?: state)?|\bis)\s*(?:is|:|=)?\s*(up|down)\b', status_output, re.I)
     states = set(s.lower() for s in re.findall(r'\b(?:up|down)\b', status_output, re.I))
@@ -793,7 +797,7 @@ def collect_utilization(client, device, ports):
     """A missing traffic command must not hide link and optical monitoring."""
     command = device.get('utilization_command', 'show interface utilization')
     output, error = '', None
-    if command:
+    if command and any(port.get('rate_source') != 'huawei-vrp' for port in ports):
         try:
             output = ssh_read(client, command)
         except CommandRejected as exc:
@@ -801,6 +805,9 @@ def collect_utilization(client, device, ports):
         except Exception:
             error = 'Não foi possível consultar a utilização nesta leitura.'
     for port in ports:
+        if port.get('rate_source') == 'huawei-vrp':
+            port.update(utilization_output=port['status_output'], utilization_error=None, utilization_enabled=True)
+            continue
         values = dict(rx_bps=None, tx_bps=None, l2_rx_bps=None, l2_tx_bps=None, rx_percent=None, tx_percent=None)
         port_error = error
         if output:
@@ -822,7 +829,7 @@ def ssh_read(client, command):
     output = stdout.read(65536).decode('utf-8', 'replace')
     error = stderr.read(4096).decode('utf-8', 'replace')
     rejected = re.search(
-        r'syntax\s+error\s*:|^\s*%?\s*(?:unknown|invalid|unrecognized|incomplete|ambiguous)\s+(?:command|argument|input)\b',
+        r'^\s*Error:|syntax\s+error\s*:|^\s*%?\s*(?:unknown|invalid|unrecognized|incomplete|ambiguous)\s+(?:command|argument|input)\b',
         clean_cli(output), re.I | re.M)
     if stdout.channel.recv_exit_status() not in (0, -1) or error.strip() or rejected:
         raise CommandRejected(f'O equipamento rejeitou o comando "{command}". '

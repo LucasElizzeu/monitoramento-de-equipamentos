@@ -46,7 +46,7 @@ function pageDevices(page=state.page){
  if(page==='siae')return state.data.devices.filter(d=>d.kind==='siae');
  return page==='bbus'?state.data.devices.filter(d=>d.kind==='ping'):state.data.devices;
 }
-function deviceKindLabel(device){return device.kind==='datacom'?'Datacom':device.kind==='siae'?'Rádio SIAE':'BBU';}
+function deviceKindLabel(device){return device.kind==='datacom'?(/^display interface XGigabitEthernet\b/i.test(device.status_command||'')?'Huawei':'Datacom'):device.kind==='siae'?'Rádio SIAE':'BBU';}
 function collectedPorts(devices){
  return orderedDatacoms(devices).filter(d=>!d.ssh_error).flatMap(device=>(device.port_data||[]).map(port=>({device,port})));
 }
@@ -220,7 +220,7 @@ function renderSiae(){
 function utilizationHTML(p){
  if(p.utilization_enabled===false)return '';
  const note=p.utilization_error||(p.rx_bps==null&&p.rx_percent==null?'Consumo não informado ou formato não reconhecido.':'');
- return `<div class="port-traffic"><div class="traffic-heading">Consumo na porta</div><div class="traffic-values"><span><strong>${bandwidth(p.rx_bps)}</strong>${p.rx_percent!=null?`<small>${number(p.rx_percent,2)}%</small>`:''}</span></div>${note?`<p class="signal-note">${esc(note)}</p>`:''}</div>`;
+ return `<div class="port-traffic"><div class="traffic-heading">Consumo na porta${p.rate_window_seconds?` · média de ${p.rate_window_seconds} s`:""}</div><div class="traffic-values"><span>${p.rate_source==='huawei-vrp'?'<small>RX</small>':''}<strong>${bandwidth(p.rx_bps)}</strong>${p.rx_percent!=null?`<small>${number(p.rx_percent,2)}%</small>`:''}</span>${p.rate_source==='huawei-vrp'?`<span><small>TX</small><strong>${bandwidth(p.tx_bps)}</strong>${p.tx_percent!=null?`<small>${number(p.tx_percent,2)}%</small>`:''}</span>`:''}</div>${note?`<p class="signal-note">${esc(note)}</p>`:''}</div>`;
 }
 function makePortIdentity(name,family='auto'){
  const match=String(name).match(/^(.*?)([0-9]+\/[0-9]+\/[0-9]+)$/);if(!match)return '';
@@ -400,6 +400,14 @@ function syncDeviceKind(){
  $('[name="name"]').placeholder=ssh?'Ex.: Datacom • Core principal':kind==='siae'?'Ex.: SIAE • Enlace Coari':'Ex.: BBU • Torre central';
  syncInterfaceMode();$('#device-circuit-rows').querySelectorAll('input,select').forEach(input=>input.disabled=!ssh);
 }
+function applyHuaweiPreset(){
+ $('[name="kind"][value="datacom"]').checked=true;
+ const settings={interface_type:'ten-gigabit-ethernet',ports:'0/0/11, 0/0/12',status_command:'display interface XGigabitEthernet {port}',optics_command:'display transceiver interface XGigabitEthernet {port} verbose',utilization_command:''};
+ for(const [name,value]of Object.entries(settings))$(`[name="${name}"]`).value=value;
+ syncDeviceKind();
+ $('#device-dialog-title').textContent=state.editing?'Configurar Huawei VRP':'Adicionar Huawei VRP';
+}
+$('#huawei-preset').addEventListener('click',applyHuaweiPreset);
 function syncSiaeFields(){
  const radio=$('[name="kind"]:checked').value==='siae',enabled=$('[name="siae_enabled"]').checked;
  $('#siae-fields').querySelectorAll('input,select').forEach(input=>input.disabled=!radio||(!['siae_enabled','radio_route','radio_network'].includes(input.name)&&!enabled));
@@ -449,7 +457,7 @@ function openEdit(id){
 }
 function renderDetail(){const d=state.data.devices.find(d=>d.id===state.selected);if(!d){$('#detail-dialog').close();state.selected=null;return;}
  const opened=[...$('#detail-content').querySelectorAll('details')].map(e=>e.open);
- $('#detail-content').innerHTML=`<div class="dialog-heading"><div><div class="eyebrow">${d.kind==='datacom'?'DATACOM · SSH + ICMP':d.kind==='siae'?'RÁDIO SIAE · ICMP':'MONITORAMENTO ICMP'}</div><h2 class="equipment-title">${equipmentIcon(d.kind)}<span>${esc(d.name)}</span></h2></div><button class="icon-button" data-close-detail aria-label="Fechar">${icon('close')}</button></div><p class="dialog-description">${esc(d.host)} · Intervalo ${d.interval}s ${state.demo?'· Demonstração':''}</p><div class="detail-summary"><div class="detail-stat">Disponibilidade<strong>${badge(d.state)}</strong></div><div class="detail-stat">Latência<strong>${number(d.latency)} <small>ms</small></strong></div><div class="detail-stat">Perdas consecutivas<strong>${d.failures} <small>/ 21</small></strong></div></div>${d.state==='error'?'<p class="ssh-warning">O coletor não conseguiu executar o ping. Veja o diagnóstico abaixo. Este erro não é contado como perda.</p>':''}<h2>Última tentativa de ping</h2><p class="dialog-description">${esc(d.ping_backend||'ICMP')} · espera máxima ${number(d.ping_timeout??4)}s</p><pre class="ping-diagnostic">${esc(d.ping_detail||'Aguardando a primeira tentativa.')}</pre><h2>Histórico de ping</h2><div class="chart-container detail-chart" id="detail-chart"></div>${d.kind==='datacom'?`<div class="section-divider">PORTAS, SINAIS E PINGS</div>${portsHTML(d)}`:d.kind==='siae'?`<div class="section-divider">CONSUMO DO RÁDIO</div>${siaeCardHTML(d)}`:''}`;
+ $('#detail-content').innerHTML=`<div class="dialog-heading"><div><div class="eyebrow">${d.kind==='datacom'?`${deviceKindLabel(d).toUpperCase()} · SSH + ICMP`:d.kind==='siae'?'RÁDIO SIAE · ICMP':'MONITORAMENTO ICMP'}</div><h2 class="equipment-title">${equipmentIcon(d.kind)}<span>${esc(d.name)}</span></h2></div><button class="icon-button" data-close-detail aria-label="Fechar">${icon('close')}</button></div><p class="dialog-description">${esc(d.host)} · Intervalo ${d.interval}s ${state.demo?'· Demonstração':''}</p><div class="detail-summary"><div class="detail-stat">Disponibilidade<strong>${badge(d.state)}</strong></div><div class="detail-stat">Latência<strong>${number(d.latency)} <small>ms</small></strong></div><div class="detail-stat">Perdas consecutivas<strong>${d.failures} <small>/ 21</small></strong></div></div>${d.state==='error'?'<p class="ssh-warning">O coletor não conseguiu executar o ping. Veja o diagnóstico abaixo. Este erro não é contado como perda.</p>':''}<h2>Última tentativa de ping</h2><p class="dialog-description">${esc(d.ping_backend||'ICMP')} · espera máxima ${number(d.ping_timeout??4)}s</p><pre class="ping-diagnostic">${esc(d.ping_detail||'Aguardando a primeira tentativa.')}</pre><h2>Histórico de ping</h2><div class="chart-container detail-chart" id="detail-chart"></div>${d.kind==='datacom'?`<div class="section-divider">PORTAS, SINAIS E PINGS</div>${portsHTML(d)}`:d.kind==='siae'?`<div class="section-divider">CONSUMO DO RÁDIO</div>${siaeCardHTML(d)}`:''}`;
  $('#detail-content').querySelectorAll('details').forEach((e,i)=>e.open=Boolean(opened[i]));chart(state.detailSamples||[], $('#detail-chart'));
 }
 async function openDetail(id){state.selected=id;state.detailSamples=[];renderDetail();$('#detail-dialog').showModal();try{state.detailSamples=state.demo?state.data.samples.filter(s=>s.device_id===id):await api(`/api/devices/${id}/history`);if(state.selected===id)renderDetail();}catch(e){toast(e.message);}}

@@ -13,7 +13,7 @@
   const d=device(n);
   if(!d||!port)return {label:!port?'Porta pendente': 'Equipamento não cadastrado',port:null};
   if(!$('#connection-error').hidden||d.ssh_error)return {label:'Erro de coleta',error:true,port:null};
-  const p=(d.port_data||[]).find(p=>portIdentity(p,d)===port||String(p.name).toLowerCase()===port.toLowerCase());
+  const p=(d.port_data||[]).find(p=>portIdentity(p,d)===makePortIdentity(port)||String(p.name).toLowerCase()===port.toLowerCase());
   if(!p)return {label:'Porta sem leitura',port:null};
   const fresh=Number.isFinite(Date.parse(p.checked_at))&&Date.now()-Date.parse(p.checked_at)<90000&&Date.parse(p.checked_at)<=Date.now()+5000;
   if(!fresh)return {label:'Leitura desatualizada',port:null};
@@ -218,9 +218,9 @@
  function activate(e){
   const fiber=e.target.closest('[data-link]');if(fiber){show(fiber,e,modality!=='mouse');return;}
   const target=e.target.closest('[data-node]');if(!target)return;
-  const n=byId(target.dataset.node),d=device(n);if(d){openDetail(d.id);return;}
+  const n=byId(target.dataset.node),d=device(n);if(d){if(n.kind==='huawei'&&d.kind==='ping'){openEdit(d.id);applyHuaweiPreset();}else openDetail(d.id);return;}
   openAdd();$('#device-form [name="name"]').value=n.name;$('#device-form [name="host"]').value=n.host;
-  $(`#device-form [name="kind"][value="${n.kind==='huawei'?'ping':'datacom'}"]`).checked=true;syncDeviceKind();
+  $(`#device-form [name="kind"][value="datacom"]`).checked=true;syncDeviceKind();if(n.kind==='huawei')applyHuaweiPreset();
  }
  svg.addEventListener('click',activate);
  svg.addEventListener('keydown',e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();activate(e);}if(e.key==='Escape')dismissInfo();});

@@ -420,3 +420,9 @@ No celular, o desenho inicia ampliado para navegação por arraste; o botão Aju
 A visualização do backbone prioriza o desenho: o título completo fica no caminho de navegação, os controles ocupam uma faixa compacta e o resumo de leituras fica no rodapé junto à legenda. A área do mapa preenche a altura restante da janela. Essa preferência visual não altera a tela inicial do sistema.
 
 A INFOVIA Coari → Escritório Tefé sai da Ten 1/1/7 de Coari e chega espelhada na Ten 1/1/4 do Escritório. Essa chegada é compartilhada com a INFOVIA de Manaus e está identificada nos detalhes dos dois enlaces. A leitura de chegada não representa banda exclusiva de cada transporte; o modo Tráfego continua exibindo a porta de origem de cada rota.
+
+### Huawei S6730 / VRP
+
+No mapa, clique em Manaus (10.200.1.1) para abrir o cadastro SSH já preenchido com as portas 0/0/11 e 0/0/12. Se o IP já existir como BBU/ping, o mesmo cadastro é aberto para conversão; salvar conserva seu ID. Também há o botão **Usar Huawei S6730 · portas 11 e 12** no formulário SSH. Informe usuário, senha e impressão digital SHA256 verificada diretamente no formulário. A configuração é salva somente ao confirmar o cadastro.
+
+O coletor consulta `display interface XGigabitEthernet {port}` e `display transceiver interface XGigabitEthernet {port} verbose`. A banda RX/TX vem das taxas médias `Last 300 seconds`, identificadas no cartão; picos, contadores de bytes e limites ópticos não viram medições atuais. Falhas SSH continuam invalidando as leituras anteriores. Os vínculos atualizados são Huawei XGE0/0/11 → Limão Ten 1/1/1 e Huawei XGE0/0/12 → Limão Ten 1/1/2. A marcação antiga de reparo foi removida do modelo; marcações manuais salvas em Editar portas / manutenção continuam sob controle do operador.

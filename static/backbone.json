@@ -126,7 +126,7 @@
       "id": "manaus-limao-1",
       "a": "manaus",
       "b": "limao",
-      "port_a": "XGE0/0/12",
+      "port_a": "XGE0/0/11",
       "port_b": "ten-gigabit-ethernet:1/1/1",
       "label": "",
       "bend": -12,
@@ -136,11 +136,11 @@
       "id": "manaus-limao-2",
       "a": "manaus",
       "b": "limao",
-      "port_a": "XGE0/0/11",
+      "port_a": "XGE0/0/12",
       "port_b": "ten-gigabit-ethernet:1/1/2",
       "label": "",
       "bend": 12,
-      "maintenance": true
+      "maintenance": false
     },
     {
       "id": "limao-manacapuru-1",
