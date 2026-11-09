@@ -402,7 +402,7 @@ function syncDeviceKind(){
 }
 function applyHuaweiPreset(){
  $('[name="kind"][value="datacom"]').checked=true;
- const settings={interface_type:'ten-gigabit-ethernet',ports:'0/0/11, 0/0/12',status_command:'display interface XGigabitEthernet {port}',optics_command:'display transceiver interface XGigabitEthernet {port} verbose',utilization_command:''};
+ const settings={interface_type:'ten-gigabit-ethernet',ports:'0/0/11, 0/0/12, 0/0/23',status_command:'display interface XGigabitEthernet {port}',optics_command:'display transceiver interface XGigabitEthernet {port} verbose',utilization_command:''};
  for(const [name,value]of Object.entries(settings))$(`[name="${name}"]`).value=value;
  syncDeviceKind();
  $('#device-dialog-title').textContent=state.editing?'Configurar Huawei VRP':'Adicionar Huawei VRP';

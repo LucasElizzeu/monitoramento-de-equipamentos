@@ -369,10 +369,10 @@
       "maintenance": false
     },
     {
-      "id": "manaus2-escritorio-1",
-      "a": "manaus2",
+      "id": "manaus-escritorio-infovia-1",
+      "a": "manaus",
       "b": "escritorio",
-      "port_a": "ten-gigabit-ethernet:1/1/4",
+      "port_a": "XGE0/0/23",
       "port_b": "ten-gigabit-ethernet:1/1/4",
       "label": "INFOVIA",
       "bend": -100,

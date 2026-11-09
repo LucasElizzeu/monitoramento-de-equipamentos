@@ -76,7 +76,7 @@ class BackboneTests(unittest.TestCase):
         self.assertNotIn('GNEX', special)
         self.assertNotIn('manaus2-coari-1', {link['id'] for link in config['links']})
         self.assertEqual((special['INFOVIA']['id'], special['INFOVIA']['a'], special['INFOVIA']['port_a'], special['INFOVIA']['b'], special['INFOVIA']['port_b']),
-                         ('manaus2-escritorio-1', 'manaus2', 'ten-gigabit-ethernet:1/1/4', 'escritorio', 'ten-gigabit-ethernet:1/1/4'))
+                         ('manaus-escritorio-infovia-1', 'manaus', 'XGE0/0/23', 'escritorio', 'ten-gigabit-ethernet:1/1/4'))
         self.assertEqual((special['SMART']['a'], special['SMART']['b']), ('coari', 'claro'))
         self.assertEqual(sum(link['maintenance'] for link in config['links']), 0)
 

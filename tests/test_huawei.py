@@ -87,7 +87,7 @@ class HuaweiTests(unittest.TestCase):
             configured = app.update_device(old['id'], app.DeviceInput(
                 name='Huawei', host='10.200.1.1', kind='datacom', username='reader',
                 password='test-only', fingerprint='SHA256:' + 'a' * 43,
-                ports=['0/0/11', '0/0/12'], interface_type='ten-gigabit-ethernet',
+                ports=['0/0/11', '0/0/12', '0/0/23'], interface_type='ten-gigabit-ethernet',
                 status_command='display interface XGigabitEthernet {port}',
                 optics_command='display transceiver interface XGigabitEthernet {port} verbose',
                 utilization_command=''))
@@ -99,6 +99,8 @@ class HuaweiTests(unittest.TestCase):
                 'display interface XGigabitEthernet 0/0/12': STATUS12,
                 'display transceiver interface XGigabitEthernet 0/0/11 verbose': OPTICS11,
                 'display transceiver interface XGigabitEthernet 0/0/12 verbose': OPTICS12,
+                'display interface XGigabitEthernet 0/0/23': STATUS11.replace('0/0/11', '0/0/23').replace('BB-LIM-DM4050-TEN1', 'INFOVIA'),
+                'display transceiver interface XGigabitEthernet 0/0/23 verbose': OPTICS11.replace('0/0/11', '0/0/23'),
             }
             with patch.object(app.paramiko, 'SSHClient') as client:
                 commands = [
@@ -106,6 +108,8 @@ class HuaweiTests(unittest.TestCase):
                     'display transceiver interface XGigabitEthernet 0/0/11 verbose',
                     'display interface XGigabitEthernet 0/0/12',
                     'display transceiver interface XGigabitEthernet 0/0/12 verbose',
+                    'display interface XGigabitEthernet 0/0/23',
+                    'display transceiver interface XGigabitEthernet 0/0/23 verbose',
                 ]
                 channel = client.return_value.invoke_shell.return_value
                 prompt = '<MANAUS-HUAWEI-S6730>'
@@ -121,8 +125,8 @@ class HuaweiTests(unittest.TestCase):
                 row = db.execute('SELECT * FROM devices WHERE id=?', (old['id'],)).fetchone()
                 self.assertIsNone(row['ssh_error'])
                 ports = json.loads(row['port_data'])
-                self.assertEqual([p['identity'] for p in ports], ['ten-gigabit-ethernet:0/0/11', 'ten-gigabit-ethernet:0/0/12'])
-                self.assertEqual([p['rx_bps'] for p in ports], [1037701192, 0])
+                self.assertEqual([p['identity'] for p in ports], ['ten-gigabit-ethernet:0/0/11', 'ten-gigabit-ethernet:0/0/12', 'ten-gigabit-ethernet:0/0/23'])
+                self.assertEqual([p['rx_bps'] for p in ports], [1037701192, 0, 1037701192])
                 self.assertTrue(all(p['utilization_enabled'] for p in ports))
                 self.assertGreater(db.execute('SELECT COUNT(*) FROM port_traffic_series').fetchone()[0], 0)
 
