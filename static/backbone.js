@@ -118,7 +118,7 @@
   renderInfo(`<button class="icon-button backbone-dismiss" aria-label="Fechar detalhes">×</button><strong>${esc(site.name)} · ${radioStateNames[status]}</strong><small>${esc(site.group.title)}</small>${sides}`);
  }
  function drawRadios(){
-  let html='<g id="radio-map-layer"><text class="radio-map-heading" x="24" y="424">Rádio · Coari → Tefé</text><text class="radio-map-heading" x="24" y="700">Rádio · Tefé → Tabatinga</text>';
+  let html='<g id="radio-map-layer"><text class="radio-map-heading" x="24" y="400">Rádio · Coari → Tefé</text><text class="radio-map-heading" x="24" y="670">Rádio · Tefé → Tabatinga</text>';
   for(const group of backboneLayout.groups){
    if(group.network)html+=`<text class="radio-network-label" x="10" y="${group.y+5}">${group.network}</text>`;
    for(const l of backboneLayout.linksFor(config,group)){const g=radioGeometry(l);html+=`<g class="backbone-radio" data-link="${l.id}" data-radio-route="${l.route}" tabindex="0" role="button"><path class="radio-stroke" d="M${g.x1},${g.y} H${g.x2}"/><path class="fiber-hit" d="M${g.x1},${g.y} H${g.x2}"/><text class="radio-caption" x="${(g.x1+g.x2)/2}" y="${g.y-18}" text-anchor="middle"></text></g>`;}
@@ -134,7 +134,7 @@
    const v=radioReading(l),g=svg.querySelector(`[data-link="${l.id}"]`),p=radioGeometry(l);
    g.dataset.status=v.status;g.setAttribute('aria-label',`${radioTitle(l)}, ${l.a.site} para ${l.b.site}, ${radioStateNames[v.status]}`);
    const primary=v.a.bps!=null?bandwidth(v.a.bps).replace(/<[^>]*>/g,''):v.status==='down'?'Sem ping':v.status==='unknown'?'Sem leitura':`Ping ${number(Math.max(v.a.latency,v.b.latency))} ms`;
-   g.querySelector('text').innerHTML=`<tspan x="${(p.x1+p.x2)/2}">${esc(primary)}</tspan><tspan class="radio-endpoint-ping" x="${(p.x1+p.x2)/2}" y="${p.y+(display.value==='full'?88:64)}">AP ${number(v.a.latency)} / ST ${number(v.b.latency)} ms</tspan>`;
+   g.querySelector('text').innerHTML=`<tspan x="${(p.x1+p.x2)/2}">${esc(primary)}</tspan><tspan class="radio-endpoint-ping" x="${(p.x1+p.x2)/2}" y="${p.y+(display.value==='full'?80:64)}">AP ${number(v.a.latency)} / ST ${number(v.b.latency)} ms</tspan>`;
   }
   for(const site of radioSites()){const v=radioSiteReading(site),g=svg.querySelector(`[data-radio-site="${site.id}"]`);g.dataset.status=v.status;g.setAttribute('aria-label',`${site.name}, ${site.group.title}, ${site.refs.length} rádios, ${radioStateNames[v.status]}`);}
   for(const [route,binding]of Object.entries(config.radio_route_origins||{})){const g=svg.querySelector(`[data-link="radio-origin-${route}"]`);if(g)g.dataset.status=originReading({route,binding}).status;}

@@ -430,3 +430,5 @@ O coletor consulta `display interface XGigabitEthernet {port}` e `display transc
 A consulta Huawei usa um único terminal SSH interativo por coleta, reconhece o prompt VRP e avança a paginação automaticamente. Cada comando tem espera limitada a 20 segundos. Em timeout, o diagnóstico informa o comando executado e conserva somente a saída parcial como diagnóstico, sem publicá-la como leitura atual. A conexão mantém a validação da impressão digital cadastrada.
 
 A origem da INFOVIA Manaus → Escritório Tefé foi corrigida para o Huawei 10.200.1.1, XGigabitEthernet0/0/23; a chegada continua Ten 1/1/4. No cadastro existente do Huawei, use **Usar Huawei S6730 · portas 11, 12 e 23** e salve para incluir a Ten 23 na coleta. O vínculo antigo do Datacom 2 foi substituído, evitando aplicar suas portas manuais à nova origem Huawei.
+
+O desenho compacta as faixas de rádio e o espaço até Tabatinga, além de distribuir Sodré, Codajás e Anori mais perto de Coari. A escala dos ícones e das letras é mantida; os filtros de trecho usam os mesmos limites compactos.

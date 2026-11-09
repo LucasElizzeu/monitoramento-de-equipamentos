@@ -76,7 +76,7 @@
       "id": "anori",
       "name": "Anori",
       "host": "10.200.6.1",
-      "x": 792.0,
+      "x": 752.0,
       "y": 153.0,
       "kind": "datacom"
     },
@@ -84,7 +84,7 @@
       "id": "codajas",
       "name": "Codajás",
       "host": "10.200.7.1",
-      "x": 632.0,
+      "x": 562.0,
       "y": 153.0,
       "kind": "datacom"
     },
@@ -92,7 +92,7 @@
       "id": "sodre",
       "name": "Sodré",
       "host": "10.200.8.1",
-      "x": 472.0,
+      "x": 372.0,
       "y": 153.0,
       "kind": "datacom"
     },
