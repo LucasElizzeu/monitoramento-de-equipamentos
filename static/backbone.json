@@ -416,7 +416,7 @@
       "port_a": "ten-gigabit-ethernet:1/1/2",
       "port_b": "ten-gigabit-ethernet:1/1/1",
       "label": "Fibra local",
-      "bend": 45,
+      "bend": 0,
       "maintenance": false
     }
   ],
