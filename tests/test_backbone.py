@@ -83,11 +83,14 @@ class BackboneTests(unittest.TestCase):
     def test_s2bti_connects_manaus_coari_with_pending_monitoring(self):
         config = app.get_backbone()
         link = next(link for link in config['links'] if link['id'] == 'manaus-coari-s2bti-1')
-        self.assertEqual((link['a'], link['b']), ('manaus', 'coari'))
+        self.assertEqual((link['a'], link['b']), ('manaus2', 'coari'))
         self.assertIsNone(link['port_a'])
         self.assertIsNone(link['port_b'])
         self.assertFalse(link['maintenance'])
         self.assertIn('S2BTI', link['label'])
+        nodes = {n['id']: n for n in config['nodes']}
+        self.assertEqual(nodes['manaus2']['x'], nodes['manaus']['x'])
+        self.assertLess(nodes['manaus2']['y'], nodes['manaus']['y'])
         self.assertLess(link['routeLane'], min(n['y'] for n in config['nodes']))
 
     def test_radio_topology_has_both_independent_networks_and_exact_endpoint_pairs(self):

@@ -117,3 +117,23 @@ body[data-view=backbone] .backbone-scroll{background:#f4f7fb;border-color:#dce4e
 .backbone-info{border-radius:14px;box-shadow:0 14px 48px #233d6029}
 #backbone-section .backbone-legend{padding:5px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
 @media(prefers-reduced-motion:reduce){#backbone-map .fiber-stroke,#backbone-map .radio-stroke{transition:none}}
+
+/* Equipment labels sit on small plates, separate from live status rings. */
+#backbone-map .node-label-card{fill:#fff;stroke:#e0e7f0;stroke-width:1;filter:drop-shadow(0 2px 3px #29435f0c);pointer-events:none}
+#backbone-map .backbone-node:hover .node-label-card,#backbone-map .backbone-node:focus-visible .node-label-card{stroke:#91b6e4;fill:#f5f9ff}
+#backbone-map .backbone-node .node-ip{fill:#718198;font-size:10px;stroke:none}
+#backbone-map .backbone-node text:not(.node-ip){fill:#243d5b;font-size:14px}
+#backbone-map .radio-map-point .radio-halo{fill:#e6eefb;stroke:none;filter:none}
+#backbone-map .radio-map-point[data-status=up] .radio-halo{fill:#dceaff}
+#backbone-map .radio-map-point[data-status=high] .radio-halo{fill:#fff0c9}
+#backbone-map .radio-map-point[data-status=down] .radio-halo{fill:#ffe1e6}
+#backbone-section .backbone-toolbar{background:linear-gradient(110deg,#fff,#f3f7fc);border:1px solid #dce5ef;border-radius:14px;padding:10px 14px;box-shadow:0 2px 8px #233d6008}
+#backbone-section .backbone-overview>strong{color:#29435f;font-size:14px;letter-spacing:.2px}
+#backbone-section .backbone-overview>strong::before{content:'';display:inline-block;width:8px;height:8px;margin-right:9px;border-radius:3px;background:#507db8;box-shadow:0 0 0 4px #e7effa}
+body[data-map-fullscreen=true] #backbone-section .backbone-overview>strong::before{content:''}
+#backbone-section .map-view-controls .button{border-radius:9px;box-shadow:0 1px 3px #243d5b0b}
+#backbone-section .backbone-view-label select{border-radius:9px;border-color:#d6e1ef;background-color:#fff}
+#backbone-map .fiber-caption,#backbone-map .radio-caption{stroke-width:6px;stroke:#fff;stroke-linejoin:round}
+#backbone-map .fiber-region{fill:#ffffffed}
+#backbone-map .radio-region{fill:#f3f7fdeb}
+@media(max-width:640px){#backbone-section .backbone-toolbar{padding:8px;border-radius:11px}}

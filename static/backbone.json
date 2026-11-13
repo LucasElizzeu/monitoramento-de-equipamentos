@@ -6,15 +6,25 @@
       "host": "10.200.1.1",
       "x": 1640,
       "y": 153,
-      "kind": "huawei"
+      "kind": "huawei",
+      "nodeLabel": {
+        "x": 30,
+        "y": 0,
+        "anchor": "start"
+      }
     },
     {
       "id": "manaus2",
       "name": "Manaus · Datacom 2",
       "host": "10.200.1.3",
-      "x": 1430,
-      "y": 285,
-      "kind": "datacom"
+      "x": 1640,
+      "y": 82,
+      "kind": "datacom",
+      "nodeLabel": {
+        "x": 30,
+        "y": 0,
+        "anchor": "start"
+      }
     },
     {
       "id": "limao",
@@ -378,8 +388,8 @@
       "bend": 0,
       "maintenance": false,
       "caption": {
-        "x": 1510,
-        "y": 215,
+        "x": 1610,
+        "y": 117,
         "offset": 0,
         "anchor": "end",
         "angle": 0
@@ -489,7 +499,7 @@
     },
     {
       "id": "manaus-coari-s2bti-1",
-      "a": "manaus",
+      "a": "manaus2",
       "b": "coari",
       "port_a": null,
       "port_b": null,
@@ -513,7 +523,7 @@
         "y": 36,
         "offset": -12
       },
-      "note": "Trecho S2BTI Manaus–Coari. Portas de origem e destino pendentes de confirmação."
+      "note": "Trecho S2BTI: saída no Datacom Manaus 2 (10.200.1.3) e chegada em Coari. Portas pendentes de confirmação."
     }
   ],
   "radio_links": [
