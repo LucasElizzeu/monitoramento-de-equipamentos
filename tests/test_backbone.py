@@ -80,9 +80,19 @@ class BackboneTests(unittest.TestCase):
         self.assertEqual((special['SMART']['a'], special['SMART']['b']), ('coari', 'claro'))
         self.assertEqual(sum(link['maintenance'] for link in config['links']), 0)
 
+    def test_s2bti_connects_manaus_coari_with_pending_monitoring(self):
+        config = app.get_backbone()
+        link = next(link for link in config['links'] if link['id'] == 'manaus-coari-s2bti-1')
+        self.assertEqual((link['a'], link['b']), ('manaus', 'coari'))
+        self.assertIsNone(link['port_a'])
+        self.assertIsNone(link['port_b'])
+        self.assertFalse(link['maintenance'])
+        self.assertIn('S2BTI', link['label'])
+        self.assertLess(link['routeLane'], min(n['y'] for n in config['nodes']))
+
     def test_radio_topology_has_both_independent_networks_and_exact_endpoint_pairs(self):
         config = app.get_backbone()
-        self.assertEqual(len(config['links']), 28)
+        self.assertEqual(len(config['links']), 29)
         radios = [l for l in config['radio_links'] if l['route'] == 'coari-tefe']
         self.assertEqual(len(radios), 8)
         self.assertEqual(len({l['id'] for l in radios}), 8)
@@ -134,4 +144,4 @@ class BackboneTests(unittest.TestCase):
         self.assertEqual(links[-1]['b']['site'], 'Tabatinga')
         all_ips = [l[side]['host'] for l in config['radio_links'] for side in ('a', 'b')]
         self.assertEqual(len(set(all_ips)), 46)
-        self.assertEqual(len(config['links']), 28)
+        self.assertEqual(len(config['links']), 29)

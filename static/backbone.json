@@ -486,6 +486,34 @@
         "anchor": "end",
         "angle": 0
       }
+    },
+    {
+      "id": "manaus-coari-s2bti-1",
+      "a": "manaus",
+      "b": "coari",
+      "port_a": null,
+      "port_b": null,
+      "label": "S2BTI · Manaus → Coari",
+      "bend": 0,
+      "maintenance": false,
+      "route": "rectangular",
+      "routeLane": 36,
+      "waypoints": [
+        {
+          "x": 1640,
+          "y": 36
+        },
+        {
+          "x": 120,
+          "y": 36
+        }
+      ],
+      "caption": {
+        "x": 550,
+        "y": 36,
+        "offset": -12
+      },
+      "note": "Trecho S2BTI Manaus–Coari. Portas de origem e destino pendentes de confirmação."
     }
   ],
   "radio_links": [

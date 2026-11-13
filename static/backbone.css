@@ -95,3 +95,25 @@ body[data-view=backbone] #backbone-summary{font-size:10px;color:var(--muted);mar
 body[data-view=backbone] .backbone-help summary{min-height:20px}
 body[data-layout][data-view=backbone][data-map-fullscreen=true] main{height:100dvh;padding:8px}
 @media(max-width:640px){body[data-layout][data-view=backbone] main{height:calc(100dvh - 103px);padding:6px 8px}body[data-view=backbone] .backbone-overview{display:none}body[data-view=backbone] #backbone-summary{margin-left:0;font-size:9px}body[data-layout][data-view=backbone][data-map-fullscreen=true] main{height:100dvh}}
+
+/* Topology canvas: quiet sections and crisp status paths. */
+body[data-view=backbone] .backbone-scroll{background:#f4f7fb;border-color:#dce4ee;border-radius:16px;box-shadow:0 4px 20px #233d6010}
+#backbone-map{background-image:radial-gradient(#9aacc52e .8px,transparent .8px);background-size:18px 18px}
+.map-regions{pointer-events:none}.map-region{stroke:#dce5ef;stroke-width:1;fill:#ffffffd9}.radio-region{fill:#f8fbffeb}
+.fiber-underlay{fill:none;stroke:white;stroke-width:8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+#backbone-map .fiber-stroke,#backbone-map .radio-stroke{stroke-linecap:round;stroke-linejoin:round;transition:stroke-width .15s ease}
+#backbone-map .backbone-node circle:not(.node-halo),#backbone-map .radio-map-point circle{filter:drop-shadow(0 3px 4px #253e6026);stroke-width:2.5}
+#backbone-map .backbone-node .node-halo{fill:#e8eef6;stroke:none;opacity:.8}
+#backbone-map .backbone-node[data-status=online] .node-halo{fill:#d9f3e5}
+#backbone-map .backbone-node[data-status=offline] .node-halo{fill:#ffe0e5}
+#backbone-map .backbone-node:hover .node-halo,#backbone-map .backbone-node:focus-visible .node-halo{fill:#dbeafe;opacity:1}
+#backbone-map .backbone-node:focus-visible{outline:2px solid #2563eb;outline-offset:5px}
+#backbone-map .backbone-node text:not(.node-ip){font-weight:650}
+#backbone-map .radio-map-heading{fill:#29435f;font-size:16px;letter-spacing:.25px}
+#backbone-map .radio-network-label{fill:#426b9d}
+#backbone-map [data-link=manaus-coari-s2bti-1] .fiber-stroke{stroke-width:4}
+#backbone-map [data-link=manaus-coari-s2bti-1] .fiber-caption{font-weight:700;fill:#334e70}
+#backbone-map[data-display=clean] [data-link=manaus-coari-s2bti-1] .fiber-caption{display:block}
+.backbone-info{border-radius:14px;box-shadow:0 14px 48px #233d6029}
+#backbone-section .backbone-legend{padding:5px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+@media(prefers-reduced-motion:reduce){#backbone-map .fiber-stroke,#backbone-map .radio-stroke{transition:none}}
