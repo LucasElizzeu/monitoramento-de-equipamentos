@@ -80,12 +80,12 @@ class BackboneTests(unittest.TestCase):
         self.assertEqual((special['SMART']['a'], special['SMART']['b']), ('coari', 'claro'))
         self.assertEqual(sum(link['maintenance'] for link in config['links']), 0)
 
-    def test_s2bti_connects_manaus_coari_with_pending_monitoring(self):
+    def test_s2bti_connects_manaus2_coari_with_confirmed_ports(self):
         config = app.get_backbone()
         link = next(link for link in config['links'] if link['id'] == 'manaus-coari-s2bti-1')
         self.assertEqual((link['a'], link['b']), ('manaus2', 'coari'))
-        self.assertIsNone(link['port_a'])
-        self.assertIsNone(link['port_b'])
+        self.assertEqual(link['port_a'], 'ten-gigabit-ethernet:1/1/9')
+        self.assertEqual(link['port_b'], 'gigabit-ethernet:1/1/11')
         self.assertFalse(link['maintenance'])
         self.assertIn('S2BTI', link['label'])
         nodes = {n['id']: n for n in config['nodes']}
