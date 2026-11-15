@@ -7,8 +7,6 @@ body[data-layout][data-view=backbone] .page-heading{border:0;padding-bottom:0;ma
 body[data-layout][data-view=backbone] .page-heading h1{margin:0;font-size:22px}
 body[data-view=backbone] .page-heading .eyebrow,body[data-view=backbone] #page-description,body[data-view=backbone] .status-strip{display:none}
 #backbone-section .backbone-toolbar{margin:0 0 12px;gap:12px}
-.backbone-overview{display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0}
-.backbone-overview>strong{color:var(--ink);font-size:13px;font-weight:600}
 #backbone-summary{font-size:11px}
 .backbone-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .backbone-view-label{display:flex;align-items:center;gap:8px;font-size:12px}
@@ -23,7 +21,7 @@ body[data-view=backbone] .backbone-scroll{height:calc(100dvh - 225px);min-height
 .backbone-help{font-size:11px;color:var(--muted);max-width:560px}
 .backbone-help summary{cursor:pointer;min-height:28px;text-align:right}
 .backbone-help p{font-size:12px;line-height:1.7;margin:8px 0}
-@media(max-width:900px){body[data-view=backbone] .backbone-scroll{height:calc(100dvh - 285px)}.backbone-actions{gap:10px}.backbone-overview{gap:8px}}
+@media(max-width:900px){body[data-view=backbone] .backbone-scroll{height:calc(100dvh - 285px)}.backbone-actions{gap:10px}}
 @media(max-width:640px){body[data-layout][data-view=backbone] main{padding-top:12px}.backbone-actions{width:100%;justify-content:space-between;gap:8px}.backbone-view-label{gap:5px}.backbone-view-label select{max-width:150px}.backbone-help summary{text-align:left}body[data-view=backbone] .backbone-scroll{height:55dvh;min-height:320px}}
 
 #backbone-map[data-display=traffic] .fiber-caption{font-size:13px}
@@ -82,7 +80,6 @@ body[data-map-fullscreen=true] .app-shell{margin-left:0}
 body[data-layout][data-map-fullscreen=true] main{height:100dvh;padding:10px;max-width:none;box-sizing:border-box}
 body[data-map-fullscreen=true] #backbone-section{height:100%;display:flex;flex-direction:column}
 body[data-map-fullscreen=true] #backbone-section .backbone-scroll{height:auto;min-height:0;flex:1}
-body[data-map-fullscreen=true] .backbone-overview>strong::before{content:'Backbone Veloso NOC · '}
 @media(max-width:760px){body[data-view=backbone] .backbone-scroll{height:65dvh;min-height:360px}.backbone-actions .map-view-controls{justify-content:flex-start}body[data-map-fullscreen=true] #backbone-section .backbone-scroll{min-height:0}}
 /* Reserve the available window for the diagram; the breadcrumb already names the page. */
 body[data-layout][data-view=backbone] main{height:calc(100dvh - 52px);padding:6px 12px 8px;display:flex;flex-direction:column;min-height:0}
@@ -94,7 +91,7 @@ body[data-view=backbone] .backbone-footer{gap:6px 14px;padding-top:6px;flex-shri
 body[data-view=backbone] #backbone-summary{font-size:10px;color:var(--muted);margin-left:auto}
 body[data-view=backbone] .backbone-help summary{min-height:20px}
 body[data-layout][data-view=backbone][data-map-fullscreen=true] main{height:100dvh;padding:8px}
-@media(max-width:640px){body[data-layout][data-view=backbone] main{height:calc(100dvh - 103px);padding:6px 8px}body[data-view=backbone] .backbone-overview{display:none}body[data-view=backbone] #backbone-summary{margin-left:0;font-size:9px}body[data-layout][data-view=backbone][data-map-fullscreen=true] main{height:100dvh}}
+@media(max-width:640px){body[data-layout][data-view=backbone] main{height:calc(100dvh - 103px);padding:6px 8px}body[data-view=backbone] #backbone-summary{margin-left:0;font-size:9px}body[data-layout][data-view=backbone][data-map-fullscreen=true] main{height:100dvh}}
 
 /* Topology canvas: uniform background and crisp status paths. */
 body[data-view=backbone] .backbone-scroll{background:var(--inset);border-color:var(--line);border-radius:16px;box-shadow:0 4px 20px #233d6010}
@@ -122,28 +119,22 @@ body[data-view=backbone] .backbone-scroll{background:var(--inset);border-color:v
 #backbone-map .radio-map-point[data-status=up] .radio-halo{fill:var(--accent-light)}
 #backbone-map .radio-map-point[data-status=high] .radio-halo{fill:var(--warning-bg)}
 #backbone-map .radio-map-point[data-status=down] .radio-halo{fill:var(--danger-bg)}
-#backbone-section .backbone-toolbar{background:linear-gradient(110deg,var(--surface),var(--raised));border:1px solid var(--line);border-radius:14px;padding:10px 14px;box-shadow:0 2px 8px #233d6008}
-#backbone-section .backbone-overview>strong{color:var(--ink);font-size:14px;letter-spacing:.2px}
-#backbone-section .backbone-overview>strong::before{content:'';display:inline-block;width:8px;height:8px;margin-right:9px;border-radius:3px;background:var(--accent);box-shadow:0 0 0 4px #e7effa}
-body[data-map-fullscreen=true] #backbone-section .backbone-overview>strong::before{content:''}
+#backbone-section .backbone-toolbar{justify-content:flex-end;gap:8px;background:transparent;border:0;padding:0;box-shadow:none}
 #backbone-section .map-view-controls .button{border-radius:9px;box-shadow:0 1px 3px #243d5b0b}
 #backbone-section .backbone-view-label select{border-radius:9px;border-color:var(--line);background-color:var(--surface)}
 #backbone-map .fiber-caption,#backbone-map .radio-caption{stroke-width:6px;stroke:var(--surface);stroke-linejoin:round}
-@media(max-width:640px){#backbone-section .backbone-toolbar{padding:8px;border-radius:11px}}
 
-.ospf-panel{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;margin:0 0 8px;flex-shrink:0}
-.ospf-panel-title{display:flex;flex-direction:column;justify-content:center;padding:6px 12px 6px 2px;gap:4px;color:var(--ink);font-size:12px}
-.ospf-panel-title small,.ospf-peer small{display:block;color:var(--muted);font-size:10px}
-.ospf-peer{display:flex;align-items:center;gap:9px;flex:1;min-width:230px;padding:8px 12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;font-size:11px}
-.ospf-peer strong{display:block;margin-bottom:3px;font-size:11px}
-.ospf-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0}
-.ospf-state{margin-left:auto;font-size:10px;max-width:170px;overflow-wrap:anywhere;color:var(--muted)}
-.ospf-peer[data-status=up] .ospf-dot{background:var(--success);box-shadow:0 0 0 3px #18905b15}
-.ospf-peer[data-status=down] .ospf-dot{background:var(--red);box-shadow:0 0 0 3px #cf293e15}
-.ospf-peer[data-status=up] .ospf-state,.ospf-detail[data-status=up]>strong,#backbone-map .ospf-caption[data-status=up]{color:var(--success);fill:var(--success)}
-.ospf-peer[data-status=down] .ospf-state,.ospf-detail[data-status=down]>strong,#backbone-map .ospf-caption[data-status=down]{color:var(--red);fill:var(--red)}
-#backbone-map .ospf-caption{font-size:11px;font-weight:650}
-@media(max-width:640px){.ospf-panel{gap:4px}.ospf-panel-title{width:100%;flex-direction:row;justify-content:space-between;padding:4px}.ospf-peer{min-width:0;flex-basis:100%;padding:5px 9px}.ospf-peer strong{margin-bottom:1px}}
+
+/* OSPF shares the footer with the link legend, leaving the canvas unobstructed. */
+.ospf-legend{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;color:var(--muted);font-size:11px;min-width:0}
+.ospf-legend-title{font-size:10px;font-weight:700;letter-spacing:.3px;color:var(--ink)}
+.ospf-legend-item{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.ospf-dot{width:6px;height:6px;border-radius:50%;background:var(--neutral);flex-shrink:0}
+.ospf-legend-value{font-size:10px;font-weight:650;color:var(--muted)}
+.ospf-legend-item[data-status=up] .ospf-dot{background:var(--success)}
+.ospf-legend-item[data-status=down] .ospf-dot{background:var(--red)}
+.ospf-legend-item[data-status=up] .ospf-legend-value,.ospf-detail[data-status=up]>strong{color:var(--success)}
+.ospf-legend-item[data-status=down] .ospf-legend-value,.ospf-detail[data-status=down]>strong{color:var(--red)}
 
 /* Summary-only map: complete telemetry opens explicitly in the selected link panel. */
 #backbone-map .fiber-caption{pointer-events:bounding-box;cursor:pointer}

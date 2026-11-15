@@ -6,7 +6,6 @@ body .primary,body[data-view=overview] #add-device{background:var(--button-bg);b
 body .primary:hover{filter:brightness(.94)}
 body .danger{background:#b92f39;color:#fff}
 body .toast{background:var(--ink);color:var(--surface)}
-body[data-layout][data-view] #backbone-section .backbone-toolbar{background:var(--surface);border-color:var(--line)}
 body[data-view=backbone] .backbone-scroll,#backbone-map{background:var(--surface)}
 #backbone-map[data-display] .backbone-node text:not(.node-ip),#backbone-map .radio-site-point .radio-site{font-weight:800;fill:var(--ink)}
 #backbone-map .node-ip,#backbone-map .radio-endpoint-ping{fill:var(--muted)}

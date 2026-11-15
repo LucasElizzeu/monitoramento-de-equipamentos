@@ -447,7 +447,7 @@ Os pares Router ID/endereço confirmados na tabela do Escritório são:
 | INFOVIA Coari | `10.200.9.1` | `10.10.20.1` |
 | INFOVIA Tabatinga | `10.200.30.1` | `10.10.20.10` |
 
-O painel no topo do mapa mostra os três vizinhos; as INFOVIAs Manaus e Coari também exibem OSPF nos detalhes abertos por clique. Tabatinga aparece no painel OSPF, sem criar uma nova fibra física. A indicação de OSPF é independente da cor/estado das portas: somente uma leitura atual do vizinho correspondente em **Full** fica verde. Outros estados e vizinho ausente de uma tabela válida ficam vermelhos. Erro de SSH, resposta inválida, desconexão do painel ou leitura com mais de 90 segundos ficam indisponíveis, sem gerar uma falsa queda de adjacência.
+O rodapé do mapa, junto à legenda, mostra o estado dos três vizinhos; as INFOVIAs Manaus e Coari também exibem OSPF nos detalhes abertos por clique. Tabatinga aparece no resumo OSPF do rodapé, sem criar uma nova fibra física. A indicação de OSPF é independente da cor/estado das portas: somente uma leitura atual do vizinho correspondente em **Full** fica verde. Outros estados e vizinho ausente de uma tabela válida ficam vermelhos. Erro de SSH, resposta inválida, desconexão do painel ou leitura com mais de 90 segundos ficam indisponíveis, sem gerar uma falsa queda de adjacência.
 
 As transições para fora de Full e a recuperação entram no histórico de alertas. Uma primeira consulta válida já sem o vizinho também gera alerta; consultas com erro não alteram o último estado conhecido para fins de recuperação. Notificações Telegram usam a opção existente **Circuitos**, quando habilitada pelo operador. Uma queda mantida não repete o alerta a cada consulta. Os vínculos esperados e o comando ficam em `ospf.py`. Os testes usam saídas simuladas; a primeira coleta no ambiente da rede deve confirmar suporte ao comando e os três estados reais.
 
@@ -477,3 +477,6 @@ O mapa apresenta um único resumo de tráfego por fibra e por enlace de rádio. 
 **Clique ou toque no trecho** para abrir e fixar o painel com as duas pontas, portas, tráfego RX, sinal RX e OSPF quando aplicável. Passar o mouse ou apenas mover o foco com Tab não abre informações. Enter/Espaço ativa o trecho focado. O trecho selecionado fica destacado; clicar nele novamente, clicar fora, pressionar Esc ou usar × fecha o painel. As leituras continuam sendo atualizadas enquanto o painel está aberto.
 
 `node tests/map_labels.test.cjs` verifica a reserva de espaço para legendas. `node tests/ui_map_readability.test.cjs` usa tráfego sintético preenchido em todos os enlaces, verifica colisões entre textos nos dois temas e em duas larguras de tela e testa a abertura somente por ativação explícita. Nenhum teste consulta os equipamentos reais.
+
+
+O OSPF fica em indicadores compactos no rodapé, junto à legenda: Manaus, Coari e Tabatinga com seu estado atual. Os cartões, IPs e a descrição da coleta foram retirados de cima do desenho. A barra superior contém somente os controles de trecho, exibição, ajuste à largura e tela cheia, para o mapa começar mais alto e ocupar a altura liberada. Dados detalhados continuam disponíveis por clique no trecho.

@@ -196,9 +196,9 @@
  }
  function refreshOspf(){
   const panel=$('#backbone-ospf'),monitor=config.ospf_monitor;if(!panel||!monitor)return;
-  const html='<div class="ospf-panel-title"><strong>OSPF · INFOVIAs</strong><small>Escritório Tefé · consulta a cada 30 s</small></div>'+monitor.peers.map(peer=>{
-   const r=ospfReading(peer);
-   return `<div class="ospf-peer" data-status="${r.status}"><span class="ospf-dot" aria-hidden="true"></span><div><strong>${esc(peer.name)}</strong><small>${esc(peer.router_id)} · ${esc(peer.address)}</small></div><span class="ospf-state" title="${esc(r.label)}">${esc(r.label)}</span></div>`;
+  const html='<strong class="ospf-legend-title">OSPF</strong>'+monitor.peers.map(peer=>{
+   const r=ospfReading(peer),name=peer.name.replace(/^INFOVIA\s*[·-]\s*/i,''),value=r.status==='unknown'?'Sem leitura':r.label==='Vizinho ausente'?'Ausente':r.label;
+   return `<span class="ospf-legend-item" data-status="${r.status}" aria-label="${esc(peer.name+' · OSPF '+r.label)}"><i class="ospf-dot" aria-hidden="true"></i><span>${esc(name)}</span><strong class="ospf-legend-value">${esc(value)}</strong></span>`;
   }).join('');if(panel.innerHTML!==html)panel.innerHTML=html;
  }
  function refresh(){

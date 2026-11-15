@@ -19,6 +19,15 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
  await page.evaluate(()=>document.fonts.ready);
  assert.equal(await page.locator('#backbone-display').inputValue(),'traffic','Old full-detail preference migrates to the summary view');
  assert.equal(await page.locator('#backbone-display option[value="full"]').count(),0);
+ assert.equal(await page.locator('#backbone-after-map #backbone-ospf').count(),1,'OSPF lives beside the footer legend');
+ assert.equal(await page.locator('.ospf-panel-title,.backbone-overview').count(),0,'No redundant information cards above the map');
+ assert.equal(await page.locator('#backbone-ospf .ospf-legend-item').count(),3);
+ assert(!(await page.locator('#backbone-ospf').innerText()).includes('10.200.'),'Footer status remains compact');
+ const controls=await page.locator('.backbone-toolbar').boundingBox(),canvas=await page.locator('.backbone-scroll').boundingBox();
+ assert(controls.height<=40,'Single compact row of map controls');
+ assert(canvas.y<=110,'Map starts near the application header');
+ assert(canvas.height>=800,'Freed space expands the drawing at 1000 px viewport height');
+
  const collisions=()=>page.evaluate(()=>{
   const visible=e=>getComputedStyle(e).display!=='none'&&getComputedStyle(e).visibility!=='hidden';
   const summaries=[...document.querySelectorAll('.fiber-caption')].filter(visible);
