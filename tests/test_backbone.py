@@ -122,7 +122,7 @@ class BackboneTests(unittest.TestCase):
                 hosts.extend([link['a']['host'], link['b']['host']])
         self.assertEqual(len(set(hosts)), 16)
 
-    def test_radio_datacom_bindings_preserve_confirmed_source_and_pending_destination(self):
+    def test_radio_datacom_bindings_match_confirmed_coari_and_claro_ports(self):
         config = app.get_backbone()
         nodes = {n['id']: n for n in config['nodes']}
         for network in config['radio_networks']:
@@ -130,8 +130,8 @@ class BackboneTests(unittest.TestCase):
             self.assertEqual(network['source'], dict(node='coari', port=f"ten-gigabit-ethernet:1/1/{7+network['network']}"))
             self.assertEqual(nodes[network['source']['node']]['host'], '10.200.9.1')
             self.assertEqual(nodes[network['target']['node']]['host'], '10.200.19.1')
-            self.assertIsNone(network['target']['port'])
-            self.assertEqual(network['target']['candidate_ports'], [f'gigabit-ethernet:1/1/{p}' for p in (5, 6, 7, 8)])
+            expected = [7, 8] if network['network'] == 1 else [5, 6]
+            self.assertEqual(network['target'], dict(node='claro', ports=[f'gigabit-ethernet:1/1/{p}' for p in expected]))
         self.assertEqual(len(config['radio_networks']), 2)
 
     def test_tefe_tabatinga_pairs_follow_the_thirty_supplied_ips(self):

@@ -917,10 +917,7 @@
       },
       "target": {
         "node": "claro",
-        "port": null,
-        "candidate_ports": [
-          "gigabit-ethernet:1/1/5",
-          "gigabit-ethernet:1/1/6",
+        "ports": [
           "gigabit-ethernet:1/1/7",
           "gigabit-ethernet:1/1/8"
         ]
@@ -934,12 +931,9 @@
       },
       "target": {
         "node": "claro",
-        "port": null,
-        "candidate_ports": [
+        "ports": [
           "gigabit-ethernet:1/1/5",
-          "gigabit-ethernet:1/1/6",
-          "gigabit-ethernet:1/1/7",
-          "gigabit-ethernet:1/1/8"
+          "gigabit-ethernet:1/1/6"
         ]
       }
     }

@@ -100,19 +100,22 @@
  const radioNetworks=()=>config.radio_networks||[];
  function accessId(network,side){return `radio-access-${network}-${side}`;}
  function findAccess(id){for(const network of radioNetworks())for(const side of ['source','target'])if(accessId(network.network,side)===id)return {network,side,binding:network[side]};}
+ const bindingPorts=binding=>binding.ports||[binding.port].filter(Boolean);
+ const bindingPortLabel=port=>port?port.replace('ten-gigabit-ethernet:','Ten ').replace('hundred-gigabit-ethernet:','Hundred ').replace('gigabit-ethernet:','Giga '):'Porta a confirmar';
  function accessReading(network,side){
   const links=radioLinks().filter(l=>l.network===network.network).sort((a,b)=>a.order-b.order),end=side==='source'?links[0]?.a:links.at(-1)?.b;
-  const binding=network[side],node=byId(binding.node),port=reading(node,binding.port),radio=radioMapState.endpoint(end,state.data.devices,Date.now(),$('#connection-error').hidden);
-  return {node,port,radio,status:binding.port?radioMapState.access(port,radio):'unknown'};
+  const binding=network[side],node=byId(binding.node),ports=bindingPorts(binding).map(name=>({name,...reading(node,name)}));
+  const radio=radioMapState.endpoint(end,state.data.devices,Date.now(),$('#connection-error').hidden);
+  return {node,ports,radio,status:radioMapState.accessPorts(ports)};
  }
  function routeOrigin(id){for(const [route,binding] of Object.entries(config.radio_route_origins||{}))if(id===`radio-origin-${route}`)return {route,binding};}
- function originReading(origin){const node=byId(origin.binding.node),link=radioLinks().filter(l=>l.route===origin.route).sort((a,b)=>a.order-b.order)[0],port=reading(node,origin.binding.port),radio=radioMapState.endpoint(link.a,state.data.devices,Date.now(),$('#connection-error').hidden);return {node,link,port,radio,status:origin.binding.port?radioMapState.access(port,radio):'unknown'};}
+ function originReading(origin){const node=byId(origin.binding.node),link=radioLinks().filter(l=>l.route===origin.route).sort((a,b)=>a.order-b.order)[0],port=reading(node,origin.binding.port),radio=radioMapState.endpoint(link.a,state.data.devices,Date.now(),$('#connection-error').hidden);return {node,link,port,radio,status:origin.binding.port?radioMapState.access(port):'unknown'};}
  function drawRouteOrigins(){
   let html='';
   for(const [route,binding]of Object.entries(config.radio_route_origins||{})){
    const origin={route,binding},v=originReading(origin),g=radioGeometry(v.link),node=v.node;
-   const points=[{x:node.x,y:node.y+14},{x:node.x,y:node.y+62},{x:1888,y:node.y+62},{x:1888,y:g.y},{x:g.x1,y:g.y}],d=roundedRoute(points,14);
-   html+=`<g class="radio-access radio-route-origin" data-link="radio-origin-${route}" data-status="${v.status}" tabindex="0" role="button" aria-label="Origem Tefé → Tabatinga no Datacom Tefé CLARO, porta a confirmar"><path class="radio-access-underlay" d="${d}"/><path class="radio-access-stroke" d="${d}"/><path class="fiber-hit" d="${d}"/><text class="radio-access-caption" x="${g.x1}" y="${g.y-50}" text-anchor="end">Tefé CLARO · porta a confirmar</text></g>`;
+   const points=[{x:node.x,y:node.y+14},{x:node.x,y:node.y+62},{x:1904,y:node.y+62},{x:1904,y:g.y},{x:g.x1,y:g.y}],d=roundedRoute(points,14);
+   html+=`<g class="radio-access radio-route-origin" data-link="radio-origin-${route}" data-status="${v.status}" tabindex="0" role="button" aria-label="Origem Tefé → Tabatinga no Datacom Tefé CLARO, porta a confirmar"><path class="radio-access-underlay" d="${d}"/><path class="radio-access-stroke" data-status="${v.status}" d="${d}"/><path class="fiber-hit" d="${d}"/><text class="radio-access-caption" x="${g.x1}" y="${g.y-50}" text-anchor="end">Tefé CLARO · porta a confirmar</text></g>`;
   }
   return html;
  }
@@ -126,18 +129,24 @@
    const links=radioLinks().filter(l=>l.network===network.network).sort((a,b)=>a.order-b.order);if(!links.length)continue;
    const first=radioGeometry(links[0]),last=radioGeometry(links.at(-1)),offset=network.network===1?-8:8;
    for(const side of ['source','target']){
-    const node=byId(network[side].node),isSource=side==='source';
-    const points=isSource?[{x:node.x-14,y:node.y+offset},{x:44-(network.network-1)*20,y:node.y+offset},{x:44-(network.network-1)*20,y:first.y},{x:first.x1,y:first.y}]:[{x:last.x2,y:last.y},{x:1860+(network.network-1)*16,y:last.y},{x:1860+(network.network-1)*16,y:node.y+30+(network.network-1)*16},{x:node.x+offset,y:node.y+30+(network.network-1)*16},{x:node.x+offset,y:node.y+14}];
-    const d=roundedRoute(points,14),id=accessId(network.network,side),label=isSource?`Coari · Ten 1/1/${7+network.network}`:'Tefé CLARO · Giga 5–8 a confirmar';
-    html+=`<g class="radio-access" data-link="${id}" data-network="${network.network}" data-end="${side}" tabindex="0" role="button" aria-label="${esc(label+' · Rede '+network.network)}"><path class="radio-access-underlay" d="${d}"/><path class="radio-access-stroke" d="${d}"/><path class="fiber-hit" d="${d}"/><text class="radio-access-caption" x="${isSource?first.x1:1805}" y="${first.y+80}" text-anchor="middle">${label}</text></g>`;
+    const binding=network[side],node=byId(binding.node),isSource=side==='source',v=accessReading(network,side);
+    const configured=bindingPorts(binding),ports=configured.length?configured:[null];
+    const paths=ports.map((port,i)=>{
+     const portStatus=radioMapState.access(v.ports[i]||{port:null}),rail=1856+(network.network-1)*24+i*8,spread=(i-(ports.length-1)/2)*6;
+     const points=isSource?[{x:node.x-14,y:node.y+offset},{x:44-(network.network-1)*20,y:node.y+offset},{x:44-(network.network-1)*20,y:first.y},{x:first.x1,y:first.y}]:[{x:last.x2,y:last.y},{x:last.x2+22,y:last.y+spread},{x:rail,y:last.y+spread},{x:rail,y:node.y+30+(network.network-1)*20+i*8},{x:node.x+offset+spread,y:node.y+30+(network.network-1)*20+i*8},{x:node.x+offset+spread,y:node.y+14}];
+     const d=roundedRoute(points,10);
+     return `<g class="radio-access-port" data-port="${esc(port||'')}" data-status="${portStatus}"><path class="radio-access-underlay" d="${d}"/><path class="radio-access-stroke" data-status="${portStatus}" d="${d}"/><path class="fiber-hit" d="${d}"/></g>`;
+    }).join('');
+    const id=accessId(network.network,side),label=`Rede ${network.network} · ${node.name} · ${ports.map(bindingPortLabel).join(', ')}`;
+    html+=`<g class="radio-access" data-link="${id}" data-network="${network.network}" data-end="${side}" data-status="${v.status}" tabindex="0" role="button" aria-label="${esc(label)}">${paths}</g>`;
    }
   }
   return html;
  }
  function accessDetails(access){
-  const {network,side,binding}=access,v=accessReading(network,side),isSource=side==='source';
-  const port=binding.port?esc(binding.port):'Porta a confirmar · Giga 1/1/5, 1/1/6, 1/1/7 ou 1/1/8';
-  renderInfo(`<button class="icon-button backbone-dismiss" aria-label="Fechar detalhes">×</button><strong>Rede ${network.network} · ${isSource?'Saída de Coari':'Chegada no CLARO'}</strong><div><strong>${esc(v.node.name)}</strong><small>${v.node.host} · ${port}</small><p>${esc(v.port.label)}${v.port.port?' · RX '+esc(rate(v.port)):''}</p></div><div><strong>${esc(v.radio.device?.name||'Rádio '+(isSource?'AP de Coari':'ST de Tefé'))}</strong><p>${esc(v.radio.label)} · Ping ${number(v.radio.latency)} ms</p></div><button type="button" class="button secondary" data-access-node="${v.node.id}">Ver Datacom</button>`);
+  const {network,side}=access,v=accessReading(network,side),isSource=side==='source';
+  const ports=v.ports.length?v.ports.map(r=>`<div><strong>${esc(bindingPortLabel(r.name))} · ${esc(r.label)}</strong><p>Tráfego RX: ${esc(rate(r))}<br>Sinal RX: ${esc(signal(r))}</p></div>`).join(''):'<p>Porta a confirmar.</p>';
+  renderInfo(`<button class="icon-button backbone-dismiss" aria-label="Fechar detalhes">×</button><strong>Rede ${network.network} · ${isSource?'Saída de Coari':'Chegada no CLARO'}</strong><small>${esc(v.node.name)} · ${esc(v.node.host)}</small><p>Conexão física monitorada por porta.</p>${ports}<div><strong>${esc(v.radio.device?.name||'Rádio '+(isSource?'AP de Coari':'ST de Tefé'))}</strong><p>${esc(v.radio.label)} · Ping ${number(v.radio.latency)} ms</p></div><button type="button" class="button secondary" data-access-node="${v.node.id}">Ver Datacom</button>`);
  }
  function radioSiteReading(site){
   const readings=site.refs.map(ref=>({ref,...radioReading(ref.link)[ref.side]})),states=readings.map(r=>r.status);
@@ -167,8 +176,14 @@
    g.querySelector('text').textContent=primary;
   }
   for(const site of radioSites()){const v=radioSiteReading(site),g=svg.querySelector(`[data-radio-site="${site.id}"]`);g.dataset.status=v.status;g.setAttribute('aria-label',`${site.name}, ${site.group.title}, ${site.refs.length} rádios, ${radioStateNames[v.status]}`);}
-  for(const [route,binding]of Object.entries(config.radio_route_origins||{})){const g=svg.querySelector(`[data-link="radio-origin-${route}"]`);if(g)g.dataset.status=originReading({route,binding}).status;}
-  for(const network of radioNetworks())for(const side of ['source','target']){const g=svg.querySelector(`[data-link="${accessId(network.network,side)}"]`);if(g)g.dataset.status=accessReading(network,side).status;}
+  for(const [route,binding]of Object.entries(config.radio_route_origins||{})){
+   const g=svg.querySelector(`[data-link="radio-origin-${route}"]`);if(g){const status=originReading({route,binding}).status;g.dataset.status=status;g.querySelector('.radio-access-stroke').dataset.status=status;}
+  }
+  for(const network of radioNetworks())for(const side of ['source','target']){
+   const g=svg.querySelector(`[data-link="${accessId(network.network,side)}"]`);if(!g)continue;
+   const v=accessReading(network,side);g.dataset.status=v.status;
+   g.querySelectorAll('.radio-access-port').forEach((port,i)=>{const status=radioMapState.access(v.ports[i]||{port:null});port.dataset.status=status;port.querySelector('.radio-access-stroke').dataset.status=status;});
+  }
  }
  function openRadio(link,side){
   hideInfo();const n=link[side],d=state.data.devices.find(d=>d.kind==='siae'&&d.host===n.host);if(d){openDetail(d.id);return;}

@@ -49,9 +49,9 @@ body[data-view=backbone] .backbone-scroll{height:calc(100dvh - 225px);min-height
 .radio-access{cursor:pointer}
 .radio-access-underlay{fill:none;stroke:var(--surface);stroke-width:7;stroke-linejoin:round;pointer-events:none}
 .radio-access-stroke{fill:none;stroke:var(--map-pending);stroke-width:2;stroke-dasharray:5 5;pointer-events:none}
-.radio-access[data-status=up] .radio-access-stroke{stroke:var(--map-radio);stroke-dasharray:none}
-.radio-access[data-status=high] .radio-access-stroke{stroke:var(--amber);stroke-dasharray:none}
-.radio-access[data-status=down] .radio-access-stroke{stroke:var(--red);stroke-dasharray:none}
+.radio-access-stroke[data-status=up]{stroke:var(--success);stroke-dasharray:none}
+.radio-access-stroke[data-status=error]{stroke:var(--amber);stroke-dasharray:5 5}
+.radio-access-stroke[data-status=down]{stroke:var(--red);stroke-dasharray:none}
 .radio-access:hover .radio-access-stroke,.radio-access:focus .radio-access-stroke{stroke-width:4}
 .radio-access-caption{font:11px var(--font);fill:var(--muted);paint-order:stroke;stroke:var(--surface);stroke-width:4px;pointer-events:none}
 .radio-access:focus-visible{outline:3px solid #155d89;outline-offset:3px}

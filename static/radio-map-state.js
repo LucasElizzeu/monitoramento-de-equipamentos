@@ -17,10 +17,13 @@
   const a=endpoint(link.a,devices,at,connected),b=endpoint(link.b,devices,at,connected),states=[a.status,b.status];
   return {a,b,status:states.includes('down')?'down':states.includes('unknown')?'unknown':states.includes('high')?'high':'up'};
  }
- function access(port,radio){
-  if(port.port?.state==='down'||radio.status==='down')return 'down';
-  if(port.port?.state!=='up'||radio.status==='unknown')return 'unknown';
-  return radio.status;
+ function access(reading){
+  if(reading.error)return 'error';
+  return reading.port?.state==='up'?'up':reading.port?.state==='down'?'down':'unknown';
  }
- const api={endpoint,link,access};if(typeof module==='object'&&module.exports)module.exports=api;else root.radioMapState=api;
+ function accessPorts(readings){
+  const states=readings.map(access);
+  return states.includes('down')?'down':states.includes('error')?'error':states.length&&states.every(s=>s==='up')?'up':'unknown';
+ }
+ const api={endpoint,link,access,accessPorts};if(typeof module==='object'&&module.exports)module.exports=api;else root.radioMapState=api;
 })(globalThis);

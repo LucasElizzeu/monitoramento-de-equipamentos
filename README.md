@@ -391,7 +391,7 @@ Uma linha de rádio fica azul com respostas atuais de ambas as pontas até 200 m
 
 A aba de rádios usa cartões menores e o selo **Respondendo** verde. Informações de banda não configurada ficam resumidas com acesso a **Configurar banda**; equipamentos com banda habilitada continuam mostrando as leituras. A [captura do mapa com as duas redes](docs/mapa-com-radios.png) usa dados ilustrativos de validação.
 
-As duas redes de rádio têm ligação visual ao Datacom de Coari (`10.200.9.1`) e ao Datacom **CLARO** de Tefé (`10.200.19.1`). A Rede 1 sai de Coari pela **Ten 1/1/8** e a Rede 2 pela **Ten 1/1/9**; essas conexões usam as leituras das respectivas portas e do rádio AP. Na chegada ao CLARO, as portas candidatas são **Giga 1/1/5, 1/1/6, 1/1/7 e 1/1/8**, sem atribuição confirmada por rede. Por isso a chegada fica tracejada, com a porta pendente explícita nos detalhes, mesmo que alguma candidata tenha leitura. As curvas de acesso identificam as conexões com os Datacoms; cruzamentos sem ponto de junção não unem redes nem fibras.
+As duas redes de rádio têm ligação visual ao Datacom de Coari (`10.200.9.1`) e ao Datacom **CLARO** de Tefé (`10.200.19.1`). A **Rede 1** sai de Coari pela **Ten 1/1/8** e chega no CLARO pelas **Giga 1/1/7 e 1/1/8**. A **Rede 2** sai pela **Ten 1/1/9** e chega pelas **Giga 1/1/5 e 1/1/6**. Cada porta física tem sua própria linha e leitura: verde para Up, vermelho para Down, cinza tracejado sem leitura atual e amarelo tracejado em erro de coleta. O estado dessas conexões depende da porta do Datacom; o ping do AP/ST continua determinando o estado dos enlaces de rádio, separadamente. As curvas de acesso identificam as conexões com os Datacoms; cruzamentos sem ponto de junção não unem redes nem fibras. Clique na conexão para ver as leituras individuais de todas as portas daquela ponta.
 
 ### Abas de equipamentos somente em cartões
 
@@ -480,3 +480,6 @@ O mapa apresenta um único resumo de tráfego por fibra e por enlace de rádio. 
 
 
 O OSPF fica em indicadores compactos no rodapé, junto à legenda: Manaus, Coari e Tabatinga com seu estado atual. Os cartões, IPs e a descrição da coleta foram retirados de cima do desenho. A barra superior contém somente os controles de trecho, exibição, ajuste à largura e tela cheia, para o mapa começar mais alto e ocupar a altura liberada. Dados detalhados continuam disponíveis por clique no trecho.
+
+
+`node tests/ui_radio_access.test.cjs` verifica os vínculos Coari–CLARO no navegador com dados sintéticos: Giga 7/8 na Rede 1, Giga 5/6 na Rede 2 e Ten 8/9 em Coari. O teste cobre cores por porta, interfaces Gigabit/Ten com o mesmo número, ping de rádio independente, leitura desatualizada e falha SSH, nos dois temas.

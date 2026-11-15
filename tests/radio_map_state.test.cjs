@@ -20,11 +20,21 @@ test('bandwidth is displayed only while fresh and successful, including real zer
  d.siae_consumption={...telemetry,status:'error',total_bps:100};assert.equal(endpoint(hop.a,[d],at).bps,null);
  d.siae_consumption={...telemetry,checked_at:new Date(at-91000).toISOString()};assert.equal(endpoint(hop.a,[d],at).bps,null);
 });
-const {access}=require('../static/radio-map-state.js');
-test('Datacom access ports retain independent state instead of inheriting an entire network',()=>{
- assert.equal(access({port:{state:'up'}},{status:'up'}),'up');
- assert.equal(access({port:{state:'up'}},{status:'high'}),'high');
+const {access,accessPorts}=require('../static/radio-map-state.js');
+test('each Datacom connection follows its physical port independently of radio ping',()=>{
+ for(const status of ['up','down','unknown','high'])assert.equal(access({port:{state:'up'}},{status}),'up');
  assert.equal(access({port:{state:'down'}},{status:'up'}),'down');
  assert.equal(access({port:null},{status:'up'}),'unknown');
- assert.equal(access({port:{state:'up'}},{status:'unknown'}),'unknown');
+ assert.equal(access({port:null},{status:'down'}),'unknown');
+ assert.equal(access({port:{state:'unknown'}}),'unknown');
+ assert.equal(access({error:true,port:null}),'error');
+ assert.equal(access({error:true,port:{state:'up'}}),'error');
+});
+test('paired access ports keep their own readings instead of borrowing a healthy neighbor',()=>{
+ const ports=[{port:{state:'up'}},{port:{state:'down'}}];
+ assert.deepEqual(ports.map(access),['up','down']);assert.equal(accessPorts(ports),'down');
+ assert.equal(accessPorts([{port:{state:'up'}},{port:{state:'up'}}]),'up');
+ assert.equal(accessPorts([{port:{state:'up'}},{port:null}]),'unknown');
+ assert.equal(accessPorts([{port:{state:'up'}},{error:true,port:null}]),'error');
+ assert.equal(accessPorts([]),'unknown');
 });
