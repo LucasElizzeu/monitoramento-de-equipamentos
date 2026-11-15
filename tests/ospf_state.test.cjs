@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict'),ospf=require('../static/ospf-state.js');
+const peer={router_id:'10.200.1.1',address:'10.10.1.81'},monitor={source_host:'10.200.24.1'},at=1000000;
+const device={host:monitor.source_host,kind:'datacom',ospf:{status:'ok',checked_at:at/1000,error:null,peers:[{...peer,state:'full',interface:'INFOVIA'}]}};
+const read=(d=device,connected=true)=>ospf.reading(monitor,peer,[d],at,connected);
+assert.equal(read().status,'up');
+for(const state of ['init','2way','exstart','loading','missing','down'])assert.equal(read({...device,ospf:{...device.ospf,peers:[{...peer,state}]}}).status,'down');
+assert.equal(read(device,false).status,'unknown');
+for(const patch of [{status:'error',error:'SSH'},{status:'stale'},{checked_at:at/1000-91},{checked_at:at/1000+6},{peers:[]},{peers:[{...peer,address:'10.1.1.1',state:'full'}]},{peers:[{...peer,state:'invalid'}]}])assert.equal(read({...device,ospf:{...device.ospf,...patch}}).status,'unknown');
+assert.equal(read({...device,host:'10.0.0.1'}).status,'unknown');
+assert.equal(read({...device,kind:'ping'}).status,'unknown');
+console.log('OK: OSPF requires a fresh matching neighbor; transport errors never imply an adjacency failure.');

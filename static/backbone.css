@@ -137,3 +137,17 @@ body[data-map-fullscreen=true] #backbone-section .backbone-overview>strong::befo
 #backbone-map .fiber-region{fill:#ffffffed}
 #backbone-map .radio-region{fill:#f3f7fdeb}
 @media(max-width:640px){#backbone-section .backbone-toolbar{padding:8px;border-radius:11px}}
+
+.ospf-panel{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;margin:0 0 8px;flex-shrink:0}
+.ospf-panel-title{display:flex;flex-direction:column;justify-content:center;padding:6px 12px 6px 2px;gap:4px;color:var(--ink);font-size:12px}
+.ospf-panel-title small,.ospf-peer small{display:block;color:var(--muted);font-size:10px}
+.ospf-peer{display:flex;align-items:center;gap:9px;flex:1;min-width:230px;padding:8px 12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;font-size:11px}
+.ospf-peer strong{display:block;margin-bottom:3px;font-size:11px}
+.ospf-dot{width:8px;height:8px;border-radius:50%;background:#8793a4;flex-shrink:0}
+.ospf-state{margin-left:auto;font-size:10px;max-width:170px;overflow-wrap:anywhere;color:var(--muted)}
+.ospf-peer[data-status=up] .ospf-dot{background:#18905b;box-shadow:0 0 0 3px #18905b15}
+.ospf-peer[data-status=down] .ospf-dot{background:#cf293e;box-shadow:0 0 0 3px #cf293e15}
+.ospf-peer[data-status=up] .ospf-state,.ospf-detail[data-status=up]>strong,#backbone-map .ospf-caption[data-status=up]{color:#14794b;fill:#14794b}
+.ospf-peer[data-status=down] .ospf-state,.ospf-detail[data-status=down]>strong,#backbone-map .ospf-caption[data-status=down]{color:#be2337;fill:#be2337}
+#backbone-map .ospf-caption{font-size:11px;font-weight:650}
+@media(max-width:640px){.ospf-panel{gap:4px}.ospf-panel-title{width:100%;flex-direction:row;justify-content:space-between;padding:4px}.ospf-peer{min-width:0;flex-basis:100%;padding:5px 9px}.ospf-peer strong{margin-bottom:1px}}

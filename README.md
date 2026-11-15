@@ -434,3 +434,19 @@ A origem da INFOVIA Manaus → Escritório Tefé foi corrigida para o Huawei 10.
 O desenho compacta as faixas de rádio e o espaço até Tabatinga, além de distribuir Sodré, Codajás e Anori mais perto de Coari. A escala dos ícones e das letras é mantida; os filtros de trecho usam os mesmos limites compactos.
 
 As fibras paralelas usam curvas mais afastadas e as rotas via Nazaré e via KM60 ficam em faixas distintas. O segmento Anori → Coari é compacto. Em Tefé, os nomes ficam à direita dos equipamentos, as fibras chegam pela esquerda e as saídas dos rádios partem por baixo; as leituras da fibra local e da interligação Manaus têm posições próprias.
+
+### OSPF das INFOVIAs
+
+O Datacom **Escritório Tefé (`10.200.24.1`)** é o ponto de coleta OSPF. Com seu cadastro SSH existente (usuário, senha e fingerprint), o sistema executa somente `show ip ospf neighbor` a cada 30 segundos, em uma coleta independente das portas. Reinicie o serviço após atualizar o código para criar a tabela de leituras e iniciar o coletor.
+
+Os pares Router ID/endereço confirmados na tabela do Escritório são:
+
+| Trecho | Router ID | Endereço do vizinho |
+| --- | --- | --- |
+| INFOVIA Manaus | `10.200.1.1` | `10.10.1.81` |
+| INFOVIA Coari | `10.200.9.1` | `10.10.20.1` |
+| INFOVIA Tabatinga | `10.200.30.1` | `10.10.20.10` |
+
+O painel no topo do mapa mostra os três vizinhos; as INFOVIAs Manaus e Coari também exibem OSPF na legenda do enlace e nos detalhes. Tabatinga aparece no painel OSPF, sem criar uma nova fibra física. A indicação de OSPF é independente da cor/estado das portas: somente uma leitura atual do vizinho correspondente em **Full** fica verde. Outros estados e vizinho ausente de uma tabela válida ficam vermelhos. Erro de SSH, resposta inválida, desconexão do painel ou leitura com mais de 90 segundos ficam indisponíveis, sem gerar uma falsa queda de adjacência.
+
+As transições para fora de Full e a recuperação entram no histórico de alertas. Uma primeira consulta válida já sem o vizinho também gera alerta; consultas com erro não alteram o último estado conhecido para fins de recuperação. Notificações Telegram usam a opção existente **Circuitos**, quando habilitada pelo operador. Uma queda mantida não repete o alerta a cada consulta. Os vínculos esperados e o comando ficam em `ospf.py`. Os testes usam saídas simuladas; a primeira coleta no ambiente da rede deve confirmar suporte ao comando e os três estados reais.

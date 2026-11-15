@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field, field_validator
 from remote_ping import RemotePingError, parse_remote_ping, read_remote_ping
 from siae import SiaeError, SiaeSessionError, login as siae_login, read_counters, calculate_rates
 import traffic_history
+import ospf
 import huawei
 import huawei_ssh
 import availability
@@ -105,6 +106,7 @@ def init_db():
           port_identity TEXT);
         CREATE UNIQUE INDEX IF NOT EXISTS circuit_target ON circuits(source_device_id, host);
         ''')
+        ospf.init_schema(db)
         traffic_history.init_schema(db)
         availability.init_schema(db)
         notifications.init_schema(db)
@@ -422,9 +424,11 @@ def public_device(row, db=None):
             (value['id'], time.time() - traffic_history.RETENTION_SECONDS))}
     if db is None:
         with connect() as connection:
+            value['ospf'] = ospf.public(connection, value)
             value['circuits'] = read_circuits(connection)
             series = read_traffic(connection)
     else:
+        value['ospf'] = ospf.public(db, value)
         value['circuits'] = read_circuits(db)
         series = read_traffic(db)
     for port in value['port_data']:
@@ -1149,6 +1153,30 @@ def run_siae_check(device):
             INFLIGHT.discard((device['id'], 'siae'))
 
 
+def run_ospf_check(device):
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(VerifyFingerprint(device['fingerprint']))
+    peers, error = [], None
+    try:
+        try:
+            client.connect(device['host'], port=device['ssh_port'], username=device['username'],
+                           password=CIPHER.decrypt(device['password'].encode()).decode(),
+                           timeout=6, auth_timeout=6, banner_timeout=6, look_for_keys=False, allow_agent=False)
+            peers = ospf.parse_neighbors(ssh_read(client, ospf.COMMAND))
+        except Exception:
+            # Do not expose credentials, or mark protocol failure on transport/parse errors.
+            error = 'Não foi possível consultar a tabela OSPF. Verifique SSH e o comando show ip ospf neighbor no Escritório Tefé.'
+        finally:
+            client.close()
+        with LOCK, connect() as db:
+            current = db.execute('SELECT * FROM devices WHERE id=?', (device['id'],)).fetchone()
+            if current and current['config_version'] == device['config_version']:
+                ospf.record(db, current, peers, error, time.time(), alert)
+    finally:
+        with LOCK:
+            INFLIGHT.discard((device['id'], 'ospf'))
+
+
 def run_check(device, kind):
     try:
         (check_ping if kind == 'ping' else check_ssh)(device)
@@ -1179,6 +1207,12 @@ def monitor():
                         if due and key not in INFLIGHT:
                             INFLIGHT.add(key)
                             pool.submit(run_check, device, kind)
+                    if device['host'] == ospf.SOURCE_HOST and device['kind'] == 'datacom':
+                        reading = db.execute('SELECT checked_at FROM ospf_readings WHERE device_id=?', (device['id'],)).fetchone()
+                        ospf_key = (device['id'], 'ospf')
+                        if (not reading or time.time() - reading['checked_at'] >= 30) and ospf_key not in INFLIGHT:
+                            INFLIGHT.add(ospf_key)
+                            remote_pool.submit(run_ospf_check, device)
                     key = (device['id'], 'siae')
                     siae_delay = (30 if json.loads(device['siae_data'] or '{}').get('status') == 'error'
                                   else device['siae_poll_interval'])
@@ -1316,6 +1350,7 @@ def backbone_config():
     with LOCK, connect() as db:
         db.execute('CREATE TABLE IF NOT EXISTS backbone_ports (link_id TEXT PRIMARY KEY, port_a TEXT, port_b TEXT, maintenance INTEGER)')
         overrides = {row['link_id']: dict(row) for row in db.execute('SELECT * FROM backbone_ports')}
+    config['ospf_monitor'] = dict(source_host=ospf.SOURCE_HOST, peers=list(ospf.PEERS))
     for link in config['links']:
         if link['id'] in overrides:
             link.update({key: overrides[link['id']][key] for key in ('port_a', 'port_b', 'maintenance')})

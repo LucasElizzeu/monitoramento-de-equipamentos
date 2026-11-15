@@ -11,6 +11,8 @@ def cause(message, level, topic=None):
         return 'Sem resposta ao ping.'
     if topic == 'port' or message.startswith('Porta '):
         return re.sub(r'(?:caiu \(link down\)|restabelecida)\.$', 'sem conexão.', message)
+    if message.startswith('OSPF '):
+        return message.replace('restabelecido em Full.', 'fora de Full.')
     if topic == 'circuit' or message.startswith('Circuito '):
         return message.replace('voltou a responder pelo Datacom.', 'sem resposta ao ping pelo Datacom.')
     if message.startswith('Leitura de banda SIAE restabelecida.'):
@@ -22,6 +24,8 @@ def title(message, level, topic=None):
         return 'Não foi possível consultar a banda do rádio'
     if message.startswith('Leitura de banda SIAE restabelecida'):
         return 'Consulta de banda do rádio normalizada'
+    if message.startswith('OSPF '):
+        return 'Adjacência OSPF restabelecida' if level == 'success' else 'Adjacência OSPF fora de Full'
     if topic == 'port' or message.startswith('Porta '):
         return 'Porta voltou a ter conexão' if level == 'success' else 'Porta perdeu a conexão'
     if topic == 'circuit' or message.startswith('Circuito '):

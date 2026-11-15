@@ -155,8 +155,23 @@
   svg.insertAdjacentHTML('beforeend',drawRadioAccess()+drawRouteOrigins()+drawRadios());
   if(!svg.style.width){if(viewport.clientWidth<640)applyZoom(.8,false);else fitMap();}refresh();
  }
+ function ospfReading(peer){return ospfState.reading(config.ospf_monitor,peer,state.data.devices,Date.now(),$('#connection-error').hidden);}
+ function ospfPeer(link){return config.ospf_monitor?.peers.find(p=>p.link_id===link.id);}
+ function ospfDetails(link){
+  const peer=ospfPeer(link);if(!peer)return '';
+  const r=ospfReading(peer);
+  return `<div class="ospf-detail" data-status="${r.status}"><strong>OSPF · ${esc(r.label)}</strong><small>Coleta: Escritório Tefé · ${esc(config.ospf_monitor.source_host)}</small><small>Router ID ${esc(peer.router_id)} · Endereço ${esc(peer.address)}</small>${r.interface?`<small>Interface ${esc(r.interface)}</small>`:''}${r.checked_at?`<small>Consulta: ${esc(new Date(r.checked_at).toLocaleTimeString())}</small>`:''}</div>`;
+ }
+ function refreshOspf(){
+  const panel=$('#backbone-ospf'),monitor=config.ospf_monitor;if(!panel||!monitor)return;
+  const html='<div class="ospf-panel-title"><strong>OSPF · INFOVIAs</strong><small>Escritório Tefé · consulta a cada 30 s</small></div>'+monitor.peers.map(peer=>{
+   const r=ospfReading(peer);
+   return `<div class="ospf-peer" data-status="${r.status}"><span class="ospf-dot" aria-hidden="true"></span><div><strong>${esc(peer.name)}</strong><small>${esc(peer.router_id)} · ${esc(peer.address)}</small></div><span class="ospf-state" title="${esc(r.label)}">${esc(r.label)}</span></div>`;
+  }).join('');if(panel.innerHTML!==html)panel.innerHTML=html;
+ }
  function refresh(){
   if(!config||state.page!=='backbone')return;
+  refreshOspf();
   const counts={up:0,down:0,error:0,missing:0,maintenance:0};
   for(const link of config.links){
    const v=values(link),g=svg.querySelector(`[data-link="${link.id}"]`),p=path(link);
@@ -166,7 +181,9 @@
    t.setAttribute('text-anchor',layout.anchor);
    const compact=display.value!=='full',primary=compact?(link.maintenance?'Em reparo':v.a.port?.rx_bps==null?'Sem leitura':rate(v.a)):`${rate(v.a)} / ${rate(v.b)}`;
    const caption=`<tspan x="0" y="${y}">${esc(link.label||'')} ${esc(primary)}</tspan><tspan class="fiber-optics" x="0" dy="14">RX ${esc(number(v.a.port?.rx,1))} / ${esc(number(v.b.port?.rx,1))} dBm</tspan>${link.maintenance&&!compact?'<tspan class="fiber-maintenance" x="0" dy="14">Em reparo</tspan>':''}`;
-   if(t.innerHTML!==caption)t.innerHTML=caption;
+   const peer=ospfPeer(link),ospfValue=peer?ospfReading(peer):null;
+   const rendered=caption+(ospfValue?`<tspan class="ospf-caption" data-status="${ospfValue.status}" x="0" dy="16">OSPF · ${esc(ospfValue.label)}</tspan>`:'');
+   if(t.innerHTML!==rendered)t.innerHTML=rendered;
   }
   for(const n of config.nodes){const d=device(n),el=svg.querySelector(`[data-node="${n.id}"]`);el.dataset.status=d?.state||'pending';el.setAttribute('aria-label',`${n.name}, ${n.host}, ${d?labels[d.state]||d.state:'não cadastrado'}`);}
   refreshRadios();
@@ -182,7 +199,7 @@
   const link=config.links.find(l=>l.id===id);if(!link)return;
   const v=values(link);
   const side=(n,port,r)=>`<div><strong>${esc(n.name)}</strong><small>${esc(n.host)} · ${esc(port||'Porta pendente')}</small><p>${esc(r.label)} · RX ${esc(rate(r))} · ${esc(signal(r))}</p></div>`;
-  const html=`<button class="icon-button backbone-dismiss" aria-label="Fechar detalhes">×</button><strong>${esc(link.label||'Fibra óptica')} · ${names[v.status]}</strong>${side(byId(link.a),link.port_a,v.a)}${side(byId(link.b),link.port_b,v.b)}${link.note?`<p>${esc(link.note)}</p>`:''}<button class="button secondary" data-edit-fiber="${link.id}">Editar portas / manutenção</button>`;
+  const html=`<button class="icon-button backbone-dismiss" aria-label="Fechar detalhes">×</button><strong>${esc(link.label||'Fibra óptica')} · ${names[v.status]}</strong>${side(byId(link.a),link.port_a,v.a)}${side(byId(link.b),link.port_b,v.b)}${ospfDetails(link)}${link.note?`<p>${esc(link.note)}</p>`:''}<button class="button secondary" data-edit-fiber="${link.id}">Editar portas / manutenção</button>`;
   renderInfo(html);
  }
  function renderInfo(html){
