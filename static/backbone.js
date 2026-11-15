@@ -1,11 +1,11 @@
 /* Physical fibers and radio hops are independent; topology never implies a live reading. */
 (() => {
- let config=null, active=null, pinned=false, editing=null, pointer={x:20,y:100}, modality='mouse', dismissTimer, suppressFocus=false;
+ let config=null,active=null,editing=null,labelPositions=new Map(),labelSignature='';
  const svg=$('#backbone-map'), info=$('#backbone-info');
  const display=$('#backbone-display');
- try{const saved=localStorage.getItem('alwaysup-map-display');if(['traffic','full','clean'].includes(saved))display.value=saved;}catch{}
+ try{const saved=localStorage.getItem('alwaysup-map-display');if(['traffic','clean'].includes(saved))display.value=saved;else if(saved==='full')localStorage.setItem('alwaysup-map-display','traffic');}catch{}
  svg.dataset.display=display.value;
- display.onchange=()=>{svg.dataset.display=display.value;hideInfo();refresh();try{localStorage.setItem('alwaysup-map-display',display.value);}catch{}};
+ display.onchange=()=>{svg.dataset.display=display.value;labelSignature='';hideInfo();refresh();try{localStorage.setItem('alwaysup-map-display',display.value);}catch{}};
  const byId=id=>config.nodes.find(n=>n.id===id);
  const device=n=>state.data.devices.find(d=>d.host===n.host&&d.kind==='datacom')||state.data.devices.find(d=>d.host===n.host);
  const names={up:'Ativa',down:'Caída',error:'Erro de coleta',missing:'Sem leitura',maintenance:'Em reparo'};
@@ -50,15 +50,46 @@
   const x=(a.x+2*cx+b.x)/4,vertical=Math.abs(dx)<80;
   return {d:`M${a.x},${a.y} Q${cx},${cy} ${b.x},${b.y}`,x,y:(a.y+2*cy+b.y)/4,labelX:vertical?(x<960?x+25:x-10):x,anchor:vertical?(x<960?'start':'end'):'middle'};
  }
- // Keep each caption beside its own fiber, parallel to diagonal spans.
+ // Summary labels stay horizontal; detailed measurements live in the selected link panel.
  function captionLayout(link,p){
   const a=byId(link.a),b=byId(link.b),vertical=Math.abs(b.x-a.x)<80;
-  let angle=link.route==='rectangular'||vertical?0:Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI;
-  if(angle>90)angle-=180;if(angle< -90)angle+=180;
   const above=link.route==='rectangular'?(link.routeLane??Infinity)<Math.min(a.y,b.y):link.bend<=0;
-  return {x:vertical&&link.route!=='rectangular'?p.labelX:p.x,y:p.y,angle,
-   offset:vertical&&link.route!=='rectangular'?-8:above?(display.value==='full'?-34:-22):link.route==='rectangular'?20:Math.abs(b.y-a.y)<20?45:35,
-   anchor:vertical&&link.route!=='rectangular'?p.anchor:'middle',...link.caption};
+  return {x:vertical?p.labelX:p.x,y:p.y,offset:vertical?-8:above?-28:link.route==='rectangular'?18:32,anchor:vertical?p.anchor:'middle',...link.caption,angle:0};
+ }
+ function mapBox(element){
+  const b=element.getBBox(),matrix=svg.getCTM().inverse().multiply(element.getCTM());
+  const p=new DOMPoint(b.x,b.y).matrixTransform(matrix),q=new DOMPoint(b.x+b.width,b.y+b.height).matrixTransform(matrix);
+  return {x:p.x,y:p.y,width:q.x-p.x,height:q.y-p.y};
+ }
+ function layoutSummaries(){
+  if(!svg.getCTM()||display.value==='clean')return;
+  const labels=config.links.map(link=>{
+   const text=svg.querySelector(`[data-link="${link.id}"] .fiber-caption`),bbox=text.getBBox(),p=path(link),preferred=captionLayout(link,p);
+   // Reserve stable widths so changing traffic does not make labels move every poll.
+   const width=Math.max(link.label?160:104,Math.ceil(bbox.width/16)*16),height=link.label?36:20;
+   return {id:link.id,width,height,x:preferred.x+(preferred.anchor==='end'?-width/2:preferred.anchor==='start'?width/2:0),y:preferred.y+preferred.offset-13,text,bbox};
+  });
+  const signature=labels.map(l=>`${l.id}:${l.width}`).join('|');
+  if(signature===labelSignature)return;
+  const obstacles=[...svg.querySelectorAll('.backbone-node circle:not(.node-halo),.backbone-node text:not(.node-ip),.radio-map-heading')].map(mapBox);
+  const points=[];
+  for(const stroke of svg.querySelectorAll('.fiber-stroke')){
+   const length=stroke.getTotalLength();for(let at=0;at<=length;at+=6){const p=stroke.getPointAtLength(at);points.push({x:p.x,y:p.y});}
+  }
+  labelPositions=mapLabels.place(labels,obstacles,points,{x:64,y:8,width:1816,height:454},labelPositions);
+  labelSignature=signature;
+  for(const label of labels){
+   const box=labelPositions.get(label.id),group=label.text.parentElement,leader=group.querySelector('.fiber-label-leader');
+   label.text.style.visibility=box?'visible':'hidden';
+   if(!box){leader.setAttribute('d','');continue;}
+   const tx=box.x+box.width/2,ty=box.y-label.bbox.y;
+   label.text.setAttribute('transform',`translate(${tx} ${ty})`);label.text.setAttribute('text-anchor','middle');
+   const stroke=group.querySelector('.fiber-stroke'),length=stroke.getTotalLength(),center={x:tx,y:box.y+box.height/2};
+   let anchor=null,distance=Infinity;
+   for(let at=0;at<=length;at+=6){const p=stroke.getPointAtLength(at),d=(p.x-center.x)**2+(p.y-center.y)**2;if(d<distance){distance=d;anchor=p;}}
+   const end={x:Math.max(box.x,Math.min(box.x+box.width,anchor.x)),y:Math.max(box.y,Math.min(box.y+box.height,anchor.y))};
+   leader.setAttribute('d',Math.hypot(end.x-anchor.x,end.y-anchor.y)>12?`M${anchor.x},${anchor.y} L${end.x},${end.y}`:'');
+  }
  }
  const radioLinks=()=>config.radio_links||[];
  const radioReading=link=>radioMapState.link(link,state.data.devices,Date.now(),$('#connection-error').hidden);
@@ -118,14 +149,13 @@
   renderInfo(`<button class="icon-button backbone-dismiss" aria-label="Fechar detalhes">×</button><strong>${esc(site.name)} · ${radioStateNames[status]}</strong><small>${esc(site.group.title)}</small>${sides}`);
  }
  function drawRadios(){
-  let html='<g id="radio-map-layer"><text class="radio-map-heading" x="24" y="400">Rádio · Coari → Tefé</text><text class="radio-map-heading" x="24" y="670">Rádio · Tefé → Tabatinga</text>';
+  let html='<g id="radio-map-layer"><text class="radio-map-heading" x="24" y="500">Rádio · Coari → Tefé</text><text class="radio-map-heading" x="24" y="790">Rádio · Tefé → Tabatinga</text>';
   for(const group of backboneLayout.groups){
-   if(group.network)html+=`<text class="radio-network-label" x="10" y="${group.y+5}">${group.network}</text>`;
+   if(group.network)html+=`<text class="radio-network-label" x="10" y="${group.y+5}">R${group.network}</text>`;
    for(const l of backboneLayout.linksFor(config,group)){const g=radioGeometry(l);html+=`<g class="backbone-radio" data-link="${l.id}" data-radio-route="${l.route}" tabindex="0" role="button"><path class="radio-stroke" d="M${g.x1},${g.y} H${g.x2}"/><path class="fiber-hit" d="M${g.x1},${g.y} H${g.x2}"/><text class="radio-caption" x="${(g.x1+g.x2)/2}" y="${g.y-18}" text-anchor="middle"></text></g>`;}
   }
   for(const site of radioSites()){
-   const ips=site.refs.map((ref,i)=>`<tspan x="0" ${i?'dy="13"':''}>${ref.link[ref.side].host}</tspan>`).join('');
-   html+=`<g class="radio-map-point radio-site-point" data-link="${site.id}" data-radio-site="${site.id}" transform="translate(${site.x} ${site.y})" tabindex="0" role="button" aria-label="${esc(site.name+' · '+site.group.title)}"><title>${esc(site.name+' · '+site.group.title+' · '+site.refs.length+' rádio(s)')}</title><circle class="radio-halo" r="20"/><circle r="13"/><image href="/static/icons/siae.png" x="-11" y="-11" width="22" height="22"/><text class="radio-site" y="32" text-anchor="middle">${esc(backboneLayout.shortName(site.name))}</text><text class="radio-ip" y="51" text-anchor="middle">${ips}</text></g>`;
+   html+=`<g class="radio-map-point radio-site-point" data-link="${site.id}" data-radio-site="${site.id}" transform="translate(${site.x} ${site.y})" tabindex="0" role="button" aria-label="${esc(site.name+' · '+site.group.title)}"><circle class="radio-halo" r="20"/><circle r="13"/><image href="/static/icons/siae.png" x="-11" y="-11" width="22" height="22"/><text class="radio-site" y="32" text-anchor="middle">${esc(backboneLayout.shortName(site.name))}</text></g>`;
   }
   return html+'</g>';
  }
@@ -134,7 +164,7 @@
    const v=radioReading(l),g=svg.querySelector(`[data-link="${l.id}"]`),p=radioGeometry(l);
    g.dataset.status=v.status;g.setAttribute('aria-label',`${radioTitle(l)}, ${l.a.site} para ${l.b.site}, ${radioStateNames[v.status]}`);
    const primary=v.a.bps!=null?bandwidth(v.a.bps).replace(/<[^>]*>/g,''):v.status==='down'?'Sem ping':v.status==='unknown'?'Sem leitura':`Ping ${number(Math.max(v.a.latency,v.b.latency))} ms`;
-   g.querySelector('text').innerHTML=`<tspan x="${(p.x1+p.x2)/2}">${esc(primary)}</tspan><tspan class="radio-endpoint-ping" x="${(p.x1+p.x2)/2}" y="${p.y+(display.value==='full'?80:64)}">AP ${number(v.a.latency)} / ST ${number(v.b.latency)} ms</tspan>`;
+   g.querySelector('text').textContent=primary;
   }
   for(const site of radioSites()){const v=radioSiteReading(site),g=svg.querySelector(`[data-radio-site="${site.id}"]`);g.dataset.status=v.status;g.setAttribute('aria-label',`${site.name}, ${site.group.title}, ${site.refs.length} rádios, ${radioStateNames[v.status]}`);}
   for(const [route,binding]of Object.entries(config.radio_route_origins||{})){const g=svg.querySelector(`[data-link="radio-origin-${route}"]`);if(g)g.dataset.status=originReading({route,binding}).status;}
@@ -151,8 +181,10 @@
  }
  function draw(){
   applyMapScope();
-  svg.innerHTML='<text class="radio-map-heading" x="24" y="24">Backbone · fibra</text>'+config.links.map(link=>{const p=path(link);return `<g class="backbone-fiber" data-link="${link.id}" tabindex="0" role="button"><path class="fiber-underlay" d="${p.d}"/><path class="fiber-stroke" d="${p.d}"/><path class="fiber-hit" d="${p.d}"/><text class="fiber-caption" x="${p.labelX}" y="0" text-anchor="${p.anchor}"></text></g>`;}).join('')+config.nodes.map(n=>`<g class="backbone-node" data-node="${n.id}" transform="translate(${n.x} ${n.y})" tabindex="0" role="button" aria-label="${esc(n.name+' '+n.host)}"><circle class="node-halo" r="22"/><circle r="16"/><image href="/static/icons/datacom.png" x="-12" y="-12" width="24" height="24"/><text x="${n.nodeLabel?.x??0}" y="${n.nodeLabel?.y??30}" text-anchor="${n.nodeLabel?.anchor||'middle'}">${esc(n.name)}</text><text class="node-ip" x="${n.nodeLabel?.x??0}" y="${(n.nodeLabel?.y??30)+16}" text-anchor="${n.nodeLabel?.anchor||'middle'}">${n.host}${n.kind==='huawei'?' · Huawei':''}</text></g>`).join('');
+  svg.innerHTML='<text class="radio-map-heading" x="24" y="24">Backbone · fibra</text>'+config.links.map(link=>{const p=path(link);return `<g class="backbone-fiber" data-link="${link.id}" tabindex="0" role="button"><path class="fiber-underlay" d="${p.d}"/><path class="fiber-stroke" d="${p.d}"/><path class="fiber-hit" d="${p.d}"/><path class="fiber-label-leader" d=""/><text class="fiber-caption" x="${p.labelX}" y="0" text-anchor="${p.anchor}"></text></g>`;}).join('')+config.nodes.map(n=>`<g class="backbone-node" data-node="${n.id}" transform="translate(${n.x} ${n.y})" tabindex="0" role="button" aria-label="${esc(n.name+' '+n.host)}"><circle class="node-halo" r="22"/><circle r="16"/><image href="/static/icons/datacom.png" x="-12" y="-12" width="24" height="24"/><text x="${n.nodeLabel?.x??0}" y="${n.nodeLabel?.y??30}" text-anchor="${n.nodeLabel?.anchor||'middle'}">${esc(n.name)}</text></g>`).join('');
   svg.insertAdjacentHTML('beforeend',drawRadioAccess()+drawRouteOrigins()+drawRadios());
+  svg.querySelectorAll('[data-link]').forEach(g=>{g.setAttribute('aria-controls','backbone-info');g.setAttribute('aria-expanded','false');});
+  labelSignature='';labelPositions=new Map();
   if(!svg.style.width){if(viewport.clientWidth<640)applyZoom(.8,false);else fitMap();}refresh();
  }
  function ospfReading(peer){return ospfState.reading(config.ospf_monitor,peer,state.data.devices,Date.now(),$('#connection-error').hidden);}
@@ -174,19 +206,15 @@
   refreshOspf();
   const counts={up:0,down:0,error:0,missing:0,maintenance:0};
   for(const link of config.links){
-   const v=values(link),g=svg.querySelector(`[data-link="${link.id}"]`),p=path(link);
+   const v=values(link),g=svg.querySelector(`[data-link="${link.id}"]`);
    counts[v.status]++;g.dataset.status=v.status;g.setAttribute('aria-label',`${byId(link.a).name} para ${byId(link.b).name}, ${link.label||'fibra'}, ${names[v.status]}`);
-   const t=g.querySelector('text'),layout=captionLayout(link,p),y=layout.offset;
-   t.setAttribute('transform',`translate(${layout.x} ${layout.y}) rotate(${layout.angle})`);
-   t.setAttribute('text-anchor',layout.anchor);
-   const compact=display.value!=='full',primary=compact?(link.maintenance?'Em reparo':v.a.port?.rx_bps==null?'Sem leitura':rate(v.a)):`${rate(v.a)} / ${rate(v.b)}`;
-   const caption=`<tspan x="0" y="${y}">${esc(link.label||'')} ${esc(primary)}</tspan><tspan class="fiber-optics" x="0" dy="14">RX ${esc(number(v.a.port?.rx,1))} / ${esc(number(v.b.port?.rx,1))} dBm</tspan>${link.maintenance&&!compact?'<tspan class="fiber-maintenance" x="0" dy="14">Em reparo</tspan>':''}`;
-   const peer=ospfPeer(link),ospfValue=peer?ospfReading(peer):null;
-   const rendered=caption+(ospfValue?`<tspan class="ospf-caption" data-status="${ospfValue.status}" x="0" dy="16">OSPF · ${esc(ospfValue.label)}</tspan>`:'');
+   const t=g.querySelector('.fiber-caption');
+   const primary=link.maintenance?'Em reparo':v.a.port?.rx_bps==null?'Sem leitura':rate(v.a);
+   const rendered=(link.label?`<tspan class="fiber-route-name" x="0" y="0">${esc(link.label)}</tspan><tspan x="0" dy="17">${esc(primary)}</tspan>`:`<tspan x="0" y="0">${esc(primary)}</tspan>`);
    if(t.innerHTML!==rendered)t.innerHTML=rendered;
   }
   for(const n of config.nodes){const d=device(n),el=svg.querySelector(`[data-node="${n.id}"]`);el.dataset.status=d?.state||'pending';el.setAttribute('aria-label',`${n.name}, ${n.host}, ${d?labels[d.state]||d.state:'não cadastrado'}`);}
-  refreshRadios();
+  refreshRadios();layoutSummaries();
   const summary=`${config.links.length} fibras · ${counts.up} ativas${counts.down?` · ${counts.down} com queda`:''}${counts.error?' · erro de coleta':''}${counts.missing?' · leituras pendentes':''}${counts.maintenance?' · em manutenção':''}${radioLinks().length?' · '+radioLinks().length+' enlaces de rádio':''}`;
   if($('#backbone-summary').textContent!==summary)$('#backbone-summary').textContent=summary;
   if(active)details(active);
@@ -198,42 +226,38 @@
   const radio=radioLinks().find(l=>l.id===id);if(radio){radioDetails(radio);return;}
   const link=config.links.find(l=>l.id===id);if(!link)return;
   const v=values(link);
-  const side=(n,port,r)=>`<div><strong>${esc(n.name)}</strong><small>${esc(n.host)} · ${esc(port||'Porta pendente')}</small><p>${esc(r.label)} · RX ${esc(rate(r))} · ${esc(signal(r))}</p></div>`;
-  const html=`<button class="icon-button backbone-dismiss" aria-label="Fechar detalhes">×</button><strong>${esc(link.label||'Fibra óptica')} · ${names[v.status]}</strong>${side(byId(link.a),link.port_a,v.a)}${side(byId(link.b),link.port_b,v.b)}${ospfDetails(link)}${link.note?`<p>${esc(link.note)}</p>`:''}<button class="button secondary" data-edit-fiber="${link.id}">Editar portas / manutenção</button>`;
+  const side=(n,port,r)=>`<div><strong>${esc(n.name)}</strong><small>${esc(n.host)} · ${esc(port||'Porta pendente')}</small><p>${esc(r.label)}</p><p>Tráfego RX: <strong>${esc(rate(r))}</strong><br>Sinal RX: <strong>${esc(signal(r))}</strong></p></div>`;
+  const html=`<button class="icon-button backbone-dismiss" aria-label="Fechar detalhes">×</button><strong>${esc(link.label||'Fibra óptica')} · ${names[v.status]}</strong><p class="backbone-link-direction">${esc(byId(link.a).name)} → ${esc(byId(link.b).name)}</p>${side(byId(link.a),link.port_a,v.a)}${side(byId(link.b),link.port_b,v.b)}${ospfDetails(link)}${link.note?`<p>${esc(link.note)}</p>`:''}<button class="button secondary" data-edit-fiber="${link.id}">Editar portas / manutenção</button>`;
   renderInfo(html);
  }
  function renderInfo(html){
-  if(info.innerHTML!==html)info.innerHTML=html;
-  info.hidden=false;info.style.left=Math.max(8,Math.min(innerWidth-info.offsetWidth-8,pointer.x+12))+'px';info.style.top=Math.max(8,Math.min(innerHeight-info.offsetHeight-8,pointer.y+12))+'px';
+  if(info.innerHTML!==html){
+   const focused=[...info.querySelectorAll('button,a')].indexOf(document.activeElement);
+   info.innerHTML=html;if(focused>=0)info.querySelectorAll('button,a')[focused]?.focus({preventScroll:true});
+  }
+  const title=info.querySelector('strong');if(title)info.setAttribute('aria-label',title.textContent);
+  info.hidden=false;
+  const top=Math.max(8,Math.min(viewport.getBoundingClientRect().top+8,innerHeight-220));
+  const target=active&&svg.querySelector(`[data-link="${active}"]`),rect=target?.getBoundingClientRect(),onRight=rect&&(rect.left+rect.right)/2>innerWidth/2;
+  info.style.top=`${top}px`;info.style.right=onRight?'auto':'16px';info.style.left=onRight?`${Math.max(8,viewport.getBoundingClientRect().left+12)}px`:'auto';info.style.maxHeight=`${innerHeight-top-16}px`;
  }
- function hideInfo(){clearTimeout(dismissTimer);active=null;pinned=false;info.hidden=true;}
+ function hideInfo(){
+  svg.querySelector('[aria-expanded="true"]')?.setAttribute('aria-expanded','false');
+  active=null;info.hidden=true;
+ }
  function dismissInfo(){
-  const restore=info.contains(document.activeElement),target=active&&svg.querySelector(`[data-link="${active}"]`);
-  hideInfo();
-  if(restore&&target){suppressFocus=true;try{target.focus({preventScroll:true});}finally{suppressFocus=false;}}
+  const target=active&&svg.querySelector(`[data-link="${active}"]`);
+  hideInfo();target?.focus({preventScroll:true});
  }
- function scheduleHide(){clearTimeout(dismissTimer);dismissTimer=setTimeout(()=>{if(!pinned)hideInfo();},200);}
- function show(target,event,pin=false){clearTimeout(dismissTimer);active=target.dataset.link;pinned=pin;const rect=target.getBoundingClientRect();pointer={x:event.clientX??rect.x,y:event.clientY??rect.y};details(active);}
- document.addEventListener('keydown',()=>{modality='keyboard';},true);
+ function show(target){
+  if(active===target.dataset.link){dismissInfo();return;}
+  hideInfo();active=target.dataset.link;target.setAttribute('aria-expanded','true');details(active);
+ }
  document.addEventListener('pointerdown',e=>{
-  modality=e.pointerType==='touch'?'touch':'mouse';
-  if(modality==='mouse')pinned=false;
-  if(!$('#backbone-port-dialog').open&&!e.target.closest('[data-link], #backbone-info'))hideInfo();
+  if(!$('#backbone-port-dialog').open&&!e.target.closest('[data-link],#backbone-info'))hideInfo();
  },true);
- svg.addEventListener('pointerover',e=>{const target=e.target.closest('[data-link]');if(target&&e.pointerType!=='touch'&&!drag)show(target,e);});
- svg.addEventListener('pointerout',e=>{
-  const from=e.target.closest('[data-link]'),to=e.relatedTarget?.closest?.('[data-link]');
-  if(from&&from!==to&&!info.contains(e.relatedTarget)&&!pinned)scheduleHide();
- });
- info.addEventListener('pointerenter',()=>clearTimeout(dismissTimer));
- info.addEventListener('pointerleave',()=>{if(!pinned)scheduleHide();});
- svg.addEventListener('focusin',e=>{const target=e.target.closest('[data-link]');if(target&&modality==='keyboard'&&!suppressFocus)show(target,{},true);});
- function focusLeaves(e){
-  if(modality==='keyboard'&&!$('#backbone-port-dialog').open&&!info.contains(e.relatedTarget)&&!e.relatedTarget?.closest?.('[data-link]'))hideInfo();
- }
- svg.addEventListener('focusout',focusLeaves);info.addEventListener('focusout',focusLeaves);
  function activate(e){
-  const fiber=e.target.closest('[data-link]');if(fiber){show(fiber,e,modality!=='mouse');return;}
+  const fiber=e.target.closest('[data-link]');if(fiber){show(fiber);return;}
   const target=e.target.closest('[data-node]');if(!target)return;
   const n=byId(target.dataset.node),d=device(n);if(d){if(n.kind==='huawei'&&d.kind==='ping'){openEdit(d.id);applyHuaweiPreset();}else openDetail(d.id);return;}
   openAdd();$('#device-form [name="name"]').value=n.name;$('#device-form [name="host"]').value=n.host;
@@ -279,6 +303,7 @@
  const fullscreen=$('#backbone-fullscreen');
  fullscreen.onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();}catch{toast('O navegador não permitiu abrir a tela cheia.');}};
  document.addEventListener('fullscreenchange',()=>{const active=document.fullscreenElement===document.documentElement;document.body.dataset.mapFullscreen=String(active);fullscreen.textContent=active?'Sair da tela cheia':'Tela cheia';fullscreen.setAttribute('aria-pressed',String(active));});
+ document.fonts.ready.then(()=>{labelSignature='';if(config&&state.page==='backbone')refresh();});
  new ResizeObserver(()=>{if(autoFit&&config&&state.page==='backbone'){if(viewport.clientWidth<640)applyZoom(Math.max(zoom,.8),false);else fitMap();}}).observe(viewport);
  viewport.addEventListener('pointerdown',e=>{if(e.button!==0||drag)return;didDrag=false;drag={id:e.pointerId,x:e.clientX,y:e.clientY,left:viewport.scrollLeft,top:viewport.scrollTop};});
  viewport.addEventListener('pointermove',e=>{

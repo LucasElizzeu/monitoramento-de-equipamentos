@@ -24,7 +24,7 @@ Use somente **um processo/worker** do servidor, para evitar consultas e eventos 
 
 A aba **Backbone Veloso NOC** mostra o backbone informado, com 15 equipamentos e 28 fibras independentes. Coari fica à esquerda e Manaus à direita; as rotas via Nazaré e via KM60/Membeca/Caapiranga se encontram em Anamã. TELEBRÁS, INFOVIA, SMART e a fibra local entre os Datacoms de Tefé aparecem separadamente. O mapa também inclui as duas redes de rádio de Coari a Tefé.
 
-As duas fibras TELEBRÁS entre Anori e Coari usam trajetos retangulares com cantos arredondados, em faixas separadas. A INFOVIA liga o Huawei de Manaus (`10.200.1.1`, Ten 0/0/23) ao Escritório de Tefé (`10.200.24.1`, Ten 1/1/4) e segue o mesmo estilo pela parte superior do desenho, preservando as cores de status e os detalhes de cada interface. Os equipamentos têm mais espaço entre si, e as leituras acompanham a direção de cada fibra, junto à linha correspondente. A tela inicia ajustada à área disponível e mostra apenas nomes e tráfego. O seletor **Exibir** permite mostrar todos os detalhes (IPs e sinal óptico) ou somente os pontos; a preferência fica salva no navegador. Os dados completos continuam disponíveis ao consultar cada fibra. A legenda e a ajuda ficam abaixo do mapa.
+As duas fibras TELEBRÁS entre Anori e Coari usam trajetos retangulares com cantos arredondados, em faixas separadas. A INFOVIA liga o Huawei de Manaus (`10.200.1.1`, Ten 0/0/23) ao Escritório de Tefé (`10.200.24.1`, Ten 1/1/4) e passa por baixo do Huawei até o Escritório, preservando as cores de status e os detalhes de cada interface. Os equipamentos têm mais espaço entre si, e os resumos são horizontais e reservam espaço para não cobrir nomes, outras leituras ou fibras. A tela inicia ajustada à área disponível e mostra apenas nomes e tráfego. O seletor **Exibir** alterna entre tráfego resumido e somente os pontos; a preferência fica salva no navegador. Os dados completos aparecem somente ao clicar em uma fibra ou ativá-la com Enter/Espaço. A legenda e a ajuda ficam abaixo do mapa.
 
 Cada equipamento é associado ao cadastro pelo IP. Clique no ponto para abrir seus detalhes ou iniciar o cadastro: não são criados equipamentos nem credenciais automaticamente. O Huawei abre a configuração de consulta SSH VRP, com as portas Ten identificadas individualmente.
 
@@ -141,7 +141,7 @@ No computador ou tablet, o botão **☰** recolhe o menu para uma faixa de 72 px
 
 A primeira parada do teclado é **Pular para o conteúdo principal**. Ao mudar de aba, o título da janela é atualizado e o foco vai para o título da página. Os controles têm indicação de foco visível, e os itens do menu mantêm nomes acessíveis quando recolhidos. Essas mudanças atendem a aspectos de navegação dos critérios WCAG 2.4; não representam uma auditoria completa de conformidade do site.
 
-No mapa, arraste com o mouse ou com um dedo para mover a visualização. Use **+**, **−** e **Ajustar à tela** para zoom. Com a área do mapa focada, as setas movem a visualização e as teclas `+` e `−` ajustam o zoom; os atalhos de zoom do navegador com Ctrl/Command são preservados. O link **Pular o desenho do mapa** evita percorrer todas as fibras com Tab. Isso movimenta a visualização e não altera os pontos ou as conexões cadastradas.
+No mapa, arraste com o mouse ou com um dedo para mover a visualização. Use a roda do mouse para zoom e **Ajustar à largura** para restaurar a visão geral. Com a área do mapa focada, as setas movem a visualização e as teclas `+` e `−` ajustam o zoom; os atalhos de zoom do navegador com Ctrl/Command são preservados. O link **Pular o desenho do mapa** evita percorrer todas as fibras com Tab. Isso movimenta a visualização e não altera os pontos ou as conexões cadastradas.
 
 Os ícones dos equipamentos seguem o mesmo estilo azul e verde: torre LTE para BBU, torre com antenas de prato para SIAE e switch para Datacom. Eles aparecem na navegação, na seleção de tipo e junto aos equipamentos. São ilustrações fixas; o estado real continua indicado pelos textos e pelas cores de status.
 
@@ -413,7 +413,7 @@ A origem da rota **Tefé → Tabatinga** está ligada visualmente ao Datacom **T
 
 O desenho usa faixas horizontais como a referência fornecida: fibra na parte superior, duas redes Coari → Tefé no meio e os 15 enlaces Tefé → Tabatinga em uma única linha inferior. Coari aparece à esquerda e Manaus à direita no backbone; o trecho inferior segue de Tefé, à direita, até Tabatinga, à esquerda. Os dados de equipamentos, IPs e portas permanecem os mesmos. Cada ponto de rádio agrupa AP e ST da localidade; clique no ponto para consultar os dois equipamentos, ou na linha para os detalhes do enlace. Os 46 rádios continuam associados individualmente pelo IP.
 
-O mapa ocupa toda a largura disponível. **Ajustar à largura** preserva essa escala e permite rolagem vertical quando a tela for mais baixa, sem encolher todo o desenho pela altura. **Tela cheia** amplia a área de trabalho, mantendo os detalhes, cadastros e portas pendentes acessíveis. No modo Tráfego, o valor principal é o RX do AP/porta de origem quando disponível; a leitura das duas pontas continua nos detalhes e no modo Todos os detalhes. Sem banda válida nos rádios, o mapa mostra ping ou o estado sem leitura. A [captura do mapa horizontal](docs/mapa-horizontal.png) usa dados ilustrativos de validação.
+O mapa ocupa toda a largura disponível. **Ajustar à largura** preserva essa escala e permite rolagem vertical quando a tela for mais baixa, sem encolher todo o desenho pela altura. **Tela cheia** amplia a área de trabalho, mantendo os detalhes, cadastros e portas pendentes acessíveis. No modo Tráfego, o valor principal é o RX do AP/porta de origem quando disponível; a leitura das duas pontas aparece no painel aberto por clique. Sem banda válida nos rádios, o mapa mostra ping ou o estado sem leitura. A [captura do mapa horizontal](docs/mapa-horizontal.png) usa dados ilustrativos de validação.
 
 No celular, o desenho inicia ampliado para navegação por arraste; o botão Ajustar à largura permite escolher uma visão geral menor quando desejado.
 
@@ -447,7 +447,7 @@ Os pares Router ID/endereço confirmados na tabela do Escritório são:
 | INFOVIA Coari | `10.200.9.1` | `10.10.20.1` |
 | INFOVIA Tabatinga | `10.200.30.1` | `10.10.20.10` |
 
-O painel no topo do mapa mostra os três vizinhos; as INFOVIAs Manaus e Coari também exibem OSPF na legenda do enlace e nos detalhes. Tabatinga aparece no painel OSPF, sem criar uma nova fibra física. A indicação de OSPF é independente da cor/estado das portas: somente uma leitura atual do vizinho correspondente em **Full** fica verde. Outros estados e vizinho ausente de uma tabela válida ficam vermelhos. Erro de SSH, resposta inválida, desconexão do painel ou leitura com mais de 90 segundos ficam indisponíveis, sem gerar uma falsa queda de adjacência.
+O painel no topo do mapa mostra os três vizinhos; as INFOVIAs Manaus e Coari também exibem OSPF nos detalhes abertos por clique. Tabatinga aparece no painel OSPF, sem criar uma nova fibra física. A indicação de OSPF é independente da cor/estado das portas: somente uma leitura atual do vizinho correspondente em **Full** fica verde. Outros estados e vizinho ausente de uma tabela válida ficam vermelhos. Erro de SSH, resposta inválida, desconexão do painel ou leitura com mais de 90 segundos ficam indisponíveis, sem gerar uma falsa queda de adjacência.
 
 As transições para fora de Full e a recuperação entram no histórico de alertas. Uma primeira consulta válida já sem o vizinho também gera alerta; consultas com erro não alteram o último estado conhecido para fins de recuperação. Notificações Telegram usam a opção existente **Circuitos**, quando habilitada pelo operador. Uma queda mantida não repete o alerta a cada consulta. Os vínculos esperados e o comando ficam em `ospf.py`. Os testes usam saídas simuladas; a primeira coleta no ambiente da rede deve confirmar suporte ao comando e os três estados reais.
 
@@ -468,3 +468,12 @@ node tests/ui_preferences.test.cjs
 ```
 
 O último teste requer Playwright e Chromium (`CHROMIUM_PATH` pode indicar o executável). Ele inicia um servidor estático temporário e usa apenas equipamentos sintéticos, sem consultas à rede. Verifica temas e persistência, contraste renderizado em desktop/celular, localidades nas quatro telas, combinação dos filtros, edição da cidade e zoom por scroll. `UI_SCREENSHOTS=/caminho/da/pasta` salva capturas opcionais.
+
+
+### Resumos legíveis e detalhes por clique
+
+O mapa apresenta um único resumo de tráfego por fibra e por enlace de rádio. Nomes de transportes e leituras ficam em linhas separadas; as legendas são horizontais, com espaço reservado e uma guia discreta quando precisam se afastar do enlace. As faixas de rádio têm uma margem maior em relação à fibra. Os IPs, as leituras AP/ST repetidas e os sinais ópticos foram concentrados nos detalhes. O antigo modo **Todos os detalhes** é migrado para **Tráfego**.
+
+**Clique ou toque no trecho** para abrir e fixar o painel com as duas pontas, portas, tráfego RX, sinal RX e OSPF quando aplicável. Passar o mouse ou apenas mover o foco com Tab não abre informações. Enter/Espaço ativa o trecho focado. O trecho selecionado fica destacado; clicar nele novamente, clicar fora, pressionar Esc ou usar × fecha o painel. As leituras continuam sendo atualizadas enquanto o painel está aberto.
+
+`node tests/map_labels.test.cjs` verifica a reserva de espaço para legendas. `node tests/ui_map_readability.test.cjs` usa tráfego sintético preenchido em todos os enlaces, verifica colisões entre textos nos dois temas e em duas larguras de tela e testa a abertura somente por ativação explícita. Nenhum teste consulta os equipamentos reais.

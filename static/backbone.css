@@ -144,3 +144,18 @@ body[data-map-fullscreen=true] #backbone-section .backbone-overview>strong::befo
 .ospf-peer[data-status=down] .ospf-state,.ospf-detail[data-status=down]>strong,#backbone-map .ospf-caption[data-status=down]{color:var(--red);fill:var(--red)}
 #backbone-map .ospf-caption{font-size:11px;font-weight:650}
 @media(max-width:640px){.ospf-panel{gap:4px}.ospf-panel-title{width:100%;flex-direction:row;justify-content:space-between;padding:4px}.ospf-peer{min-width:0;flex-basis:100%;padding:5px 9px}.ospf-peer strong{margin-bottom:1px}}
+
+/* Summary-only map: complete telemetry opens explicitly in the selected link panel. */
+#backbone-map .fiber-caption{pointer-events:bounding-box;cursor:pointer}
+#backbone-map .fiber-route-name{font-size:13px;font-weight:700;fill:var(--ink)}
+#backbone-map .fiber-label-leader{fill:none;stroke:var(--muted);stroke-width:1;stroke-dasharray:2 3;opacity:.65;pointer-events:none}
+#backbone-map .radio-access-caption{display:none}
+#backbone-map[data-display=clean] .fiber-caption,#backbone-map[data-display=clean] .fiber-label-leader{display:none}
+#backbone-map [aria-expanded=true] .fiber-stroke,#backbone-map [aria-expanded=true] .radio-stroke{stroke-width:6}
+#backbone-map [aria-expanded=true] .radio-access-stroke{stroke-width:4}
+#backbone-map [aria-expanded=true] circle:not(.node-halo):not(.radio-halo){stroke-width:4}
+.backbone-info{width:min(380px,calc(100vw - 32px));padding:18px;border-radius:12px;border-color:var(--line);box-shadow:0 12px 48px #10182330}
+.backbone-info>.backbone-link-direction{margin:6px 20px 12px 0;color:var(--ink);font-size:12px;font-weight:650}
+.backbone-info>strong{display:block;margin-right:24px;font-size:14px;line-height:1.6}
+.backbone-info .backbone-dismiss{position:absolute;right:8px;top:8px;min-height:32px;min-width:32px}
+.backbone-info>div>p{margin:6px 0}
