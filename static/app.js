@@ -171,20 +171,21 @@ function cityGroups(devices,card){
 }
 function syncCityFilter(){
  const select=$('#city-filter'),selected=select.value;
- const groups=deviceLocations.groups(state.data.devices,cityHosts);
+ const datacoms=state.page==='datacoms';select.hidden=!datacoms;$('#city-filter-label').hidden=!datacoms;
+ const groups=deviceLocations.groups(orderedDatacoms(),cityHosts);
  const options='<option value="all">Todas as cidades</option>'+groups.map(g=>`<option value="${esc(g.name==='Sem cidade'?'__none':g.name)}">${esc(g.name)}</option>`).join('');
  if(select.innerHTML!==options){select.innerHTML=options;select.value=[...select.options].some(o=>o.value===selected)?selected:'all';}
  const names=[...new Set([...cityHosts.values(),...state.data.devices.map(deviceCity).filter(Boolean)])].sort((a,b)=>a.localeCompare(b,'pt-BR'));
  const list=$('#device-cities'),html=names.map(n=>`<option value="${esc(n)}"></option>`).join('');if(list.innerHTML!==html)list.innerHTML=html;
 }
 function filteredDevices(devices=pageDevices()){
- const q=$('#search').value.trim().toLowerCase(),filter=$('#state-filter').value,city=$('#city-filter').value;
+ const q=$('#search').value.trim().toLowerCase(),filter=$('#state-filter').value,city=state.page==='datacoms'?$('#city-filter').value:'all';
  return devices.filter(d=>(d.name.toLowerCase().includes(q)||d.host.includes(q))&&(filter==='all'||d.state===filter)&&(city==='all'||(city==='__none'?!deviceCity(d):deviceLocations.key(deviceCity(d))===deviceLocations.key(city))));
 }
 function equipmentCardActions(d){return `<div class="card-equipment-actions"><button type="button" class="icon-button" data-edit="${d.id}" title="Editar equipamento" aria-label="Editar ${esc(d.name)}">${icon('edit')}</button><button type="button" class="icon-button" data-detail="${d.id}" title="Ver detalhes" aria-label="Ver detalhes de ${esc(d.name)}">${icon('arrow')}</button><button type="button" class="icon-button" data-remove="${d.id}" title="Remover equipamento" aria-label="Remover ${esc(d.name)}">${icon('trash')}</button></div>`;}
 function renderBbus(){
  const all=pageDevices('bbus'),devices=filteredDevices(all);
- $('#bbu-content').innerHTML=devices.length?cityGroups(devices,d=>`<article class="bbu-device-card" data-bbu="${d.id}" aria-label="${esc(d.name)}"><header><h2 class="equipment-title">${equipmentIcon(d.kind)}<span>${esc(d.name)}</span></h2>${badge(d.state)}</header><p class="ip">${deviceAddressHTML(d)}</p><div class="bbu-card-values"><span>Latência<strong>${number(d.latency)} <small>ms</small></strong></span><span>Perdas consecutivas<strong>${d.failures} <small>/ 21</small></strong></span></div><small class="bbu-last-check">Última checagem: ${ago(d.last_check)}</small>${equipmentCardActions(d)}</article>`):empty(all.length?'Nenhuma BBU neste filtro':'Cadastre sua primeira BBU',all.length?'Tente outro nome, IP ou status.':'Adicione uma BBU para acompanhar ping e latência.',!all.length);
+ $('#bbu-content').innerHTML=devices.length?devices.map(d=>`<article class="bbu-device-card" data-bbu="${d.id}" aria-label="${esc(d.name)}"><header><h2 class="equipment-title">${equipmentIcon(d.kind)}<span>${esc(d.name)}</span></h2>${badge(d.state)}</header><p class="ip">${deviceAddressHTML(d)}</p><div class="bbu-card-values"><span>Latência<strong>${number(d.latency)} <small>ms</small></strong></span><span>Perdas consecutivas<strong>${d.failures} <small>/ 21</small></strong></span></div><small class="bbu-last-check">Última checagem: ${ago(d.last_check)}</small>${equipmentCardActions(d)}</article>`).join(''):empty(all.length?'Nenhuma BBU neste filtro':'Cadastre sua primeira BBU',all.length?'Tente outro nome, IP ou status.':'Adicione uma BBU para acompanhar ping e latência.',!all.length);
 }
 function renderDevices(){
  const all=pageDevices(),devices=filteredDevices(all);
@@ -227,7 +228,7 @@ function renderSiae(){
  $('#siae-content').innerHTML=groups.map(([route,network,title])=>{
   const all=radios.filter(d=>(d.radio_route||'tefe-tabatinga')===route&&(network==null||d.radio_network===network));
   const visible=filteredDevices(all);
-  return `<section class="radio-route" data-radio-route="${route}" data-radio-network="${network||''}"><header><div><h3>${title}</h3><small>${all.length} ${all.length===1?'rádio cadastrado':'rádios cadastrados'}</small></div><button type="button" class="button secondary" data-add-radio-route="${route}" data-add-radio-network="${network||''}">${icon('plus')}Adicionar rádio</button></header><div class="radio-route-cards">${visible.length?cityGroups(visible,siaeCardHTML):`<p class="radio-empty">${all.length?'Nenhum rádio corresponde ao filtro.':'Nenhum rádio cadastrado neste trecho.'}</p>`}</div></section>`;
+  return `<section class="radio-route" data-radio-route="${route}" data-radio-network="${network||''}"><header><div><h3>${title}</h3><small>${all.length} ${all.length===1?'rádio cadastrado':'rádios cadastrados'}</small></div><button type="button" class="button secondary" data-add-radio-route="${route}" data-add-radio-network="${network||''}">${icon('plus')}Adicionar rádio</button></header><div class="radio-route-cards">${visible.length?visible.map(siaeCardHTML).join(''):`<p class="radio-empty">${all.length?'Nenhum rádio corresponde ao filtro.':'Nenhum rádio cadastrado neste trecho.'}</p>`}</div></section>`;
  }).join('');
 }
 function utilizationHTML(p){

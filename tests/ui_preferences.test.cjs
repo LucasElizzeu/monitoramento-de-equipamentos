@@ -56,14 +56,21 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
   await page.reload();await page.waitForFunction(t=>document.documentElement.dataset.theme===t,theme);
   for(const tab of ['overview','bbus','datacoms','siae']){
    await page.locator(`[data-page="${tab}"]`).click();
-   await page.waitForSelector('#city-filter');
-   await page.selectOption('#city-filter','Coari');
-   const selectors={overview:'#device-rows .device-row',bbus:'[data-bbu]',datacoms:'[data-datacom]',siae:'[data-siae]'};
-   const ids=await page.locator(selectors[tab]).evaluateAll((els,tab)=>els.map(e=>tab==='overview'?Number(e.querySelector('[data-detail]')?.dataset.detail):Number(e.getAttribute({'bbus':'data-bbu','datacoms':'data-datacom','siae':'data-siae'}[tab]))),tab);
-   assert(ids.length>0,`Há equipamentos em Coari: ${tab}`);
-   const expected=fixture.data.devices.filter(d=>d.host==='10.200.9.1'||d.host==='192.168.20.1'||d.city==='Coari').map(d=>d.id);
-   assert(ids.every(id=>expected.includes(id)),`Filtro por cidade não mistura localidades em ${tab}: ${ids}`);
-   await page.selectOption('#city-filter','all');
+   if(tab==='datacoms'){
+    assert(await page.locator('#city-filter').isVisible());
+    await page.selectOption('#city-filter','Coari');
+    const ids=await page.locator('[data-datacom]').evaluateAll(els=>els.map(e=>Number(e.dataset.datacom)));
+    const expected=fixture.data.devices.filter(d=>d.host==='10.200.9.1').map(d=>d.id);
+    assert.deepEqual(ids,expected,'City filtering applies to Datacoms');
+    await page.selectOption('#city-filter','all');
+   }else{
+    assert(await page.locator('#city-filter').isHidden(),`City filter is exclusive to Datacoms: ${tab}`);
+    if(tab==='siae'){
+     assert.equal(await page.locator('#siae-content .equipment-city-group').count(),0,'Radio cards have no city sections');
+     assert.equal(await page.locator('.radio-route-cards>.siae-card').count(),fixture.data.devices.filter(d=>d.kind==='siae').length,'Radio cards stay directly in their route/network grid');
+    }
+    if(tab==='bbus')assert.equal(await page.locator('#bbu-content>.bbu-device-card').count(),fixture.data.devices.filter(d=>d.kind==='ping').length);
+   }
    await auditColors(`${theme}/${tab}`);
    if(tab==='datacoms'&&process.env.UI_SCREENSHOTS)await page.screenshot({path:process.env.UI_SCREENSHOTS+'/'+theme+'-datacoms.png'});
   }
@@ -78,9 +85,17 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
   assert.equal(await page.locator('[data-datacom]').count(),0,'Cidade e status se combinam');
   await page.selectOption('#state-filter','all');
   await page.locator('[data-page="bbus"]').click();
-  assert.equal(await page.locator('#city-filter').inputValue(),'Coari','Cidade escolhida permanece ao mudar de aba');
-  await page.selectOption('#city-filter','__none');assert.equal(await page.locator('[data-bbu]').count(),1);
-  await page.selectOption('#city-filter','all');
+  assert(await page.locator('#city-filter').isHidden());
+  assert.equal(await page.locator('[data-bbu]').count(),fixture.data.devices.filter(d=>d.kind==='ping').length,'Datacom city does not filter BBUs');
+  await page.locator('[data-page="siae"]').click();
+  assert(await page.locator('#city-filter').isHidden());
+  assert.equal(await page.locator('.radio-route-cards>.siae-card').count(),fixture.data.devices.filter(d=>d.kind==='siae').length,'Datacom city does not filter radios');
+  await page.locator('#search').fill('ST_COARI');assert.equal(await page.locator('.radio-route-cards>.siae-card').count(),1,'Radio search still works');
+  await page.locator('#search').fill('');await page.selectOption('#state-filter','offline');assert.equal(await page.locator('.radio-route-cards>.siae-card').count(),0,'Radio status filter still works');
+  await page.selectOption('#state-filter','all');
+  await page.locator('[data-page="overview"]').click();assert.equal(await page.locator('#device-rows .device-row').count(),fixture.data.devices.length,'Datacom city does not filter overview');
+  await page.locator('[data-page="datacoms"]').click();assert.equal(await page.locator('#city-filter').inputValue(),'Coari','Returning to Datacoms preserves their city filter');
+  await page.locator('[data-page="bbus"]').click();
   await page.locator('#bbu-content [data-edit="100"]').click();
   assert.equal(await page.locator('#device-form [name="city"]').inputValue(),'Coari','Editar preserva a cidade');
   await page.locator('#device-dialog .close-dialog').first().click();
@@ -99,6 +114,6 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
   }
  }
  assert.deepEqual(errors,[],'Nenhum erro JavaScript');
- console.log('OK: themes persist, map/wheel controls, bold names and city filters on all four equipment views.');
+ console.log('OK: themes persist, map/wheel controls, bold names and city filter only on Datacoms; radio/BBU card grids remain unchanged.');
  }finally{await browser.close();if(server)await new Promise(resolve=>server.close(resolve));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

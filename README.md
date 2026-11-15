@@ -457,7 +457,7 @@ O seletor **Tema**, na barra superior, permite usar **Claro** (padrão) ou **Esc
 
 Use a **roda do mouse sobre o mapa** para ampliar ou reduzir na posição do cursor. Arraste para mover. O teclado mantém setas para navegação e `+`/`−` para zoom; **Ajustar à largura** restaura a visão geral. Os controles de porcentagem e o ajuste em pixels do menu foram removidos. O menu ainda pode ser expandido/recolhido.
 
-O filtro **Todas as cidades** aparece na visão geral e nas abas **BBUs, Datacoms e Rádios SIAE**. Ele se combina com busca e status e mantém a cidade escolhida ao mudar de aba. Os cartões ficam agrupados por cidade dentro da respectiva aba/trecho. Manaus 2 é agrupado em Manaus; Escritório e CLARO em Tefé; os rádios usam a localidade de cada AP/ST. Cadastros fora do mapa aparecem em **Sem cidade** até preencher **Cidade / localidade** no formulário. A cidade informada manualmente tem prioridade sobre o mapa e fica salva no banco; clientes antigos que não enviam esse campo não apagam o valor existente. Reinicie o serviço depois da atualização para aplicar a migração do banco.
+O filtro **Todas as cidades** é exclusivo da aba **Datacoms**. Ele se combina com busca e status e mantém a cidade escolhida ao sair e voltar à aba. Somente os Datacoms ficam agrupados por cidade. Rádios mantêm os cartões na grade original por trecho e rede; BBUs mantêm a grade original. A cidade selecionada nos Datacoms não filtra rádios, BBUs ou a visão geral. Manaus 2 é agrupado em Manaus; Escritório e CLARO em Tefé; os rádios usam a localidade de cada AP/ST. Cadastros fora do mapa aparecem em **Sem cidade** até preencher **Cidade / localidade** no formulário. A cidade informada manualmente tem prioridade sobre o mapa e fica salva no banco; clientes antigos que não enviam esse campo não apagam o valor existente. Reinicie o serviço depois da atualização para aplicar a migração do banco.
 
 Verificação das preferências (além dos testes Python):
 
@@ -467,7 +467,7 @@ node tests/device_locations.test.cjs
 node tests/ui_preferences.test.cjs
 ```
 
-O último teste requer Playwright e Chromium (`CHROMIUM_PATH` pode indicar o executável). Ele inicia um servidor estático temporário e usa apenas equipamentos sintéticos, sem consultas à rede. Verifica temas e persistência, contraste renderizado em desktop/celular, localidades nas quatro telas, combinação dos filtros, edição da cidade e zoom por scroll. `UI_SCREENSHOTS=/caminho/da/pasta` salva capturas opcionais.
+O último teste requer Playwright e Chromium (`CHROMIUM_PATH` pode indicar o executável). Ele inicia um servidor estático temporário e usa apenas equipamentos sintéticos, sem consultas à rede. Verifica temas e persistência, contraste renderizado em desktop/celular, filtro de cidade exclusivo dos Datacoms, grades originais de rádios/BBUs, combinação dos filtros, edição da cidade e zoom por scroll. `UI_SCREENSHOTS=/caminho/da/pasta` salva capturas opcionais.
 
 
 ### Resumos legíveis e detalhes por clique
