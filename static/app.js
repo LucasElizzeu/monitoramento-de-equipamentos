@@ -164,14 +164,27 @@ function deviceAddressHTML(device){
  const suffix=port===(scheme==='https'?443:80)?'':`:${port}`;
  return `<a class="device-web-link" href="${esc(scheme)}://${esc(host)}${suffix}/" target="_blank" rel="noopener noreferrer" title="Abrir site de ${esc(deviceKindLabel(device))} em nova aba" aria-label="Abrir site de ${esc(device.name)} (${esc(device.host)}) em nova aba"><span>${esc(device.host)}</span>${icon('arrow')}</a>`;
 }
+let cityHosts=new Map();
+function deviceCity(d){return deviceLocations.city(d,cityHosts);}
+function cityGroups(devices,card){
+ return deviceLocations.groups(devices,cityHosts).map(group=>`<section class="equipment-city-group"><h3 class="equipment-city-title">${esc(group.name)} <small>${group.devices.length}</small></h3><div class="equipment-city-cards">${group.devices.map(card).join('')}</div></section>`).join('');
+}
+function syncCityFilter(){
+ const select=$('#city-filter'),selected=select.value;
+ const groups=deviceLocations.groups(state.data.devices,cityHosts);
+ const options='<option value="all">Todas as cidades</option>'+groups.map(g=>`<option value="${esc(g.name==='Sem cidade'?'__none':g.name)}">${esc(g.name)}</option>`).join('');
+ if(select.innerHTML!==options){select.innerHTML=options;select.value=[...select.options].some(o=>o.value===selected)?selected:'all';}
+ const names=[...new Set([...cityHosts.values(),...state.data.devices.map(deviceCity).filter(Boolean)])].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+ const list=$('#device-cities'),html=names.map(n=>`<option value="${esc(n)}"></option>`).join('');if(list.innerHTML!==html)list.innerHTML=html;
+}
 function filteredDevices(devices=pageDevices()){
- const q=$('#search').value.trim().toLowerCase(),filter=$('#state-filter').value;
- return devices.filter(d=>(d.name.toLowerCase().includes(q)||d.host.includes(q))&&(filter==='all'||d.state===filter));
+ const q=$('#search').value.trim().toLowerCase(),filter=$('#state-filter').value,city=$('#city-filter').value;
+ return devices.filter(d=>(d.name.toLowerCase().includes(q)||d.host.includes(q))&&(filter==='all'||d.state===filter)&&(city==='all'||(city==='__none'?!deviceCity(d):deviceLocations.key(deviceCity(d))===deviceLocations.key(city))));
 }
 function equipmentCardActions(d){return `<div class="card-equipment-actions"><button type="button" class="icon-button" data-edit="${d.id}" title="Editar equipamento" aria-label="Editar ${esc(d.name)}">${icon('edit')}</button><button type="button" class="icon-button" data-detail="${d.id}" title="Ver detalhes" aria-label="Ver detalhes de ${esc(d.name)}">${icon('arrow')}</button><button type="button" class="icon-button" data-remove="${d.id}" title="Remover equipamento" aria-label="Remover ${esc(d.name)}">${icon('trash')}</button></div>`;}
 function renderBbus(){
  const all=pageDevices('bbus'),devices=filteredDevices(all);
- $('#bbu-content').innerHTML=devices.length?devices.map(d=>`<article class="bbu-device-card" data-bbu="${d.id}" aria-label="${esc(d.name)}"><header><h2 class="equipment-title">${equipmentIcon(d.kind)}<span>${esc(d.name)}</span></h2>${badge(d.state)}</header><p class="ip">${deviceAddressHTML(d)}</p><div class="bbu-card-values"><span>Latência<strong>${number(d.latency)} <small>ms</small></strong></span><span>Perdas consecutivas<strong>${d.failures} <small>/ 21</small></strong></span></div><small class="bbu-last-check">Última checagem: ${ago(d.last_check)}</small>${equipmentCardActions(d)}</article>`).join(''):empty(all.length?'Nenhuma BBU neste filtro':'Cadastre sua primeira BBU',all.length?'Tente outro nome, IP ou status.':'Adicione uma BBU para acompanhar ping e latência.',!all.length);
+ $('#bbu-content').innerHTML=devices.length?cityGroups(devices,d=>`<article class="bbu-device-card" data-bbu="${d.id}" aria-label="${esc(d.name)}"><header><h2 class="equipment-title">${equipmentIcon(d.kind)}<span>${esc(d.name)}</span></h2>${badge(d.state)}</header><p class="ip">${deviceAddressHTML(d)}</p><div class="bbu-card-values"><span>Latência<strong>${number(d.latency)} <small>ms</small></strong></span><span>Perdas consecutivas<strong>${d.failures} <small>/ 21</small></strong></span></div><small class="bbu-last-check">Última checagem: ${ago(d.last_check)}</small>${equipmentCardActions(d)}</article>`):empty(all.length?'Nenhuma BBU neste filtro':'Cadastre sua primeira BBU',all.length?'Tente outro nome, IP ou status.':'Adicione uma BBU para acompanhar ping e latência.',!all.length);
 }
 function renderDevices(){
  const all=pageDevices(),devices=filteredDevices(all);
@@ -209,12 +222,12 @@ function siaeCardHTML(device){
 function radioHealth(d){return d.radio_status||(d.state==='offline'?'down':['online','unstable'].includes(d.state)&&d.latency!=null?(d.latency>200?'high':'up'):'unknown');}
 function radioBadge(d){const health=radioHealth(d),names={up:'Respondendo',high:'Ping alto',down:'Sem ping',unknown:'Sem leitura'};return `<span class="radio-status radio-${health}"><i></i>${names[health]}</span>`;}
 function renderSiae(){
- const radios=pageDevices('siae'),q=$('#search').value.toLowerCase(),filter=$('#state-filter').value;
+ const radios=pageDevices('siae');
  const groups=[['tefe-tabatinga',null,'Tefé → Tabatinga'],['coari-tefe',1,'Coari → Tefé · Rede 1'],['coari-tefe',2,'Coari → Tefé · Rede 2']];
  $('#siae-content').innerHTML=groups.map(([route,network,title])=>{
   const all=radios.filter(d=>(d.radio_route||'tefe-tabatinga')===route&&(network==null||d.radio_network===network));
-  const visible=all.filter(d=>(d.name.toLowerCase().includes(q)||d.host.includes(q))&&(filter==='all'||d.state===filter));
-  return `<section class="radio-route" data-radio-route="${route}" data-radio-network="${network||''}"><header><div><h3>${title}</h3><small>${all.length} ${all.length===1?'rádio cadastrado':'rádios cadastrados'}</small></div><button type="button" class="button secondary" data-add-radio-route="${route}" data-add-radio-network="${network||''}">${icon('plus')}Adicionar rádio</button></header><div class="radio-route-cards">${visible.length?visible.map(siaeCardHTML).join(''):`<p class="radio-empty">${all.length?'Nenhum rádio corresponde ao filtro.':'Nenhum rádio cadastrado neste trecho.'}</p>`}</div></section>`;
+  const visible=filteredDevices(all);
+  return `<section class="radio-route" data-radio-route="${route}" data-radio-network="${network||''}"><header><div><h3>${title}</h3><small>${all.length} ${all.length===1?'rádio cadastrado':'rádios cadastrados'}</small></div><button type="button" class="button secondary" data-add-radio-route="${route}" data-add-radio-network="${network||''}">${icon('plus')}Adicionar rádio</button></header><div class="radio-route-cards">${visible.length?cityGroups(visible,siaeCardHTML):`<p class="radio-empty">${all.length?'Nenhum rádio corresponde ao filtro.':'Nenhum rádio cadastrado neste trecho.'}</p>`}</div></section>`;
  }).join('');
 }
 function utilizationHTML(p){
@@ -324,11 +337,11 @@ function render(){
  const cardAction=cardContainer&&['data-edit','data-detail','data-remove','data-configure-siae','data-check-siae','data-configure-circuits'].find(key=>cardElement.hasAttribute(key));
  const cardFocus=cardAction?{container:cardContainer.id,key:cardAction,value:cardElement.getAttribute(cardAction)}:null;
  const {devices,alerts,samples}=state.data;$('#last-update').textContent=`${state.demo?'Simulação':'Atualizado'} às ${formatTime(state.data.updated_at)}`;
- renderMetrics();renderDevices();renderBbus();renderSiae();renderLatency();
+ syncCityFilter();renderMetrics();renderDevices();renderBbus();renderSiae();renderLatency();
  $('#recent-events').innerHTML=alerts.length?alerts.slice(0,3).map(eventHTML).join(''):empty('Nenhum evento por aqui','Quedas e recuperações aparecerão neste espaço.');
  $('#alerts-content').innerHTML=alerts.length?alerts.map(eventHTML).join(''):empty('Sua linha do tempo começa aqui','Eventos serão registrados automaticamente quando houver uma mudança na rede.');
  const openPorts=new Set([...$('#ports-content').querySelectorAll('details[open]')].map(e=>e.dataset.portKey));
- const allDatacoms=orderedDatacoms(devices),datacoms=state.page==='datacoms'?filteredDevices(allDatacoms):allDatacoms;$('#ports-content').innerHTML=datacoms.length?datacoms.map(datacomHTML).join(''):allDatacoms.length?empty('Nenhum Datacom neste filtro','Tente outro nome, IP ou status.'):empty('Conecte seu primeiro Datacom','Cadastre uma conexão SSH para acompanhar portas, sinais e circuitos.',true);
+ const allDatacoms=orderedDatacoms(devices),datacoms=state.page==='datacoms'?filteredDevices(allDatacoms):allDatacoms;$('#ports-content').innerHTML=datacoms.length?cityGroups(datacoms,datacomHTML):allDatacoms.length?empty('Nenhum Datacom neste filtro','Tente outro nome, IP ou status.'):empty('Conecte seu primeiro Datacom','Cadastre uma conexão SSH para acompanhar portas, sinais e circuitos.',true);
  $('#ports-content').querySelectorAll('details').forEach(e=>e.open=openPorts.has(e.dataset.portKey));
  window.renderOverview?.();
  if(cardFocus&&!document.querySelector('dialog[open]'))document.getElementById(cardFocus.container)?.querySelector(`[${cardFocus.key}="${cardFocus.value}"]`)?.focus({preventScroll:true});
@@ -442,7 +455,7 @@ function openEdit(id){
  const device=state.data.devices.find(d=>d.id===id);
  if(!device)return;
  state.editing=device;$('#device-form').reset();
- for(const name of ['name','host','interval','ping_timeout','interface_type','circuit_position','ssh_port','username','fingerprint','status_command','optics_command','utilization_command','siae_scheme','siae_port','siae_poll_interval']){
+ for(const name of ['city','name','host','interval','ping_timeout','interface_type','circuit_position','ssh_port','username','fingerprint','status_command','optics_command','utilization_command','siae_scheme','siae_port','siae_poll_interval']){
   $(`[name="${name}"]`).value=device[name]??(name==='ping_timeout'?4:name==='interface_type'?'auto':'');
  }
  $(`[name="kind"][value="${device.kind}"]`).checked=true;
@@ -501,6 +514,7 @@ $('#all-events').addEventListener('click',()=>navigate('alerts'));
 $('#add-device').addEventListener('click',openAdd);
 document.addEventListener('click',e=>{const button=e.target.closest('[data-add-radio-route]');if(!button)return;openAdd();$('[name="kind"][value="siae"]').checked=true;$('[name="radio_route"]').value=button.dataset.addRadioRoute;$('[name="radio_network"]').value=button.dataset.addRadioNetwork;syncDeviceKind();});
 $('#refresh').addEventListener('click',()=>load());
+$('#city-filter').addEventListener('change',render);
 $('#search').addEventListener('input',render);$('#state-filter').addEventListener('change',render);
 document.querySelectorAll('.close-dialog').forEach(e=>e.addEventListener('click',()=>$('#device-dialog').close()));
 document.querySelectorAll('.close-confirm').forEach(e=>e.addEventListener('click',()=>$('#confirm-dialog').close()));
@@ -556,3 +570,4 @@ document.addEventListener('selectionchange',()=>{
 $('#confirm-remove').addEventListener('click',async()=>{$('#confirm-remove').disabled=true;try{await api(state.removingCircuit?`/api/circuits/${state.removingCircuit}`:`/api/devices/${state.deleting}`,{method:'DELETE'});$('#confirm-dialog').close();toast(state.removingCircuit?'Circuito removido.':'Equipamento removido.');state.removingCircuit=null;state.deleting=null;await load();}catch(e){toast(e.message);}finally{$('#confirm-remove').disabled=false;}});
 for(const dialog of document.querySelectorAll('dialog'))dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});
 hydrateIcons();load();setInterval(load,1000);
+api('/api/backbone').then(config=>{cityHosts=deviceLocations.index(config);render();}).catch(()=>{/* Explicit cities remain available when topology cannot load. */});

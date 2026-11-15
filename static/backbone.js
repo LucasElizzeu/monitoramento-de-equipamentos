@@ -151,7 +151,7 @@
  }
  function draw(){
   applyMapScope();
-  svg.innerHTML='<g class="map-regions" aria-hidden="true"><rect class="map-region fiber-region" x="8" y="4" width="1904" height="376" rx="18"/><rect class="map-region radio-region" x="8" y="386" width="1904" height="250" rx="18"/><rect class="map-region radio-region" x="8" y="650" width="1904" height="162" rx="18"/></g><text class="radio-map-heading" x="24" y="24">Backbone · fibra</text>'+config.links.map(link=>{const p=path(link);return `<g class="backbone-fiber" data-link="${link.id}" tabindex="0" role="button"><path class="fiber-underlay" d="${p.d}"/><path class="fiber-stroke" d="${p.d}"/><path class="fiber-hit" d="${p.d}"/><text class="fiber-caption" x="${p.labelX}" y="0" text-anchor="${p.anchor}"></text></g>`;}).join('')+config.nodes.map(n=>`<g class="backbone-node" data-node="${n.id}" transform="translate(${n.x} ${n.y})" tabindex="0" role="button" aria-label="${esc(n.name+' '+n.host)}"><rect class="node-label-card" x="${(n.nodeLabel?.x??0)>0?24:-65}" y="${(n.nodeLabel?.x??0)>0?-17:19}" width="${(n.nodeLabel?.x??0)>0?172:130}" height="38" rx="9"/><circle class="node-halo" r="22"/><circle r="16"/><image href="/static/icons/datacom.png" x="-12" y="-12" width="24" height="24"/><text x="${n.nodeLabel?.x??0}" y="${n.nodeLabel?.y??30}" text-anchor="${n.nodeLabel?.anchor||'middle'}">${esc(n.name)}</text><text class="node-ip" x="${n.nodeLabel?.x??0}" y="${(n.nodeLabel?.y??30)+16}" text-anchor="${n.nodeLabel?.anchor||'middle'}">${n.host}${n.kind==='huawei'?' · Huawei':''}</text></g>`).join('');
+  svg.innerHTML='<text class="radio-map-heading" x="24" y="24">Backbone · fibra</text>'+config.links.map(link=>{const p=path(link);return `<g class="backbone-fiber" data-link="${link.id}" tabindex="0" role="button"><path class="fiber-underlay" d="${p.d}"/><path class="fiber-stroke" d="${p.d}"/><path class="fiber-hit" d="${p.d}"/><text class="fiber-caption" x="${p.labelX}" y="0" text-anchor="${p.anchor}"></text></g>`;}).join('')+config.nodes.map(n=>`<g class="backbone-node" data-node="${n.id}" transform="translate(${n.x} ${n.y})" tabindex="0" role="button" aria-label="${esc(n.name+' '+n.host)}"><circle class="node-halo" r="22"/><circle r="16"/><image href="/static/icons/datacom.png" x="-12" y="-12" width="24" height="24"/><text x="${n.nodeLabel?.x??0}" y="${n.nodeLabel?.y??30}" text-anchor="${n.nodeLabel?.anchor||'middle'}">${esc(n.name)}</text><text class="node-ip" x="${n.nodeLabel?.x??0}" y="${(n.nodeLabel?.y??30)+16}" text-anchor="${n.nodeLabel?.anchor||'middle'}">${n.host}${n.kind==='huawei'?' · Huawei':''}</text></g>`).join('');
   svg.insertAdjacentHTML('beforeend',drawRadioAccess()+drawRouteOrigins()+drawRadios());
   if(!svg.style.width){if(viewport.clientWidth<640)applyZoom(.8,false);else fitMap();}refresh();
  }
@@ -253,17 +253,21 @@
  $('#backbone-port-close').onclick=()=>$('#backbone-port-dialog').close();
  $('#backbone-port-form').onsubmit=async e=>{e.preventDefault();const f=e.target,button=f.querySelector('[type="submit"]');button.disabled=true;try{config=await api(`/api/backbone/links/${editing.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({port_a:f.elements.port_a.value,port_b:f.elements.port_b.value,maintenance:f.elements.maintenance.checked})});$('#backbone-port-dialog').close();draw();}catch(error){$('#backbone-port-error').textContent=error.message;$('#backbone-port-error').hidden=false;}finally{button.disabled=false;}};
  const viewport=$('.backbone-scroll');let zoom=1,drag=null,didDrag=false,autoFit=true;
- function applyZoom(next,center=true){
+ function applyZoom(next,center=true,anchor=null){
   autoFit=false;hideInfo();
   const oldW=svg.getBoundingClientRect().width||1500,oldH=svg.getBoundingClientRect().height||600;
-  const cx=(viewport.scrollLeft+viewport.clientWidth/2)/oldW,cy=(viewport.scrollTop+viewport.clientHeight/2)/oldH;
+  const ax=anchor?.x??viewport.clientWidth/2,ay=anchor?.y??viewport.clientHeight/2;
+  const cx=(viewport.scrollLeft+ax)/oldW,cy=(viewport.scrollTop+ay)/oldH;
   zoom=Math.min(3,Math.max(.1,next));svg.style.minWidth='0';svg.style.width=`${svg.viewBox.baseVal.width*zoom}px`;
-  $('#backbone-zoom-level').value=`${Math.round(zoom*100)}%`;$('#backbone-zoom-in').disabled=zoom>=3;$('#backbone-zoom-out').disabled=zoom<=.1;
-  if(center){viewport.scrollLeft=cx*svg.getBoundingClientRect().width-viewport.clientWidth/2;viewport.scrollTop=cy*svg.getBoundingClientRect().height-viewport.clientHeight/2;}
+  if(center){viewport.scrollLeft=cx*svg.getBoundingClientRect().width-ax;viewport.scrollTop=cy*svg.getBoundingClientRect().height-ay;}
   else{viewport.scrollLeft=0;viewport.scrollTop=0;}
  }
- $('#backbone-zoom-in').onclick=()=>applyZoom(zoom+.2);
- $('#backbone-zoom-out').onclick=()=>applyZoom(zoom-.2);
+ viewport.addEventListener('wheel',e=>{
+  if(e.ctrlKey||e.metaKey||!config||state.page!=='backbone'||drag||!e.deltaY)return;
+  e.preventDefault();
+  const rect=viewport.getBoundingClientRect(),delta=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?viewport.clientHeight:1);
+  applyZoom(zoom*Math.exp(-Math.max(-600,Math.min(600,delta))*.0015),true,{x:e.clientX-rect.left-viewport.clientLeft,y:e.clientY-rect.top-viewport.clientTop});
+ },{passive:false});
  function fitMap(){
   applyZoom(viewport.clientWidth/svg.viewBox.baseVal.width,false);autoFit=true;
  }

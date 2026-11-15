@@ -80,6 +80,16 @@ class BackboneTests(unittest.TestCase):
         self.assertEqual((special['SMART']['a'], special['SMART']['b']), ('coari', 'claro'))
         self.assertEqual(sum(link['maintenance'] for link in config['links']), 0)
 
+    def test_manaus_infovia_runs_below_huawei_away_from_manaus2(self):
+        config = app.get_backbone()
+        nodes = {n['id']: n for n in config['nodes']}
+        link = next(l for l in config['links'] if l['id'] == 'manaus-escritorio-infovia-1')
+        self.assertEqual((link['a'], link['b']), ('manaus', 'escritorio'))
+        self.assertEqual((link['port_a'], link['port_b']), ('XGE0/0/23', 'ten-gigabit-ethernet:1/1/4'))
+        self.assertEqual(link['waypoints'], [dict(x=nodes['manaus']['x'], y=nodes['escritorio']['y'])])
+        self.assertGreater(link['routeLane'], nodes['manaus']['y'])
+        self.assertLess(link['caption']['x'], nodes['manaus']['x'])
+
     def test_s2bti_connects_manaus2_coari_with_confirmed_ports(self):
         config = app.get_backbone()
         link = next(link for link in config['links'] if link['id'] == 'manaus-coari-s2bti-1')

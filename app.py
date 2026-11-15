@@ -138,6 +138,8 @@ def init_db():
             db.execute('ALTER TABLE devices ADD COLUMN ping_detail TEXT')
         if 'interface_type' not in columns:
             db.execute("ALTER TABLE devices ADD COLUMN interface_type TEXT NOT NULL DEFAULT 'auto'")
+        if 'city' not in columns:
+            db.execute("ALTER TABLE devices ADD COLUMN city TEXT NOT NULL DEFAULT ''")
         if 'ssh_diagnostic' not in columns:
             db.execute("ALTER TABLE devices ADD COLUMN ssh_diagnostic TEXT NOT NULL DEFAULT '{}'")
         if 'circuit_position' not in columns:
@@ -166,6 +168,7 @@ class NotificationInput(BaseModel):
 
 
 class DeviceInput(BaseModel):
+    city: str = Field(default='', max_length=80)
     name: str = Field(min_length=1, max_length=80)
     host: str
     kind: str = 'ping'
@@ -247,6 +250,13 @@ class DeviceInput(BaseModel):
                 raise ValueError('Informe uma posição como 2 ou 2.1.')
             return value.replace(',', '.')
         return value
+
+    @field_validator('city')
+    @classmethod
+    def clean_city(cls, value):
+        if any(ord(c) < 32 for c in value):
+            raise ValueError('Informe uma cidade sem caracteres de controle.')
+        return ' '.join(value.split())
 
     @field_validator('name')
     @classmethod
@@ -1628,6 +1638,8 @@ def traffic_port_history(series_id: int, demo: bool = False):
 
 def device_values(device, previous=None):
     values = device.model_dump(exclude={'circuits', 'circuits_snapshot'})
+    if previous is not None and 'city' not in device.model_fields_set:
+        values['city'] = previous['city']
     if device.kind != 'datacom' and device.circuits:
         raise HTTPException(422, 'IPs de circuitos devem ser configurados em um Datacom.')
     if device.kind == 'siae':

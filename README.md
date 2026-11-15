@@ -450,3 +450,21 @@ Os pares Router ID/endereço confirmados na tabela do Escritório são:
 O painel no topo do mapa mostra os três vizinhos; as INFOVIAs Manaus e Coari também exibem OSPF na legenda do enlace e nos detalhes. Tabatinga aparece no painel OSPF, sem criar uma nova fibra física. A indicação de OSPF é independente da cor/estado das portas: somente uma leitura atual do vizinho correspondente em **Full** fica verde. Outros estados e vizinho ausente de uma tabela válida ficam vermelhos. Erro de SSH, resposta inválida, desconexão do painel ou leitura com mais de 90 segundos ficam indisponíveis, sem gerar uma falsa queda de adjacência.
 
 As transições para fora de Full e a recuperação entram no histórico de alertas. Uma primeira consulta válida já sem o vizinho também gera alerta; consultas com erro não alteram o último estado conhecido para fins de recuperação. Notificações Telegram usam a opção existente **Circuitos**, quando habilitada pelo operador. Uma queda mantida não repete o alerta a cada consulta. Os vínculos esperados e o comando ficam em `ospf.py`. Os testes usam saídas simuladas; a primeira coleta no ambiente da rede deve confirmar suporte ao comando e os três estados reais.
+
+### Tema, cidades e navegação do mapa
+
+O seletor **Tema**, na barra superior, permite usar **Claro** (padrão) ou **Escuro**. A preferência fica neste navegador, é aplicada antes de pintar a página e não altera o monitoramento. As cores de texto, controles, estados e desenho usam uma paleta comum. O mapa tem um único fundo nas áreas de fibra e rádio, sem quadros nos nomes; os nomes das localidades ficam em negrito.
+
+Use a **roda do mouse sobre o mapa** para ampliar ou reduzir na posição do cursor. Arraste para mover. O teclado mantém setas para navegação e `+`/`−` para zoom; **Ajustar à largura** restaura a visão geral. Os controles de porcentagem e o ajuste em pixels do menu foram removidos. O menu ainda pode ser expandido/recolhido.
+
+O filtro **Todas as cidades** aparece na visão geral e nas abas **BBUs, Datacoms e Rádios SIAE**. Ele se combina com busca e status e mantém a cidade escolhida ao mudar de aba. Os cartões ficam agrupados por cidade dentro da respectiva aba/trecho. Manaus 2 é agrupado em Manaus; Escritório e CLARO em Tefé; os rádios usam a localidade de cada AP/ST. Cadastros fora do mapa aparecem em **Sem cidade** até preencher **Cidade / localidade** no formulário. A cidade informada manualmente tem prioridade sobre o mapa e fica salva no banco; clientes antigos que não enviam esse campo não apagam o valor existente. Reinicie o serviço depois da atualização para aplicar a migração do banco.
+
+Verificação das preferências (além dos testes Python):
+
+```sh
+node tests/theme_palette.test.cjs
+node tests/device_locations.test.cjs
+node tests/ui_preferences.test.cjs
+```
+
+O último teste requer Playwright e Chromium (`CHROMIUM_PATH` pode indicar o executável). Ele inicia um servidor estático temporário e usa apenas equipamentos sintéticos, sem consultas à rede. Verifica temas e persistência, contraste renderizado em desktop/celular, localidades nas quatro telas, combinação dos filtros, edição da cidade e zoom por scroll. `UI_SCREENSHOTS=/caminho/da/pasta` salva capturas opcionais.

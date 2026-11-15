@@ -7,21 +7,21 @@ body[data-layout] #siae-content.siae-cards{display:block;padding:0 16px 16px}
 .radio-route header small{font-size:12px;color:var(--muted)}
 .radio-route header .button{display:flex;gap:8px;font-size:12px}
 .radio-route-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));gap:14px;margin-bottom:20px}
-.radio-empty{grid-column:1/-1;font-size:12px;padding:20px;border:1px dashed var(--line);border-radius:9px;text-align:center;background:#f8fafc;color:var(--muted)}
-body[data-layout] .siae-card[data-radio-status]{border-top:3px solid #8592a3}
-body[data-layout] .siae-card[data-radio-status=up]{border-top-color:#2878ef}
-body[data-layout] .siae-card[data-radio-status=high]{border-top-color:#e3ae16}
-body[data-layout] .siae-card[data-radio-status=down]{border-top-color:#cf293e}
-.radio-status{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:6px;font-size:11px;font-weight:650;white-space:nowrap;background:#f1f4f7;color:#596b80}
+.radio-empty{grid-column:1/-1;font-size:12px;padding:20px;border:1px dashed var(--line);border-radius:9px;text-align:center;background:var(--inset);color:var(--muted)}
+body[data-layout] .siae-card[data-radio-status]{border-top:3px solid var(--neutral)}
+body[data-layout] .siae-card[data-radio-status=up]{border-top-color:var(--map-radio)}
+body[data-layout] .siae-card[data-radio-status=high]{border-top-color:var(--amber)}
+body[data-layout] .siae-card[data-radio-status=down]{border-top-color:var(--red)}
+.radio-status{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:6px;font-size:11px;font-weight:650;white-space:nowrap;background:var(--neutral-bg);color:var(--neutral)}
 .radio-status i{width:6px;height:6px;border-radius:50%;background:currentColor}
-.radio-up{color:#1a62c4}.radio-high{color:#8a6200}.radio-down{color:#bd1e36}
-.radio-status.radio-up{background:#edf4ff}.radio-status.radio-high{background:#fff7d9}.radio-status.radio-down{background:#fff0f2}
+.radio-up{color:var(--map-radio)}.radio-high{color:var(--amber)}.radio-down{color:var(--red)}
+.radio-status.radio-up{background:var(--accent-light)}.radio-status.radio-high{background:var(--warning-bg)}.radio-status.radio-down{background:var(--danger-bg)}
 .siae-card .port-card-header{gap:8px;flex-wrap:wrap}
 .radio-route-fields{padding-bottom:16px;border-bottom:1px solid var(--line);margin-bottom:16px}
 @media(max-width:640px){.radio-route>header{align-items:flex-start;flex-wrap:wrap}.radio-route header .button{min-height:40px}.radio-route-cards{grid-template-columns:1fr}body[data-layout] #siae-content.siae-cards{padding:0 12px 12px}.radio-legend{padding:0 12px 12px;font-size:11px}}
 /* Compact radio cards; online badges are green independently of blue map links. */
-.radio-up{color:#16824b}.radio-status.radio-up{color:#16824b;background:#edf9f1}
-body[data-layout] .siae-card[data-radio-status=up]{border-top-color:#16824b}
+.radio-up{color:var(--success)}.radio-status.radio-up{color:var(--success);background:var(--success-bg)}
+body[data-layout] .siae-card[data-radio-status=up]{border-top-color:var(--success)}
 body[data-view=siae] .radio-route{padding-top:12px;margin-top:0}
 body[data-view=siae] .radio-route>header{margin-bottom:10px}
 body[data-view=siae] .radio-route-cards{grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr));gap:10px;margin-bottom:12px}

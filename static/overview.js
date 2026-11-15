@@ -1,7 +1,7 @@
 /* Approved compact overview. All values come from current monitoring data. */
 (() => {
  const workspace=$('#overview-workspace'),table=$('#devices-section'),aside=$('#overview-charts');
- const originalHead=table.querySelector('thead').innerHTML,locations=new Map();
+ const originalHead=table.querySelector('thead').innerHTML;
  const latencyTypes=document.createElement('div');latencyTypes.className='overview-latency-types';latencyTypes.setAttribute('role','group');latencyTypes.setAttribute('aria-label','Tipo para a latência média');
  latencyTypes.innerHTML=[['ping','BBU'],['siae','Rádio SIAE'],['datacom','Datacom']].map(([kind,label])=>`<button type="button" data-latency-type="${kind}" aria-pressed="false">${label}</button>`).join('');
  $('.chart-panel .panel-heading').append(latencyTypes);
@@ -11,7 +11,7 @@
  syncLatencyTypes();
  let sortKey=null,ascending=true;
  const columns=[['name','Nome'],['location','Localidade'],['state','Estado'],['latency','Latência'],['ports','Portas']];
- function location(d){return locations.get(d.host)||'—';}
+ function location(d){return deviceCity(d)||'Sem cidade';}
  function portSummary(d){const ports=d.ssh_error?[]:(d.port_data||[]);return ports.length?{up:ports.filter(p=>p.state==='up').length,total:ports.length}:null;}
  function issue(d){
   if(d.state==='offline')return {text:'Sem resposta',tone:'critical',rank:0};
@@ -59,5 +59,4 @@
  $('#overview-actions').addEventListener('close',()=>{const id=$('#overview-actions-buttons [data-detail]')?.dataset.detail;if(!document.querySelector('dialog[open]'))$(`[data-overview-actions="${id}"]`)?.focus({preventScroll:true});});
  $('.event-panel h2').textContent='Atenção agora';
  window.setupOverview(state.page);window.renderOverview();
- api('/api/backbone').then(config=>{for(const n of config.nodes)locations.set(n.host,n.id==='manaus2'?'Manaus':['claro','escritorio'].includes(n.id)?'Tefé':n.name);window.renderOverview();}).catch(()=>{/* Unknown locations remain explicitly unavailable. */});
 })();

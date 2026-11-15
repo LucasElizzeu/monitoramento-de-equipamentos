@@ -34,7 +34,7 @@ body[data-layout] .eyebrow { color: var(--dim); font-size: 9px; letter-spacing: 
 body[data-layout] .page-heading p { font-size: 12px; }
 .button { min-height: 36px; border-radius: 7px; transition: background .18s, border-color .18s; }
 .primary { background: var(--accent); box-shadow: none; }
-.secondary { background: var(--surface); border-color: #b9c9d8; color: var(--ink); }
+.secondary { background: var(--surface); border-color: var(--line); color: var(--ink); }
 body[data-layout] .status-strip { margin-bottom: 12px; gap: 10px; line-height: 1.6; }
 .status-strip > span:first-child { flex-wrap: wrap; }
 body[data-layout] .metrics { gap: 10px; margin-bottom: 16px; }
@@ -49,7 +49,7 @@ body[data-layout] h2 { font-size: 15px; font-weight: 600; }
 .overview-grid { gap: 14px; }
 .chart-container svg line { stroke-dasharray: 3 5; }
 .subtle-tag, .count-chip { border-radius: 5px; }
-.search, select { background-color: var(--surface); border-color: #b9c9d8; border-radius: 7px; }
+.search, select { background-color: var(--surface); border-color: var(--line); border-radius: 7px; }
 .search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px #155d8914; }
 body[data-layout] th { background: var(--inset); color: var(--muted); font-size: 10px; padding-top: 10px; padding-bottom: 10px; }
 body[data-layout] td { padding-top: 11px; padding-bottom: 11px; border-color: var(--line); }

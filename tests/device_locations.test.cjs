@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict'),loc=require('../static/device-locations.js');
+const config=require('../static/backbone.json'),hosts=loc.index(config);
+assert.equal(loc.city({host:'10.200.1.3'},hosts),'Manaus');
+assert.equal(loc.city({host:'10.200.24.1'},hosts),'Tefé');
+assert.equal(loc.city({host:'192.168.30.2'},hosts),'Betânia');
+assert.equal(loc.city({host:'192.168.20.1'},hosts),'Coari');
+assert.equal(loc.city({host:'10.200.24.1',city:'  tefe '},hosts),'Tefé');
+assert.equal(loc.city({host:'10.200.24.1',city:'Manaus'},hosts),'Manaus');
+assert.equal(loc.city({host:'192.0.2.1',name:'Manaus'},hosts),'');
+const groups=loc.groups([{host:'192.0.2.1'},{city:'Manaus'},{city:'MANAUS'},{city:'Coari'}],hosts);
+assert.equal(groups.at(-1).name,'Sem cidade');assert.equal(groups.find(g=>g.name==='Manaus').devices.length,2);
+console.log('OK: topology hosts, radio endpoints, explicit cities and unknown equipment are grouped without guessing names.');

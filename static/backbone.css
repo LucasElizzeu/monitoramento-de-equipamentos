@@ -1,4 +1,4 @@
-.backbone-toolbar,.backbone-legend{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:12px 0;color:var(--muted);font-size:12px}.backbone-legend{justify-content:flex-start}.backbone-legend .up{color:var(--success)}.backbone-legend .down{color:var(--red)}.backbone-legend .error{color:var(--amber)}.backbone-scroll{overflow:auto;border:1px solid var(--line);border-radius:8px;background:white}#backbone-map{display:block;width:100%;min-width:1500px;height:auto}#backbone-map.fit-map{min-width:0}.fiber-stroke{fill:none;stroke:#8996a6;stroke-width:3;stroke-dasharray:7 5}.fiber-hit{fill:none;stroke:transparent;stroke-width:15;cursor:pointer}.backbone-fiber[data-status=up] .fiber-stroke{stroke:#32b64e;stroke-dasharray:none}.backbone-fiber[data-status=down] .fiber-stroke{stroke:var(--red);stroke-dasharray:none}.backbone-fiber[data-status=error] .fiber-stroke{stroke:var(--amber);stroke-dasharray:none}.backbone-fiber:focus{outline:none}.backbone-fiber:focus .fiber-stroke,.backbone-fiber:hover .fiber-stroke{stroke-width:5}.fiber-caption{font:11px system-ui;fill:var(--muted);paint-order:stroke;stroke:white;stroke-width:4px;stroke-linejoin:round;pointer-events:none}.backbone-node{cursor:pointer}.backbone-node circle{fill:white;stroke:#94a1b0;stroke-width:2}.backbone-node[data-status=online] circle{stroke:var(--success)}.backbone-node[data-status=offline] circle{stroke:var(--red)}.backbone-node text{fill:var(--ink);font:12px system-ui;paint-order:stroke;stroke:white;stroke-width:3px}.backbone-node .node-ip{font-size:10px;fill:var(--muted)}.backbone-note{color:var(--muted);font-size:12px;line-height:1.7}.backbone-info{position:fixed;z-index:30;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px;box-shadow:0 8px 30px #1b293e24;width:min(350px,calc(100vw - 16px));max-height:85vh;overflow:auto;font-size:12px}.backbone-info>div{border-top:1px solid var(--line);padding-top:10px;margin-top:10px}.backbone-info small{display:block;overflow-wrap:anywhere;color:var(--muted);margin-top:5px}.backbone-dismiss{float:right}.backbone-info p{color:var(--muted);line-height:1.6}.backbone-info>.button{margin-top:8px}#backbone-port-form>p{font-size:12px;line-height:1.7}#backbone-port-form>label:has(input[type=checkbox]){display:flex;align-items:center;gap:8px;font-size:12px;margin:18px 0}
+.backbone-toolbar,.backbone-legend{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:12px 0;color:var(--muted);font-size:12px}.backbone-legend{justify-content:flex-start}.backbone-legend .up{color:var(--success)}.backbone-legend .down{color:var(--red)}.backbone-legend .error{color:var(--amber)}.backbone-scroll{overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface)}#backbone-map{display:block;width:100%;min-width:1500px;height:auto}#backbone-map.fit-map{min-width:0}.fiber-stroke{fill:none;stroke:var(--map-pending);stroke-width:3;stroke-dasharray:7 5}.fiber-hit{fill:none;stroke:transparent;stroke-width:15;cursor:pointer}.backbone-fiber[data-status=up] .fiber-stroke{stroke:var(--success);stroke-dasharray:none}.backbone-fiber[data-status=down] .fiber-stroke{stroke:var(--red);stroke-dasharray:none}.backbone-fiber[data-status=error] .fiber-stroke{stroke:var(--amber);stroke-dasharray:none}.backbone-fiber:focus{outline:none}.backbone-fiber:focus .fiber-stroke,.backbone-fiber:hover .fiber-stroke{stroke-width:5}.fiber-caption{font:11px system-ui;fill:var(--muted);paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round;pointer-events:none}.backbone-node{cursor:pointer}.backbone-node circle{fill:var(--surface);stroke:var(--muted);stroke-width:2}.backbone-node[data-status=online] circle{stroke:var(--success)}.backbone-node[data-status=offline] circle{stroke:var(--red)}.backbone-node text{fill:var(--ink);font:12px system-ui;paint-order:stroke;stroke:var(--surface);stroke-width:3px}.backbone-node .node-ip{font-size:10px;fill:var(--muted)}.backbone-note{color:var(--muted);font-size:12px;line-height:1.7}.backbone-info{position:fixed;z-index:30;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px;box-shadow:0 8px 30px #1b293e24;width:min(350px,calc(100vw - 16px));max-height:85vh;overflow:auto;font-size:12px}.backbone-info>div{border-top:1px solid var(--line);padding-top:10px;margin-top:10px}.backbone-info small{display:block;overflow-wrap:anywhere;color:var(--muted);margin-top:5px}.backbone-dismiss{float:right}.backbone-info p{color:var(--muted);line-height:1.6}.backbone-info>.button{margin-top:8px}#backbone-port-form>p{font-size:12px;line-height:1.7}#backbone-port-form>label:has(input[type=checkbox]){display:flex;align-items:center;gap:8px;font-size:12px;margin:18px 0}
 @media(max-width:640px){body[data-layout] .sidebar nav{justify-content:flex-start}.backbone-toolbar{font-size:11px}}
 
 /* A compact workspace for the circuit, with optional technical readings. */
@@ -33,36 +33,36 @@ body[data-view=backbone] .backbone-scroll{height:calc(100dvh - 225px);min-height
 .radio-map-heading{fill:var(--ink);font:700 18px var(--font)}
 .radio-network-label{fill:var(--muted);font:600 14px var(--font)}
 .radio-site{fill:var(--ink);font:650 15px var(--font)}
-.radio-stroke{fill:none;stroke:#8b98ab;stroke-width:4;stroke-dasharray:7 5}
-.backbone-radio[data-status=up] .radio-stroke{stroke:#2878ef;stroke-dasharray:none}
-.backbone-radio[data-status=high] .radio-stroke{stroke:#e0ad12;stroke-dasharray:none}
-.backbone-radio[data-status=down] .radio-stroke{stroke:#cf293e;stroke-dasharray:none}
+.radio-stroke{fill:none;stroke:var(--map-pending);stroke-width:4;stroke-dasharray:7 5}
+.backbone-radio[data-status=up] .radio-stroke{stroke:var(--map-radio);stroke-dasharray:none}
+.backbone-radio[data-status=high] .radio-stroke{stroke:var(--amber);stroke-dasharray:none}
+.backbone-radio[data-status=down] .radio-stroke{stroke:var(--red);stroke-dasharray:none}
 .backbone-radio{cursor:pointer}.backbone-radio:focus .radio-stroke,.backbone-radio:hover .radio-stroke{stroke-width:6}
-.radio-caption{font:12px var(--font);fill:var(--muted);paint-order:stroke;stroke:white;stroke-width:4px;pointer-events:none}
+.radio-caption{font:12px var(--font);fill:var(--muted);paint-order:stroke;stroke:var(--surface);stroke-width:4px;pointer-events:none}
 .radio-map-point{cursor:pointer}
-.radio-map-point circle{fill:white;stroke:#8b98ab;stroke-width:2}
-.radio-map-point[data-status=up] circle{stroke:#2878ef}.radio-map-point[data-status=high] circle{stroke:#e0ad12}.radio-map-point[data-status=down] circle{stroke:#cf293e}
-.radio-map-point text{font:11px var(--font);fill:var(--muted);paint-order:stroke;stroke:white;stroke-width:3px}
+.radio-map-point circle{fill:var(--surface);stroke:var(--map-pending);stroke-width:2}
+.radio-map-point[data-status=up] circle{stroke:var(--map-radio)}.radio-map-point[data-status=high] circle{stroke:var(--amber)}.radio-map-point[data-status=down] circle{stroke:var(--red)}
+.radio-map-point text{font:11px var(--font);fill:var(--muted);paint-order:stroke;stroke:var(--surface);stroke-width:3px}
 #backbone-map:not([data-display=full]) :is(.radio-ip,.radio-band){display:none}
 #backbone-map[data-display=clean] .radio-caption{display:none}
-.map-radio-up{color:#1b62c7}.map-radio-high{color:#896000}
+.map-radio-up{color:var(--map-radio)}.map-radio-high{color:var(--amber)}
 .backbone-radio:focus-visible,.radio-map-point:focus-visible{outline:3px solid #155d89;outline-offset:3px}
 /* Access paths tie each radio network to the confirmed Datacom endpoint. */
 .radio-access{cursor:pointer}
-.radio-access-underlay{fill:none;stroke:white;stroke-width:7;stroke-linejoin:round;pointer-events:none}
-.radio-access-stroke{fill:none;stroke:#8b98ab;stroke-width:2;stroke-dasharray:5 5;pointer-events:none}
-.radio-access[data-status=up] .radio-access-stroke{stroke:#2878ef;stroke-dasharray:none}
-.radio-access[data-status=high] .radio-access-stroke{stroke:#e0ad12;stroke-dasharray:none}
-.radio-access[data-status=down] .radio-access-stroke{stroke:#cf293e;stroke-dasharray:none}
+.radio-access-underlay{fill:none;stroke:var(--surface);stroke-width:7;stroke-linejoin:round;pointer-events:none}
+.radio-access-stroke{fill:none;stroke:var(--map-pending);stroke-width:2;stroke-dasharray:5 5;pointer-events:none}
+.radio-access[data-status=up] .radio-access-stroke{stroke:var(--map-radio);stroke-dasharray:none}
+.radio-access[data-status=high] .radio-access-stroke{stroke:var(--amber);stroke-dasharray:none}
+.radio-access[data-status=down] .radio-access-stroke{stroke:var(--red);stroke-dasharray:none}
 .radio-access:hover .radio-access-stroke,.radio-access:focus .radio-access-stroke{stroke-width:4}
-.radio-access-caption{font:11px var(--font);fill:var(--muted);paint-order:stroke;stroke:white;stroke-width:4px;pointer-events:none}
+.radio-access-caption{font:11px var(--font);fill:var(--muted);paint-order:stroke;stroke:var(--surface);stroke-width:4px;pointer-events:none}
 .radio-access:focus-visible{outline:3px solid #155d89;outline-offset:3px}
-.radio-route-continuation{fill:none;stroke:#aeb9c7;stroke-width:1.5;stroke-dasharray:4 5;pointer-events:none}
+.radio-route-continuation{fill:none;stroke:var(--map-pending);stroke-width:1.5;stroke-dasharray:4 5;pointer-events:none}
 #backbone-scope{max-width:190px}
 @media(max-width:640px){.backbone-actions .backbone-view-label{flex:1;min-width:0}.backbone-actions select{min-width:0;max-width:100%;flex:1}.backbone-actions .map-view-controls{width:100%;justify-content:flex-end}}
 /* Wide topology: preserve readable scale by fitting width, with vertical scroll as needed. */
 body[data-layout][data-view=backbone] main{max-width:none;width:100%;padding:14px 16px 12px;box-sizing:border-box}
-body[data-view=backbone] .backbone-scroll{height:calc(100dvh - 205px);min-height:420px;max-height:none;border-radius:8px;background:#fff}
+body[data-view=backbone] .backbone-scroll{height:calc(100dvh - 205px);min-height:420px;max-height:none;border-radius:8px;background:var(--surface)}
 body[data-layout][data-view=backbone] .page-heading{margin-bottom:10px}
 body[data-view=backbone] #backbone-section .backbone-toolbar{margin-bottom:10px}
 body[data-view=backbone] .backbone-actions{gap:10px}
@@ -73,7 +73,7 @@ body[data-view=backbone] .backbone-actions{gap:10px}
 #backbone-map .radio-site-point .radio-site{font-size:13px;font-weight:550;fill:var(--ink)}
 #backbone-map .radio-site-point .radio-ip{font-size:9px}
 #backbone-map .radio-caption{font-size:14px}
-#backbone-map .radio-endpoint-ping{font-size:11px;fill:#6b7789}
+#backbone-map .radio-endpoint-ping{font-size:11px;fill:var(--muted)}
 #backbone-map[data-display=clean] .radio-endpoint-ping{display:none}
 #backbone-map .radio-access-caption{font-size:10px}
 #backbone-map .radio-stroke{stroke-width:4}
@@ -96,46 +96,39 @@ body[data-view=backbone] .backbone-help summary{min-height:20px}
 body[data-layout][data-view=backbone][data-map-fullscreen=true] main{height:100dvh;padding:8px}
 @media(max-width:640px){body[data-layout][data-view=backbone] main{height:calc(100dvh - 103px);padding:6px 8px}body[data-view=backbone] .backbone-overview{display:none}body[data-view=backbone] #backbone-summary{margin-left:0;font-size:9px}body[data-layout][data-view=backbone][data-map-fullscreen=true] main{height:100dvh}}
 
-/* Topology canvas: quiet sections and crisp status paths. */
-body[data-view=backbone] .backbone-scroll{background:#f4f7fb;border-color:#dce4ee;border-radius:16px;box-shadow:0 4px 20px #233d6010}
-#backbone-map{background-image:radial-gradient(#9aacc52e .8px,transparent .8px);background-size:18px 18px}
-.map-regions{pointer-events:none}.map-region{stroke:#dce5ef;stroke-width:1;fill:#ffffffd9}.radio-region{fill:#f8fbffeb}
-.fiber-underlay{fill:none;stroke:white;stroke-width:8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+/* Topology canvas: uniform background and crisp status paths. */
+body[data-view=backbone] .backbone-scroll{background:var(--inset);border-color:var(--line);border-radius:16px;box-shadow:0 4px 20px #233d6010}
+#backbone-map{background:var(--surface)}
+.fiber-underlay{fill:none;stroke:var(--surface);stroke-width:8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
 #backbone-map .fiber-stroke,#backbone-map .radio-stroke{stroke-linecap:round;stroke-linejoin:round;transition:stroke-width .15s ease}
 #backbone-map .backbone-node circle:not(.node-halo),#backbone-map .radio-map-point circle{filter:drop-shadow(0 3px 4px #253e6026);stroke-width:2.5}
-#backbone-map .backbone-node .node-halo{fill:#e8eef6;stroke:none;opacity:.8}
-#backbone-map .backbone-node[data-status=online] .node-halo{fill:#d9f3e5}
-#backbone-map .backbone-node[data-status=offline] .node-halo{fill:#ffe0e5}
-#backbone-map .backbone-node:hover .node-halo,#backbone-map .backbone-node:focus-visible .node-halo{fill:#dbeafe;opacity:1}
+#backbone-map .backbone-node .node-halo{fill:var(--accent-light);stroke:none;opacity:.8}
+#backbone-map .backbone-node[data-status=online] .node-halo{fill:var(--success-bg)}
+#backbone-map .backbone-node[data-status=offline] .node-halo{fill:var(--danger-bg)}
+#backbone-map .backbone-node:hover .node-halo,#backbone-map .backbone-node:focus-visible .node-halo{fill:var(--accent-light);opacity:1}
 #backbone-map .backbone-node:focus-visible{outline:2px solid #2563eb;outline-offset:5px}
 #backbone-map .backbone-node text:not(.node-ip){font-weight:650}
-#backbone-map .radio-map-heading{fill:#29435f;font-size:16px;letter-spacing:.25px}
-#backbone-map .radio-network-label{fill:#426b9d}
+#backbone-map .radio-map-heading{fill:var(--ink);font-size:16px;letter-spacing:.25px}
+#backbone-map .radio-network-label{fill:var(--accent)}
 #backbone-map [data-link=manaus-coari-s2bti-1] .fiber-stroke{stroke-width:4}
-#backbone-map [data-link=manaus-coari-s2bti-1] .fiber-caption{font-weight:700;fill:#334e70}
+#backbone-map [data-link=manaus-coari-s2bti-1] .fiber-caption{font-weight:700;fill:var(--ink)}
 #backbone-map[data-display=clean] [data-link=manaus-coari-s2bti-1] .fiber-caption{display:block}
 .backbone-info{border-radius:14px;box-shadow:0 14px 48px #233d6029}
 #backbone-section .backbone-legend{padding:5px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
 @media(prefers-reduced-motion:reduce){#backbone-map .fiber-stroke,#backbone-map .radio-stroke{transition:none}}
-
-/* Equipment labels sit on small plates, separate from live status rings. */
-#backbone-map .node-label-card{fill:#fff;stroke:#e0e7f0;stroke-width:1;filter:drop-shadow(0 2px 3px #29435f0c);pointer-events:none}
-#backbone-map .backbone-node:hover .node-label-card,#backbone-map .backbone-node:focus-visible .node-label-card{stroke:#91b6e4;fill:#f5f9ff}
-#backbone-map .backbone-node .node-ip{fill:#718198;font-size:10px;stroke:none}
-#backbone-map .backbone-node text:not(.node-ip){fill:#243d5b;font-size:14px}
-#backbone-map .radio-map-point .radio-halo{fill:#e6eefb;stroke:none;filter:none}
-#backbone-map .radio-map-point[data-status=up] .radio-halo{fill:#dceaff}
-#backbone-map .radio-map-point[data-status=high] .radio-halo{fill:#fff0c9}
-#backbone-map .radio-map-point[data-status=down] .radio-halo{fill:#ffe1e6}
-#backbone-section .backbone-toolbar{background:linear-gradient(110deg,#fff,#f3f7fc);border:1px solid #dce5ef;border-radius:14px;padding:10px 14px;box-shadow:0 2px 8px #233d6008}
-#backbone-section .backbone-overview>strong{color:#29435f;font-size:14px;letter-spacing:.2px}
-#backbone-section .backbone-overview>strong::before{content:'';display:inline-block;width:8px;height:8px;margin-right:9px;border-radius:3px;background:#507db8;box-shadow:0 0 0 4px #e7effa}
+#backbone-map .backbone-node .node-ip{fill:var(--muted);font-size:10px;stroke:none}
+#backbone-map .backbone-node text:not(.node-ip){fill:var(--ink);font-size:14px}
+#backbone-map .radio-map-point .radio-halo{fill:var(--accent-light);stroke:none;filter:none}
+#backbone-map .radio-map-point[data-status=up] .radio-halo{fill:var(--accent-light)}
+#backbone-map .radio-map-point[data-status=high] .radio-halo{fill:var(--warning-bg)}
+#backbone-map .radio-map-point[data-status=down] .radio-halo{fill:var(--danger-bg)}
+#backbone-section .backbone-toolbar{background:linear-gradient(110deg,var(--surface),var(--raised));border:1px solid var(--line);border-radius:14px;padding:10px 14px;box-shadow:0 2px 8px #233d6008}
+#backbone-section .backbone-overview>strong{color:var(--ink);font-size:14px;letter-spacing:.2px}
+#backbone-section .backbone-overview>strong::before{content:'';display:inline-block;width:8px;height:8px;margin-right:9px;border-radius:3px;background:var(--accent);box-shadow:0 0 0 4px #e7effa}
 body[data-map-fullscreen=true] #backbone-section .backbone-overview>strong::before{content:''}
 #backbone-section .map-view-controls .button{border-radius:9px;box-shadow:0 1px 3px #243d5b0b}
-#backbone-section .backbone-view-label select{border-radius:9px;border-color:#d6e1ef;background-color:#fff}
-#backbone-map .fiber-caption,#backbone-map .radio-caption{stroke-width:6px;stroke:#fff;stroke-linejoin:round}
-#backbone-map .fiber-region{fill:#ffffffed}
-#backbone-map .radio-region{fill:#f3f7fdeb}
+#backbone-section .backbone-view-label select{border-radius:9px;border-color:var(--line);background-color:var(--surface)}
+#backbone-map .fiber-caption,#backbone-map .radio-caption{stroke-width:6px;stroke:var(--surface);stroke-linejoin:round}
 @media(max-width:640px){#backbone-section .backbone-toolbar{padding:8px;border-radius:11px}}
 
 .ospf-panel{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;margin:0 0 8px;flex-shrink:0}
@@ -143,11 +136,11 @@ body[data-map-fullscreen=true] #backbone-section .backbone-overview>strong::befo
 .ospf-panel-title small,.ospf-peer small{display:block;color:var(--muted);font-size:10px}
 .ospf-peer{display:flex;align-items:center;gap:9px;flex:1;min-width:230px;padding:8px 12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;font-size:11px}
 .ospf-peer strong{display:block;margin-bottom:3px;font-size:11px}
-.ospf-dot{width:8px;height:8px;border-radius:50%;background:#8793a4;flex-shrink:0}
+.ospf-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0}
 .ospf-state{margin-left:auto;font-size:10px;max-width:170px;overflow-wrap:anywhere;color:var(--muted)}
-.ospf-peer[data-status=up] .ospf-dot{background:#18905b;box-shadow:0 0 0 3px #18905b15}
-.ospf-peer[data-status=down] .ospf-dot{background:#cf293e;box-shadow:0 0 0 3px #cf293e15}
-.ospf-peer[data-status=up] .ospf-state,.ospf-detail[data-status=up]>strong,#backbone-map .ospf-caption[data-status=up]{color:#14794b;fill:#14794b}
-.ospf-peer[data-status=down] .ospf-state,.ospf-detail[data-status=down]>strong,#backbone-map .ospf-caption[data-status=down]{color:#be2337;fill:#be2337}
+.ospf-peer[data-status=up] .ospf-dot{background:var(--success);box-shadow:0 0 0 3px #18905b15}
+.ospf-peer[data-status=down] .ospf-dot{background:var(--red);box-shadow:0 0 0 3px #cf293e15}
+.ospf-peer[data-status=up] .ospf-state,.ospf-detail[data-status=up]>strong,#backbone-map .ospf-caption[data-status=up]{color:var(--success);fill:var(--success)}
+.ospf-peer[data-status=down] .ospf-state,.ospf-detail[data-status=down]>strong,#backbone-map .ospf-caption[data-status=down]{color:var(--red);fill:var(--red)}
 #backbone-map .ospf-caption{font-size:11px;font-weight:650}
 @media(max-width:640px){.ospf-panel{gap:4px}.ospf-panel-title{width:100%;flex-direction:row;justify-content:space-between;padding:4px}.ospf-peer{min-width:0;flex-basis:100%;padding:5px 9px}.ospf-peer strong{margin-bottom:1px}}
