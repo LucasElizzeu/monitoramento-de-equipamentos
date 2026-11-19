@@ -12,6 +12,7 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
  page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/api/**',route=>{const u=new URL(route.request().url());let body=u.pathname==='/api/backbone'?fixture.config:u.pathname==='/api/dashboard'?fixture.data:u.pathname.endsWith('/history')?[]:{};return route.fulfill({json:body});});
  try{
+ const mapAction=async action=>{await page.locator('.backbone-scroll').click({button:'right',position:{x:80,y:80}});await page.locator(`[data-map-action="${action}"]`).click();};
  await page.addInitScript(()=>localStorage.setItem('alwaysup-map-display','full'));
  await page.goto(base+'/static/index.html');
  await page.locator('[data-page="backbone"]').click();
@@ -23,11 +24,10 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
  assert.equal(await page.locator('.ospf-panel-title,.backbone-overview').count(),0,'No redundant information cards above the map');
  assert.equal(await page.locator('#backbone-ospf .ospf-legend-item').count(),3);
  assert(!(await page.locator('#backbone-ospf').innerText()).includes('10.200.'),'Footer status remains compact');
- const controls=await page.locator('.backbone-toolbar').boundingBox(),canvas=await page.locator('.backbone-scroll').boundingBox();
- assert(controls.height<=40,'Single compact row of map controls');
- assert(canvas.y<=110,'Map starts near the application header');
- assert(canvas.height>=800,'Freed space expands the drawing at 1000 px viewport height');
-
+ assert(await page.locator('.backbone-toolbar').isHidden(),'No controls above the map');
+ assert(await page.locator('.backbone-footer').isHidden(),'No footer around the map');
+ const canvas=await page.locator('.backbone-scroll').boundingBox();
+ assert(Math.abs(canvas.x)<1&&Math.abs(canvas.y)<1&&Math.abs(canvas.height-1000)<1,'Map fills the viewport');
  const collisions=()=>page.evaluate(()=>{
   const visible=e=>getComputedStyle(e).display!=='none'&&getComputedStyle(e).visibility!=='hidden';
   const summaries=[...document.querySelectorAll('.fiber-caption')].filter(visible);
@@ -40,9 +40,9 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
   return {count:summaries.length,hits,rotated:summaries.some(e=>e.getAttribute('transform')?.includes('rotate'))};
  });
  for(const theme of ['light','dark']){
-  await page.selectOption('#theme-select',theme);
+  if(await page.locator('html').getAttribute('data-theme')!==theme)await mapAction('theme');
   for(const width of [1536,1080]){
-   await page.setViewportSize({width,height:1000});await page.locator('#backbone-fit').click();
+   await page.setViewportSize({width,height:1000});await mapAction('fit');
    await page.waitForTimeout(100);
    const result=await collisions();assert.equal(result.count,fixture.config.links.length,'Every fiber has a placed summary');assert.deepEqual(result.hits,[],`No overlapping labels at ${width}/${theme}`);assert(!result.rotated,'All summaries are horizontal');
    if(process.env.UI_SCREENSHOTS)await page.screenshot({path:process.env.UI_SCREENSHOTS+'/'+theme+'-map-'+width+'.png'});
@@ -60,10 +60,10 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
  await page.keyboard.press('Escape');assert(await page.locator('#backbone-info').isHidden());assert.equal(await target.getAttribute('aria-expanded'),'false');
  await label.click();assert(await page.locator('#backbone-info').isVisible(),'Click opens details');
  await page.locator('#backbone-info .backbone-dismiss').click();assert(await page.locator('#backbone-info').isHidden());
- await label.click();await page.locator('.backbone-toolbar').click({position:{x:10,y:10}});assert(await page.locator('#backbone-info').isHidden(),'Click outside closes details');
+ await label.click();await page.locator('.backbone-scroll').click({position:{x:5,y:5}});assert(await page.locator('#backbone-info').isHidden(),'Click outside closes details');
  await label.click();await label.click();assert(await page.locator('#backbone-info').isHidden(),'Clicking the selected link closes its panel');
- await page.selectOption('#backbone-display','clean');assert(await label.isHidden());
- await page.selectOption('#backbone-display','traffic');assert.deepEqual((await collisions()).hits,[]);
+ await mapAction('readings');assert(await label.isHidden());
+ await mapAction('readings');assert.deepEqual((await collisions()).hits,[]);
  assert.deepEqual(errors,[]);
  console.log('OK: dense traffic stays readable in both themes at 1536/1080 px; details open only on activation and remain pinned.');
  }finally{await browser.close();if(server)await new Promise(resolve=>server.close(resolve));}

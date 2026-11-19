@@ -12,6 +12,7 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
  page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/api/**',route=>{const u=new URL(route.request().url());let body=u.pathname==='/api/backbone'?fixture.config:u.pathname==='/api/dashboard'?fixture.data:u.pathname.endsWith('/history')?[]:{};return route.fulfill({json:body});});
  try{
+ const mapAction=async action=>{await page.locator('.backbone-scroll').click({button:'right',position:{x:80,y:80}});await page.locator(`[data-map-action="${action}"]`).click();};
  async function auditColors(label){
   await page.waitForTimeout(220);
   const failures=await page.evaluate(()=>{
@@ -50,7 +51,7 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
   await page.waitForFunction(w=>document.querySelector('#backbone-map').getBoundingClientRect().width>w,before);
   const after=(await map.boundingBox()).width;assert(after>before,'Scroll amplia');
   await page.mouse.wheel(0,240);await page.waitForTimeout(120);assert((await map.boundingBox()).width<after,'Scroll reduz');
-  await page.locator('#backbone-fit').click();
+  await mapAction('fit');
   await auditColors(`${theme}/backbone`);
   if(process.env.UI_SCREENSHOTS)await page.screenshot({path:process.env.UI_SCREENSHOTS+'/'+theme+'-map.png'});
   await page.reload();await page.waitForFunction(t=>document.documentElement.dataset.theme===t,theme);
@@ -112,6 +113,7 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
    const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1);
    assert(!overflow,`${theme}/${tab}: no page overflow on mobile`);
   }
+  await page.keyboard.press('Escape');
  }
  assert.deepEqual(errors,[],'Nenhum erro JavaScript');
  console.log('OK: themes persist, map/wheel controls, bold names and city filter only on Datacoms; radio/BBU card grids remain unchanged.');

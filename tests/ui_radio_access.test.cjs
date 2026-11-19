@@ -12,6 +12,7 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
  page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/api/**',route=>{const u=new URL(route.request().url());let body=u.pathname==='/api/backbone'?fixture.config:u.pathname==='/api/dashboard'?fixture.data:u.pathname.endsWith('/history')?[]:{};return route.fulfill({json:body});});
  try{
+ const mapAction=async action=>{await page.locator('.backbone-scroll').click({button:'right',position:{x:80,y:80}});await page.locator(`[data-map-action="${action}"]`).click();};
  const now=new Date().toISOString(),coari=fixture.data.devices.find(d=>d.host==='10.200.9.1'),claro=fixture.data.devices.find(d=>d.host==='10.200.19.1');
  const configure=(device,family,number,state='up')=>{
   const name='1/1/'+number;let port=device.port_data.find(p=>p.name===name&&p.interface_type===family);
@@ -45,7 +46,7 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
  claro.ssh_error=null;source1.state='down';source2.checked_at=new Date(Date.now()-100000).toISOString();await refresh();await expectStatus(1,'source',8,'down');await expectStatus(2,'source',9,'unknown');
  source1.state='up';source2.checked_at=new Date().toISOString();await refresh();
  for(const theme of ['light','dark']){
-  await page.selectOption('#theme-select',theme);
+  if(await page.locator('html').getAttribute('data-theme')!==theme)await mapAction('theme');
   await expectStatus(1,'source',8,'up');await expectStatus(1,'target',7,'up');
  }
  await group(1,'target').focus();await page.keyboard.press('Enter');
