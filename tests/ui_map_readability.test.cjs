@@ -25,9 +25,11 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
  assert.equal(await page.locator('#backbone-ospf .ospf-legend-item').count(),3);
  assert(!(await page.locator('#backbone-ospf').innerText()).includes('10.200.'),'Footer status remains compact');
  assert(await page.locator('.backbone-toolbar').isHidden(),'No controls above the map');
- assert(await page.locator('.backbone-footer').isHidden(),'No footer around the map');
+ assert(await page.locator('#backbone-ospf').isVisible(),'OSPF is visible below the map');
+ for(const selector of ['.backbone-legend','#backbone-summary','.backbone-help'])assert(await page.locator(selector).isHidden());
  const canvas=await page.locator('.backbone-scroll').boundingBox();
- assert(Math.abs(canvas.x)<1&&Math.abs(canvas.y)<1&&Math.abs(canvas.height-1000)<1,'Map fills the viewport');
+ const footer=await page.locator('.backbone-footer').boundingBox();
+ assert(Math.abs(canvas.x)<1&&Math.abs(canvas.y)<1&&Math.abs(canvas.height+footer.height-1000)<1,'Map fills the space above OSPF');
  const collisions=()=>page.evaluate(()=>{
   const visible=e=>getComputedStyle(e).display!=='none'&&getComputedStyle(e).visibility!=='hidden';
   const summaries=[...document.querySelectorAll('.fiber-caption')].filter(visible);

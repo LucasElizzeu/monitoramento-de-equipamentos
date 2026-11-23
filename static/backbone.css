@@ -151,8 +151,8 @@ body[data-view=backbone] .backbone-scroll{background:var(--inset);border-color:v
 .backbone-info .backbone-dismiss{position:absolute;right:8px;top:8px;min-height:32px;min-width:32px}
 .backbone-info>div>p{margin:6px 0}
 
-/* The map screen shows only its canvas; tools appear on explicit right-click. */
-body[data-layout][data-view=backbone] :is(.sidebar,.topbar,.backbone-toolbar,.backbone-footer,.page-heading,#reading-banner){display:none}
+/* The map screen keeps only the canvas and compact OSPF states visible. */
+body[data-layout][data-view=backbone] :is(.sidebar,.topbar,.backbone-toolbar,.page-heading,#reading-banner){display:none}
 body[data-layout][data-view=backbone][data-sidebar] .app-shell{margin:0;width:100%}
 body[data-layout][data-view=backbone][data-sidebar] main{height:100dvh;max-width:none;width:100%;padding:0;overflow:hidden}
 body[data-layout][data-view=backbone] #backbone-section{margin:0;min-height:0;height:100%;width:100%}
@@ -162,3 +162,7 @@ body[data-layout][data-view=backbone] #connection-error{position:fixed;top:8px;r
 .map-context-menu button{display:block;width:100%;min-height:36px;padding:8px 12px;text-align:left;border:0;border-radius:6px;background:transparent;color:var(--ink);font:inherit;font-size:12px;cursor:pointer}
 .map-context-menu button:hover,.map-context-menu button:focus-visible{background:var(--raised);outline-color:var(--accent)}
 .map-context-menu button:last-child{margin-top:4px;border-top:1px solid var(--line);border-top-left-radius:0;border-top-right-radius:0}
+
+/* Restore only the OSPF row; navigation, controls and other footer information stay hidden. */
+body[data-layout][data-view=backbone] .backbone-footer{display:flex;justify-content:flex-end;flex-shrink:0;padding:6px 12px;min-height:28px;gap:0;border-top:1px solid var(--line);background:var(--surface)}
+body[data-layout][data-view=backbone] .backbone-footer>:not(#backbone-ospf){display:none}

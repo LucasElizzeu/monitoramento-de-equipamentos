@@ -417,7 +417,7 @@ O mapa ocupa toda a largura disponível. **Ajustar à largura** preserva essa es
 
 No celular, o desenho inicia ampliado para navegação por arraste; o botão Ajustar à largura permite escolher uma visão geral menor quando desejado.
 
-A tela do backbone mostra somente o mapa, ocupando toda a janela. Cabeçalho, menu lateral, barra de controles e rodapé ficam ocultos nessa tela. As outras abas mantêm sua navegação normal. O botão direito (ou toque prolongado no celular) abre opções de ajuste, leituras, tema e retorno ao painel. Esc fecha primeiro um menu ou painel de detalhes aberto; se nenhum estiver aberto, retorna à tela anterior.
+A tela do backbone mostra o mapa ocupando a janela, com somente os indicadores OSPF em uma faixa compacta abaixo dele. Cabeçalho, menu lateral, barra de controles, legenda de cores, contagens e ajuda ficam ocultos nessa tela. As outras abas mantêm sua navegação normal. O botão direito (ou toque prolongado no celular) abre opções de ajuste, leituras, tema e retorno ao painel. Esc fecha primeiro um menu ou painel de detalhes aberto; se nenhum estiver aberto, retorna à tela anterior.
 
 A INFOVIA Coari → Escritório Tefé sai da Ten 1/1/7 de Coari e chega espelhada na Ten 1/1/4 do Escritório. Essa chegada é compartilhada com a INFOVIA de Manaus e está identificada nos detalhes dos dois enlaces. A leitura de chegada não representa banda exclusiva de cada transporte; o modo Tráfego continua exibindo a porta de origem de cada rota.
 
@@ -447,7 +447,7 @@ Os pares Router ID/endereço confirmados na tabela do Escritório são:
 | INFOVIA Coari | `10.200.9.1` | `10.10.20.1` |
 | INFOVIA Tabatinga | `10.200.30.1` | `10.10.20.10` |
 
-O monitoramento mantém o estado dos três vizinhos; o rodapé fica oculto na tela exclusiva do mapa; as INFOVIAs Manaus e Coari também exibem OSPF nos detalhes abertos por clique. A consulta OSPF de Tabatinga não cria uma nova fibra física no desenho. A indicação de OSPF é independente da cor/estado das portas: somente uma leitura atual do vizinho correspondente em **Full** fica verde. Outros estados e vizinho ausente de uma tabela válida ficam vermelhos. Erro de SSH, resposta inválida, desconexão do painel ou leitura com mais de 90 segundos ficam indisponíveis, sem gerar uma falsa queda de adjacência.
+O rodapé mostra somente o estado OSPF dos três vizinhos, Manaus, Coari e Tabatinga; as INFOVIAs Manaus e Coari também exibem OSPF nos detalhes abertos por clique. A consulta OSPF de Tabatinga não cria uma nova fibra física no desenho. A indicação de OSPF é independente da cor/estado das portas: somente uma leitura atual do vizinho correspondente em **Full** fica verde. Outros estados e vizinho ausente de uma tabela válida ficam vermelhos. Erro de SSH, resposta inválida, desconexão do painel ou leitura com mais de 90 segundos ficam indisponíveis, sem gerar uma falsa queda de adjacência.
 
 As transições para fora de Full e a recuperação entram no histórico de alertas. Uma primeira consulta válida já sem o vizinho também gera alerta; consultas com erro não alteram o último estado conhecido para fins de recuperação. Notificações Telegram usam a opção existente **Circuitos**, quando habilitada pelo operador. Uma queda mantida não repete o alerta a cada consulta. Os vínculos esperados e o comando ficam em `ospf.py`. Os testes usam saídas simuladas; a primeira coleta no ambiente da rede deve confirmar suporte ao comando e os três estados reais.
 
@@ -479,7 +479,7 @@ O mapa apresenta um único resumo de tráfego por fibra e por enlace de rádio. 
 `node tests/map_labels.test.cjs` verifica a reserva de espaço para legendas. `node tests/ui_map_readability.test.cjs` usa tráfego sintético preenchido em todos os enlaces, verifica colisões entre textos nos dois temas e em duas larguras de tela e testa a abertura somente por ativação explícita. Nenhum teste consulta os equipamentos reais.
 
 
-Na tela exclusiva do mapa, os indicadores do rodapé também ficam ocultos. O OSPF continua sendo coletado e aparece nos detalhes das INFOVIAs abertas por clique.
+Na tela exclusiva do mapa, somente os indicadores OSPF permanecem visíveis no rodapé. Legendas de cores, contagens e ajuda continuam ocultas. O OSPF também aparece nos detalhes das INFOVIAs abertas por clique.
 
 
 `node tests/ui_radio_access.test.cjs` verifica os vínculos Coari–CLARO no navegador com dados sintéticos: Giga 7/8 na Rede 1, Giga 5/6 na Rede 2 e Ten 8/9 em Coari. O teste cobre cores por porta, interfaces Gigabit/Ten com o mesmo número, ping de rádio independente, leitura desatualizada e falha SSH, nos dois temas.

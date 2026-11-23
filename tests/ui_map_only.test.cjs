@@ -22,9 +22,15 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
  await page.locator('[data-page="backbone"]').click();await page.waitForSelector('.backbone-node');
  for(const size of [{width:1536,height:900},{width:390,height:844}]){
   await page.setViewportSize(size);await page.waitForTimeout(100);
-  for(const selector of ['.sidebar','.topbar','.backbone-toolbar','.backbone-footer'])assert(await page.locator(selector).isHidden(),selector+' is hidden on the map screen');
+  for(const selector of ['.sidebar','.topbar','.backbone-toolbar'])assert(await page.locator(selector).isHidden(),selector+' is hidden on the map screen');
+  assert(await page.locator('#backbone-ospf').isVisible(),'Only OSPF indicators return below the map');
+  for(const selector of ['.backbone-legend','#backbone-summary','.backbone-help'])assert(await page.locator(selector).isHidden(),selector+' remains hidden');
+  assert.equal(await page.locator('#backbone-ospf .ospf-legend-item').count(),3);
+  for(const city of ['Manaus','Coari','Tabatinga'])assert((await page.locator('#backbone-ospf').innerText()).includes(city));
   const box=await page.locator('.backbone-scroll').boundingBox();assert(Math.abs(box.x)<1&&Math.abs(box.y)<1,'Canvas starts at the viewport origin: '+JSON.stringify(box));
-  assert(Math.abs(box.width-size.width)<1&&Math.abs(box.height-size.height)<1,'Map fills the viewport');
+  const footer=await page.locator('.backbone-footer').boundingBox();
+  assert(Math.abs(box.width-size.width)<1&&Math.abs(box.height+footer.height-size.height)<1,'Map and compact OSPF row fill the viewport');
+  assert(footer.y>=box.y+box.height-1,'OSPF remains below the canvas');
   assert(await page.locator('#backbone-context-menu').isHidden(),'No menu overlays the map by default');
  }
  await page.setViewportSize({width:1536,height:900});
@@ -47,6 +53,6 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
  await page.locator('.backbone-scroll').dispatchEvent('pointerup',{pointerId:55,pointerType:'touch',button:0,clientX:80,clientY:180});
  await page.locator('[data-map-action="back"]').click();assert.equal(await page.locator('body').getAttribute('data-view'),'datacoms','Long press opens a way back on touch devices');
  assert.deepEqual(errors,[]);
- console.log('OK: map-only screen fills desktop/mobile viewport, supports wheel/click, and restores navigation with Escape or the context menu.');
+ console.log('OK: map and OSPF-only row fill desktop/mobile viewport, supports wheel/click, and restores navigation with Escape or the context menu.');
  }finally{await browser.close();if(server)await new Promise(resolve=>server.close(resolve));}
 })().catch(e=>{console.error(e);process.exitCode=1;});
